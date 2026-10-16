@@ -3,6 +3,7 @@
 // are as stored in the font; only dates, versions, text and flags-as-boolean
 // are interpreted.
 #include <cstdio>
+#include <optional>
 
 #include "internal.h"
 #include "reader.h"
@@ -20,9 +21,11 @@ double version16Dot16(const Reader& r, size_t offset) {
   return r.u16(offset) + ((minor & 0x0FFF) == 0 ? (minor >> 12) / 10.0 : minor / 65536.0);
 }
 
-// Seconds since 1904-01-01 00:00 UTC -> "YYYY-MM-DDTHH:MM:SSZ". Years outside
-// 0000-9999 (a garbage timestamp) use ISO 8601's signed six-digit year.
-std::string isoFromLongDateTime(int64_t seconds) {
+// Seconds since 1904-01-01 00:00 UTC -> "YYYY-MM-DDTHH:MM:SSZ". The conversion
+// is literal; a result whose year is outside 0001-9999 (a garbage timestamp, or
+// a Unix timestamp the font wrote by mistake) has no four-digit form and gives
+// nullopt, so the date is left out instead of being reported as something odd.
+std::optional<std::string> isoFromLongDateTime(int64_t seconds) {
   constexpr int64_t kSecondsPerDay = 86400;
   constexpr int64_t kDaysFrom1904To1970 = 24107;
   int64_t days = seconds / kSecondsPerDay;
@@ -44,17 +47,14 @@ std::string isoFromLongDateTime(int64_t seconds) {
   const int month = int(mp < 10 ? mp + 3 : mp - 9);
   const int64_t year = yearOfEra + era * 400 + (month <= 2 ? 1 : 0);
 
-  char text[48];
+  if (year < 1 || year > 9999) return std::nullopt;
+
+  char text[32];
   const int hour = int(secondOfDay / 3600);
   const int minute = int(secondOfDay % 3600 / 60);
   const int second = int(secondOfDay % 60);
-  if (year >= 0 && year <= 9999) {
-    std::snprintf(text, sizeof text, "%04d-%02d-%02dT%02d:%02d:%02dZ", int(year), month, day, hour, minute, second);
-  } else {
-    std::snprintf(text, sizeof text, "%c%06lld-%02d-%02dT%02d:%02d:%02dZ", year < 0 ? '-' : '+',
-                  static_cast<long long>(year < 0 ? -year : year), month, day, hour, minute, second);
-  }
-  return text;
+  std::snprintf(text, sizeof text, "%04d-%02d-%02dT%02d:%02d:%02dZ", int(year), month, day, hour, minute, second);
+  return std::string(text);
 }
 
 // Latin-1 so that every byte survives as a valid UTF-8 character.
@@ -76,10 +76,10 @@ Value headToValue(std::span<const uint8_t> table) {
   v.set("version", version16Dot16(r, 0))
       .set("fontRevision", r.fixed(4))
       .set("flags", r.u16(16))
-      .set("unitsPerEm", r.u16(18))
-      .set("created", isoFromLongDateTime(r.i64(20)))
-      .set("modified", isoFromLongDateTime(r.i64(28)))
-      .set("boundingBox", std::move(boundingBox))
+      .set("unitsPerEm", r.u16(18));
+  if (const auto created = isoFromLongDateTime(r.i64(20))) v.set("created", *created);
+  if (const auto modified = isoFromLongDateTime(r.i64(28))) v.set("modified", *modified);
+  v.set("boundingBox", std::move(boundingBox))
       .set("macStyle", r.u16(44))
       .set("lowestRecPPEM", r.u16(46))
       .set("fontDirectionHint", r.i16(48))

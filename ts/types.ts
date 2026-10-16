@@ -158,10 +158,10 @@ export interface HeadTable {
   fontRevision: number
   flags: number
   unitsPerEm: number
-  /** ISO 8601 (UTC). */
-  created: string
-  /** ISO 8601 (UTC). */
-  modified: string
+  /** ISO 8601 (UTC), converted from the stored LONGDATETIME as it is. Absent when the year falls outside 0001-9999. */
+  created?: string
+  /** ISO 8601 (UTC), same rule as `created`. */
+  modified?: string
   /** [xMin, yMin, xMax, yMax] */
   boundingBox: [number, number, number, number]
   macStyle: number

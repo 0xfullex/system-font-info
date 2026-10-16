@@ -54,9 +54,9 @@ Records stay in table order and nothing is merged. For each record:
   plus the top hex digit of the minor word as tenths (`0x00011000` is 1.1).
   A minor word that is not of that form is read as a fraction of 65536.
 - `head.created` / `modified`: LONGDATETIME (signed seconds since
-  1904-01-01 UTC) as `YYYY-MM-DDTHH:MM:SSZ`; a year outside 0000-9999 uses
-  ISO 8601's signed six-digit year. The value is converted as stored, even
-  when the font evidently wrote a Unix timestamp.
+  1904-01-01 UTC) as `YYYY-MM-DDTHH:MM:SSZ`. The value is converted as stored,
+  even when the font evidently wrote a Unix timestamp; there is no guessing.
+  A date whose year falls outside 0001-9999 is left out of `head`.
 - `os2`: a field group of a newer version is read only when the table is long
   enough to hold all of it. Optical sizes are TWIPs / 20, in points.
   `vendorId` is the four bytes as stored, each byte as the same code point.
