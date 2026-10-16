@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <vector>
 
 #include "../../core/value.h"
@@ -15,11 +16,15 @@ namespace sfi::platform::darwin {
 struct PlatformValueInput {
   CTFontDescriptorRef descriptor;
   CTFontRef font;  // null when CoreText created another font than the descriptor names
+  const Value* features;  // from readFeatures; null leaves `features` out
   const Traits& traits;
   const AppKitMember* appKitMember;  // null when AppKit does not list the face
   bool withMetrics;
   const std::vector<ShadowedFile>& shadowed;
 };
+
+// The features of the font with their names (CTFontCopyFeatures); nullopt when CoreText has none.
+std::optional<Value> readFeatures(CTFontRef font);
 
 Value makePlatformValue(const PlatformValueInput& input);
 

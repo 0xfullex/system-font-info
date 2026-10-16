@@ -61,10 +61,14 @@ class FaceReader {
   TableSource tablesFromFile(const std::string& path, const std::string& postscriptName);
   std::optional<uint32_t> faceIndexInFile(const std::string& path, const std::vector<uint32_t>& tags, CTFontRef font);
   FileFaces& fileFaces(const std::string& path);
+  std::optional<Value> featuresOf(CTFontRef font, const std::optional<FileLocation>& file);
 
   EnumerateOptions options_;
   std::map<std::string, FileFaces> files_;
   std::map<std::pair<std::string, uint32_t>, std::shared_ptr<const Resource>> resources_;
+  // CTFontCopyFeatures per font resource: it is the most expensive call per
+  // face, and the named instances of one variable font report the same list.
+  std::map<std::pair<std::string, uint32_t>, std::optional<Value>> features_;
 };
 
 }  // namespace sfi::platform::darwin

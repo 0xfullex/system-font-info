@@ -60,19 +60,6 @@ Value featureValue(CFDictionaryRef feature) {
   return out;
 }
 
-// The features of the font with their names. CTFontCopyFeatures is used and
-// not kCTFontFeaturesAttribute because the attribute lists only identifiers;
-// the names come from the font itself, in the language of the process.
-std::optional<Value> featuresValue(CTFontRef font) {
-  const Ref<CFArrayRef> features(CTFontCopyFeatures(font));
-  if (!features) return std::nullopt;
-  Value out = Value::array();
-  for (CFIndex i = 0; i < CFArrayGetCount(features.get()); ++i) {
-    if (CFDictionaryRef feature = asDictionary(CFArrayGetValueAtIndex(features.get(), i))) out.push(featureValue(feature));
-  }
-  return out;
-}
-
 // CTFont reports lengths in points at the size the font was created with;
 // font units are what the font file stores.
 Value metricsValue(CTFontRef font) {
@@ -110,6 +97,19 @@ Value shadowedValue(const std::vector<ShadowedFile>& shadowed) {
 
 }  // namespace
 
+// The features of the font with their names. CTFontCopyFeatures is used and
+// not kCTFontFeaturesAttribute because the attribute lists only identifiers;
+// the names come from the font itself, in the language of the process.
+std::optional<Value> readFeatures(CTFontRef font) {
+  const Ref<CFArrayRef> features(CTFontCopyFeatures(font));
+  if (!features) return std::nullopt;
+  Value out = Value::array();
+  for (CFIndex i = 0; i < CFArrayGetCount(features.get()); ++i) {
+    if (CFDictionaryRef feature = asDictionary(CFArrayGetValueAtIndex(features.get(), i))) out.push(featureValue(feature));
+  }
+  return out;
+}
+
 Value makePlatformValue(const PlatformValueInput& input) {
   CTFontDescriptorRef descriptor = input.descriptor;
 
@@ -129,9 +129,7 @@ Value makePlatformValue(const PlatformValueInput& input) {
   out.set("localizedFamilyName", localizedAttribute(descriptor, kCTFontFamilyNameAttribute));
   out.set("localizedStyleName", localizedAttribute(descriptor, kCTFontStyleNameAttribute));
   if (const auto advance = numberValue(copyAttribute(descriptor, kCTFontFixedAdvanceAttribute).get())) out.set("fixedAdvance", *advance);
-  if (input.font) {
-    if (auto features = featuresValue(input.font)) out.set("features", std::move(*features));
-  }
+  if (input.features) out.set("features", *input.features);
   if (input.appKitMember) {
     out.set("appKitWeight", input.appKitMember->weight);
     out.set("appKitTraits", static_cast<double>(input.appKitMember->traits));

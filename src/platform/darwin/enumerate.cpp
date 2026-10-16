@@ -30,9 +30,9 @@ struct Group {
 };
 
 Ref<CFArrayRef> copyCollectionDescriptors() {
-  const void* keys[] = {kCTFontCollectionRemoveDuplicatesOption, kCTFontCollectionIncludeDisabledFontsOption};
-  const void* values[] = {kCFBooleanTrue, kCFBooleanTrue};
-  const Ref<CFDictionaryRef> options(CFDictionaryCreate(kCFAllocatorDefault, keys, values, 2, &kCFTypeDictionaryKeyCallBacks,
+  const void* keys[] = {kCTFontCollectionIncludeDisabledFontsOption};
+  const void* values[] = {kCFBooleanTrue};
+  const Ref<CFDictionaryRef> options(CFDictionaryCreate(kCFAllocatorDefault, keys, values, 1, &kCFTypeDictionaryKeyCallBacks,
                                                         &kCFTypeDictionaryValueCallBacks));
   const Ref<CTFontCollectionRef> collection(CTFontCollectionCreateFromAvailableFonts(options.get()));
   if (!collection) throw std::runtime_error("system-font-info: CoreText cannot create the font collection");

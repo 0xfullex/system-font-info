@@ -142,6 +142,14 @@ std::shared_ptr<const FaceReader::Resource> FaceReader::loadResource(const Table
   return resource;
 }
 
+std::optional<Value> FaceReader::featuresOf(CTFontRef font, const std::optional<FileLocation>& file) {
+  if (!file || !file->index) return readFeatures(font);
+  const auto key = std::make_pair(file->path, *file->index);
+  const auto cached = features_.find(key);
+  if (cached != features_.end()) return cached->second;
+  return features_.emplace(key, readFeatures(font)).first->second;
+}
+
 Face FaceReader::read(CTFontDescriptorRef descriptor, const std::vector<ShadowedFile>& shadowed,
                       const AppKitMember* appKitMember) {
   Face face;
@@ -205,8 +213,10 @@ Face FaceReader::read(CTFontDescriptorRef descriptor, const std::vector<Shadowed
 
   if (options_.coverage) face.coverage = coverageRanges(descriptor);
 
-  face.platform = makePlatformValue(
-      {descriptor, substituted ? nullptr : font.get(), traits, appKitMember, options_.tables, shadowed});
+  // Only a CTFont provides the features and the metrics.
+  const std::optional<Value> features = substituted ? std::nullopt : featuresOf(font.get(), face.file);
+  face.platform = makePlatformValue({descriptor, substituted ? nullptr : font.get(), features ? &*features : nullptr, traits,
+                                     appKitMember, options_.tables, shadowed});
   return face;
 }
 

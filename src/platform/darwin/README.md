@@ -21,8 +21,9 @@ The macOS backend: CoreText for everything, one small AppKit file
 
 ## One face per PostScript name
 
-`CTFontCollectionCreateFromAvailableFonts` (with duplicates removed and
-disabled fonts included) lists a font once for each file that provides it.
+`CTFontCollectionCreateFromAvailableFonts` (disabled fonts included, CoreText's
+own duplicate removal left off: the grouping below does that work) lists a font
+once for each file that provides it.
 A system update can leave two files with the same PostScript name: on current
 macOS the static `PingFang.ttc` from the font assets and the variable
 `PingFangUI.ttc` of the private FontServices framework. Everything that takes a
@@ -83,7 +84,8 @@ worker thread has none.
   number byte and bitmap for every further plane).
 - `platform`: see `ts/types.ts` (`DarwinNative`) for the meaning of each key.
   `features` come from `CTFontCopyFeatures` because the attribute carries
-  identifiers without names. `metrics` are CoreText's lengths scaled from the
+  identifiers without names; the call is made once per font resource (the
+  named instances of a variable font report the same list). `metrics` are CoreText's lengths scaled from the
   creation size to font units (the slant angle is in degrees and is not
   scaled); they are attached only when `tables` is on.
 
