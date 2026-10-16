@@ -168,7 +168,7 @@ class Converter {
     if (f.file) {
       auto file = Napi::Object::New(env_);
       file.Set("path", Napi::String::New(env_, f.file->path));
-      file.Set("index", Napi::Number::New(env_, f.file->index));
+      if (f.file->index) file.Set("index", Napi::Number::New(env_, *f.file->index));
       out.Set("file", file);
     }
 

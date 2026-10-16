@@ -54,11 +54,6 @@ LocalizedStrings coreTextFullName(CTFontRef font) {
   return {{languageTag(language), toUtf8(name.get())}};
 }
 
-[[noreturn]] void failFaceIndex(const std::string& path, const std::string& postscriptName, const char* reason) {
-  throw std::runtime_error("system-font-info: cannot tell which face of " + path + " is " + postscriptName + ": " +
-                           reason);
-}
-
 }  // namespace
 
 FaceReader::FileFaces& FaceReader::fileFaces(const std::string& path) {
@@ -76,32 +71,31 @@ FaceReader::FileFaces& FaceReader::fileFaces(const std::string& path) {
 
 // CoreText does not say which face of a collection a font is. Two faces of a
 // collection are never the same font, and a font's `name` table names it, so
-// the face is the one whose `name` table equals the font's.
-uint32_t FaceReader::faceIndexInFile(const std::string& path, const std::vector<uint32_t>& tags, CTFontRef font,
-                                     const std::string& postscriptName) {
+// the face is the one whose `name` table equals the font's. Unset when that
+// does not single out a face, or when the file is one the sfnt reader cannot
+// open and the font is nevertheless an sfnt (a .dfont suitcase can hold several).
+std::optional<uint32_t> FaceReader::faceIndexInFile(const std::string& path, const std::vector<uint32_t>& tags,
+                                                    CTFontRef font) {
   const FileFaces& faces = fileFaces(path);
-  if (!faces.file) {
-    if (tags.empty()) return 0;  // not an sfnt, so not a collection
-    failFaceIndex(path, postscriptName, "the file cannot be read as an sfnt");
-  }
+  if (!faces.file) return tags.empty() ? std::make_optional(0u) : std::nullopt;  // no tables: not an sfnt, so not a collection
   if (faces.file->faceCount() <= 1) return 0;
 
   const auto name = copyTable(font, sfnt::makeTag("name"));
-  if (!name) failFaceIndex(path, postscriptName, "the font has no name table");
-  std::vector<uint32_t> candidates;
+  if (!name) return std::nullopt;
+  std::optional<uint32_t> found;
   for (size_t i = 0; i < faces.nameTables.size(); ++i) {
-    if (faces.nameTables[i] == *name) candidates.push_back(static_cast<uint32_t>(i));
+    if (faces.nameTables[i] != *name) continue;
+    if (found) return std::nullopt;
+    found = static_cast<uint32_t>(i);
   }
-  if (candidates.size() != 1) {
-    failFaceIndex(path, postscriptName, candidates.empty() ? "no face has the same name table" : "several faces have the same name table");
-  }
-  return candidates.front();
+  return found;
 }
 
 std::shared_ptr<const FaceReader::Resource> FaceReader::loadResource(CTFontRef font, CTFontDescriptorRef descriptor,
                                                                      const std::vector<uint32_t>& tags,
                                                                      const std::optional<FileLocation>& file) {
-  const auto key = file ? std::make_optional(std::make_pair(file->path, file->index)) : std::nullopt;
+  // Faces of a file are told apart by their index; without one nothing is shared.
+  const auto key = file && file->index ? std::make_optional(std::make_pair(file->path, *file->index)) : std::nullopt;
   if (key) {
     const auto cached = resources_.find(*key);
     if (cached != resources_.end()) return cached->second;
@@ -127,7 +121,7 @@ Face FaceReader::read(CTFontDescriptorRef descriptor, const std::vector<Shadowed
   // ---- file, tables
   const std::vector<uint32_t> tags = availableTags(font.get());
   const std::string path = filePath(copyAttribute(descriptor, kCTFontURLAttribute).get());
-  if (!path.empty()) face.file = FileLocation{path, faceIndexInFile(path, tags, font.get(), face.postscriptName)};
+  if (!path.empty()) face.file = FileLocation{path, faceIndexInFile(path, tags, font.get())};
   const auto resource = loadResource(font.get(), descriptor, tags, face.file);
   const sfnt::FontTables& tables = resource->tables;
   if (options_.tables && !tags.empty()) face.opentype = tables.opentype;

@@ -75,8 +75,8 @@ export interface FontFace {
   /** Absent for fonts that do not come from a file. */
   file?: {
     path: string
-    /** Face index inside a collection (TTC/OTC); 0 for a single-font file. */
-    index: number
+    /** Face index inside a collection (TTC/OTC); 0 for a single-font file. Absent when the platform cannot tell which face of the file this is. */
+    index?: number
   }
 
   // ---- variations

@@ -72,8 +72,11 @@ worker thread has none.
 - `file.path`: `kCTFontURLAttribute`. `file.index`: CoreText does not say which
   face of a collection a font is, so it is the face whose `name` table equals
   the font's `name` table (the collection is read through `sfnt::FontFile`, once
-  per file). A collection face that cannot be told apart makes the enumeration
-  throw with the font and file named, never guess an index.
+  per file). A collection face that cannot be told apart, and an sfnt font in
+  a file the reader cannot open (a `.dfont`), get no `file.index`: it is
+  omitted, never guessed. A font without tables (not an sfnt) is a single-face
+  file and has index 0. A face without an index shares no `opentype` or axes
+  with other faces, because the font resource is keyed by file and index.
 - `coverage`: `kCTFontCharacterSetAttribute` through
   `CFCharacterSetCreateBitmapRepresentation` (the BMP bitmap, then a plane
   number byte and bitmap for every further plane).

@@ -42,7 +42,9 @@ using SharedAxes = std::shared_ptr<const std::vector<VariationAxis>>;
 
 struct FileLocation {
   std::string path;    // UTF-8
-  uint32_t index = 0;  // face index inside a collection; 0 for a single-font file
+  // Face index inside a collection; 0 for a single-font file. Unset when the
+  // platform cannot tell which face of the file this is.
+  std::optional<uint32_t> index;
 };
 
 enum class Style { Normal, Italic, Oblique };

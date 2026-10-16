@@ -51,8 +51,7 @@ class FaceReader {
   std::shared_ptr<const Resource> loadResource(CTFontRef font, CTFontDescriptorRef descriptor,
                                                const std::vector<uint32_t>& tags,
                                                const std::optional<FileLocation>& file);
-  uint32_t faceIndexInFile(const std::string& path, const std::vector<uint32_t>& tags, CTFontRef font,
-                           const std::string& postscriptName);
+  std::optional<uint32_t> faceIndexInFile(const std::string& path, const std::vector<uint32_t>& tags, CTFontRef font);
   FileFaces& fileFaces(const std::string& path);
 
   EnumerateOptions options_;
