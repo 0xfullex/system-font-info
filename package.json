@@ -1,0 +1,65 @@
+{
+  "name": "system-font-info",
+  "version": "0.0.0",
+  "description": "List installed system fonts with full metadata (localized names, supported languages, variable axes and named instances) through CoreText, DirectWrite and fontconfig. Prebuilt Node-API addon, no install-time compilation.",
+  "license": "MIT",
+  "author": "fullex",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/0xfullex/system-font-info.git"
+  },
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/",
+    "prebuilds/",
+    "README.md",
+    "LICENSE"
+  ],
+  "gypfile": false,
+  "os": [
+    "darwin",
+    "win32",
+    "linux"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build:native": "node-gyp rebuild",
+    "build:native:debug": "node-gyp rebuild --debug",
+    "build:ts": "tsc -p tsconfig.json",
+    "build": "npm run build:native && npm run build:ts",
+    "test": "node --test test/",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "copy-prebuild": "node scripts/copy-prebuild.mjs"
+  },
+  "keywords": [
+    "fonts",
+    "system-fonts",
+    "font-list",
+    "installed-fonts",
+    "localized",
+    "variable-fonts",
+    "coretext",
+    "directwrite",
+    "fontconfig",
+    "native",
+    "napi",
+    "node-addon",
+    "electron"
+  ],
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "node-addon-api": "^8.9.2",
+    "node-gyp": "^13.1.0",
+    "typescript": "^7.0.2"
+  }
+}
