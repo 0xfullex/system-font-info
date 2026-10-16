@@ -416,7 +416,7 @@ function validateResult(families, { tables, coverage }) {
         else {
           face.coverage.forEach(([start, end], r) => {
             if (!(start <= end && end <= 0x10ffff)) fail(`coverage range ${start}-${end} is invalid`)
-            if (r > 0 && !(face.coverage[r - 1][1] < start)) fail(`coverage range ${start}-${end} does not follow ${face.coverage[r - 1]}`)
+            if (r > 0 && !(face.coverage[r - 1][1] + 1 < start)) fail(`coverage range ${start}-${end} overlaps or touches ${face.coverage[r - 1]}`)
           })
         }
       } else if (face.coverage !== undefined) fail('coverage was not requested')

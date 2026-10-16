@@ -3,7 +3,10 @@
 // in them. `readFontFile` returns the native view: language tags are as the
 // reader mapped them, before the JS layer canonicalizes them.
 import assert from 'node:assert/strict'
-import { describe, test } from 'node:test'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { after, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 import { loadNative } from '../lib/native.js'
@@ -14,6 +17,7 @@ const fixture = (name) => fileURLToPath(new URL(`./fixtures/${name}`, import.met
 const variable = readFontFile(fixture('SFITest-Variable.ttf'), 0)
 const collection = [0, 1].map((index) => readFontFile(fixture('SFITest-Collection.ttc'), index))
 const symbol = readFontFile(fixture('SFITest-Symbol.ttf'), 0)
+const legacy = readFontFile(fixture('SFITest-Legacy.ttf'), 0)
 
 const records = (opentype, nameId) => opentype.names.filter((record) => record.nameId === nameId)
 const windows = (opentype, nameId, languageId) =>
@@ -193,5 +197,91 @@ describe('SFITest-Symbol.ttf', () => {
   test('declares the symbol character set in OS/2', () => {
     assert.equal(symbol.os2.codePageRanges[0], 2 ** 31)
     assert.deepEqual([symbol.os2.firstCharIndex, symbol.os2.lastCharIndex], [0xf041, 0xf042])
+  })
+})
+
+describe('SFITest-Legacy.ttf', () => {
+  const idsOn = (platformId, nameIds) =>
+    legacy.names.filter((record) => record.platformId === platformId && nameIds.includes(record.nameId))
+
+  test('has typographic names on Windows and legacy names on the Macintosh platform only', () => {
+    assert.deepEqual(
+      idsOn(3, [16, 17]).map((record) => [record.nameId, record.language, record.value]),
+      [
+        [16, 'en-US', 'SFITest Legacy'],
+        [17, 'en-US', 'Book']
+      ]
+    )
+    assert.deepEqual(idsOn(3, [1, 2]), [])
+    assert.deepEqual(idsOn(1, [16, 17]), [])
+    assert.deepEqual(
+      idsOn(1, [1, 2]).map((record) => [record.nameId, record.language]),
+      [[1, 'en'], [2, 'en'], [1, 'is'], [2, 'is'], [1, 'tr'], [2, 'tr']]
+    )
+  })
+
+  // The same bytes mean other characters in the Turkish and Icelandic Mac Roman
+  // variants than in plain Mac Roman (0xDA is Ğ in Mac Turkish, the fraction slash in Mac Roman).
+  test(
+    'decodes the Mac Roman variants of Turkish and Icelandic',
+    { skip: process.platform !== 'darwin' && 'only the macOS decoder is certain to know the encodings' },
+    () => {
+      const value = (nameId, language) => legacy.names.find((r) => r.platformId === 1 && r.nameId === nameId && r.language === language)
+      assert.equal(value(1, 'tr').value, 'Yazı Tipi Ğğ Şş İ')
+      assert.equal(value(2, 'tr').value, 'Düz')
+      assert.equal(value(1, 'is').value, 'Letur Þþ Ðð')
+      assert.equal(value(2, 'is').value, 'Venjulegt')
+      assert.ok(legacy.names.every((record) => record.bytes === undefined))
+    }
+  )
+})
+
+describe('opentype.errors', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'sfi-corrupt-'))
+  after(() => rmSync(directory, { recursive: true, force: true }))
+
+  /** Copies SFITest-Variable.ttf with the directory entry or the data of some tables damaged. */
+  function corruptedCopy(damage) {
+    const bytes = Buffer.from(readFileSync(fixture('SFITest-Variable.ttf')))
+    const tableCount = bytes.readUInt16BE(4)
+    for (let i = 0; i < tableCount; i++) {
+      const record = 12 + i * 16
+      const tag = bytes.toString('latin1', record, record + 4)
+      const offset = bytes.readUInt32BE(record + 8)
+      if (damage[tag]) damage[tag]({ bytes, record, offset })
+    }
+    const file = join(directory, `corrupt-${Object.keys(damage).join('-').replaceAll('/', '')}.ttf`)
+    writeFileSync(file, bytes)
+    return readFontFile(file, 0)
+  }
+
+  const damage = {
+    // An unknown table format.
+    name: ({ bytes, offset }) => bytes.writeUInt16BE(7, offset),
+    // A table too short for its fixed fields.
+    head: ({ bytes, record }) => bytes.writeUInt32BE(10, record + 12),
+    // A table that starts beyond the end of the file and cannot be fetched.
+    'OS/2': ({ bytes, record }) => bytes.writeUInt32BE(0x7ffffff0, record + 8)
+  }
+
+  test('lists a table that is present but cannot be parsed or fetched, and leaves it out', () => {
+    const font = corruptedCopy(damage)
+    assert.deepEqual(font.errors, ['OS/2', 'head', 'name'])
+    assert.equal(font.head, undefined)
+    assert.equal(font.os2, undefined)
+    // The other tables are still read, and every table stays in the list.
+    assert.ok(font.tables.includes('name') && font.tables.includes('head') && font.tables.includes('OS/2'))
+    assert.equal(font.maxp.numGlyphs, 8)
+    assert.equal(font.cmap.subtables.length, 3)
+  })
+
+  test('a malformed name table gives empty names, also in fvar', () => {
+    const font = corruptedCopy({ name: damage.name })
+    assert.deepEqual(font.errors, ['name'])
+    assert.deepEqual(font.names, [])
+    assert.deepEqual(font.fvar.axes[0].names, [])
+    assert.deepEqual(font.fvar.instances.map((instance) => instance.subfamilyNames), [[], [], []])
+    assert.equal(font.fvar.instances[0].postscriptName, undefined)
+    assert.equal(font.head.unitsPerEm, 1000)
   })
 })

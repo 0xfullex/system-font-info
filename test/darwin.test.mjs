@@ -28,6 +28,23 @@ describe('system fonts', { skip }, () => {
     assert.equal(pickName(family('PingFang SC').familyNames, ['zh-Hans']), '苹方-简')
   })
 
+  test('script faces without a slanted design are normal, italic faces are italic', () => {
+    const style = (familyName, postscriptName) => family(familyName).faces.find((face) => face.postscriptName === postscriptName).style
+    assert.equal(style('Zapfino', 'Zapfino'), 'normal')
+    assert.equal(style('Apple Chancery', 'Apple-Chancery'), 'normal')
+    assert.equal(style('Helvetica Neue', 'HelveticaNeue-Italic'), 'italic')
+    assert.equal(style('Helvetica Neue', 'HelveticaNeue'), 'normal')
+    // CoreText's slant trait is not what decides: it stays raw in platform.slant.
+    assert.notEqual(family('Zapfino').faces[0].platform.slant, 0)
+    assert.ok(families.every((entry) => entry.faces.every((face) => face.style !== 'oblique')))
+  })
+
+  test('Avenir lists its typographic family name, not the legacy "Avenir Book" next to it', () => {
+    const names = family('Avenir').familyNames
+    assert.ok(names.some((name) => name.value === 'Avenir'))
+    assert.ok(!names.some((name) => name.value === 'Avenir Book' && name.language.startsWith('en')))
+  })
+
   test('Skia is variable, with coordinates and named instances', () => {
     const { faces } = family('Skia')
     assert.ok(faces.every((face) => face.variable))
@@ -46,7 +63,7 @@ describe('system fonts', { skip }, () => {
 
 describe('registered test fonts', { skip }, () => {
   const { registerFont, unregisterFont } = loadNative().__testing
-  const files = ['SFITest-Variable.ttf', 'SFITest-Collection.ttc', 'SFITest-Symbol.ttf'].map(fixture)
+  const files = ['SFITest-Variable.ttf', 'SFITest-Collection.ttc', 'SFITest-Symbol.ttf', 'SFITest-Legacy.ttf'].map(fixture)
   const registered = []
   const testFamilies = async () => (await getFonts()).filter((entry) => entry.family.startsWith('SFITest'))
 
@@ -62,7 +79,7 @@ describe('registered test fonts', { skip }, () => {
 
   test('appear with process scope, localized names, collection indices and the symbol flag', async () => {
     const found = Object.fromEntries((await testFamilies()).map((entry) => [entry.family, entry]))
-    assert.deepEqual(Object.keys(found).sort(), ['SFITest Collection', 'SFITest Symbol', 'SFITest Variable'])
+    assert.deepEqual(Object.keys(found).sort(), ['SFITest Collection', 'SFITest Legacy', 'SFITest Symbol', 'SFITest Variable'])
     const faces = Object.values(found).flatMap((entry) => entry.faces)
     assert.ok(faces.length > 0)
     assert.ok(faces.every((face) => face.scope === 'process'))
@@ -93,6 +110,62 @@ describe('registered test fonts', { skip }, () => {
       faces.map((face) => face.coordinates.wght).sort((a, b) => a - b),
       [100, 400, 700]
     )
+  })
+
+  test('add legacy names only for languages the typographic names lack', async () => {
+    const { faces } = (await testFamilies()).find((entry) => entry.family === 'SFITest Legacy')
+    assert.equal(faces.length, 1)
+    const [face] = faces
+    // Windows has ID 16 and 17 in en-US; the Macintosh "en" ID 1 and 2 ("SFITest Legacy Book", "Regular")
+    // are the same language and stay out. Turkish and Icelandic are not covered, so their legacy names join.
+    assert.deepEqual(face.familyNames, [
+      { language: 'en-US', value: 'SFITest Legacy' },
+      { language: 'is', value: 'Letur Þþ Ðð' },
+      { language: 'tr', value: 'Yazı Tipi Ğğ Şş İ' }
+    ])
+    assert.deepEqual(face.styleNames, [
+      { language: 'en-US', value: 'Book' },
+      { language: 'is', value: 'Venjulegt' },
+      { language: 'tr', value: 'Düz' }
+    ])
+  })
+
+  test('keep the legacy names of a language the typographic names lack, Chinese included', async () => {
+    const variable = (await testFamilies()).find((entry) => entry.family === 'SFITest Variable')
+    const languages = variable.familyNames.map((name) => name.language)
+    // ID 16 exists on both platforms in English; every other language comes from ID 1.
+    for (const language of ['zh-CN', 'zh-Hans', 'ja-JP', 'ru-RU', 'ar-SA', 'gsw']) assert.ok(languages.includes(language), language)
+    assert.deepEqual(variable.familyNames.filter((name) => name.language.startsWith('en')).map((name) => name.language), ['en', 'en-US'])
+  })
+
+  test('compose the full names of a named instance from its family and subfamily names, per language', async () => {
+    const { faces } = (await testFamilies()).find((entry) => entry.family === 'SFITest Variable')
+    const face = (postscriptName) => faces.find((candidate) => candidate.postscriptName === postscriptName)
+    const pairs = (strings) => strings.map((entry) => [entry.language, entry.value])
+
+    // Thin and Regular have English subfamily names on both platforms.
+    assert.deepEqual(pairs(face('SFITestVariable-Thin').styleNames), [['en', 'Thin'], ['en-US', 'Thin']])
+    assert.deepEqual(pairs(face('SFITestVariable-Thin').fullNames), [
+      ['en', 'SFITest Variable Thin'],
+      ['en-US', 'SFITest Variable Thin']
+    ])
+    // "Regular" is not dropped from a name composed of ID 16 and the subfamily name.
+    assert.deepEqual(pairs(face('SFITestVariable-Regular').fullNames), [
+      ['en', 'SFITest Variable Regular'],
+      ['en-US', 'SFITest Variable Regular']
+    ])
+    // Bold also has Chinese: Macintosh zh-Hans and Windows zh-CN, each paired with the family name of its own script.
+    assert.deepEqual(pairs(face('SFITestVariable-Bold').styleNames), [['en', 'Bold'], ['zh-Hans', '粗体'], ['en-US', 'Bold'], ['zh-CN', '粗体']])
+    assert.deepEqual(pairs(face('SFITestVariable-Bold').fullNames), [
+      ['en', 'SFITest Variable Bold'],
+      ['zh-Hans', 'SFITest 变量 粗体'],
+      ['en-US', 'SFITest Variable Bold'],
+      ['zh-CN', 'SFITest 变量 粗体']
+    ])
+    // The languages that have a family name but no subfamily name (ja-JP, ru-RU, ...) get no full name.
+    assert.ok(faces.every((candidate) => candidate.fullNames.every((entry) => ['en', 'en-US', 'zh-Hans', 'zh-CN'].includes(entry.language))))
+    // CoreText's own composed string is kept for reference.
+    assert.equal(typeof face('SFITestVariable-Bold').platform.displayName, 'string')
   })
 
   test('are gone after they are unregistered', async () => {
