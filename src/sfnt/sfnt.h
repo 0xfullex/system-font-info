@@ -60,6 +60,11 @@ LocalizedStrings localizedName(const std::vector<NameRecord>& records, uint16_t 
 
 // Records of `preferred` (e.g. 16, typographic family), plus records of
 // `fallback` (e.g. 1, legacy family) in every language `preferred` lacks.
+// Two tags are the same language when their primary subtags match, so a Mac
+// "en" record of the fallback does not join a Windows "en-US" record of the
+// preferred ID. Chinese is told apart by script: "zh-Hans" and "zh-CN" and
+// "zh-SG" are one language, "zh-Hant", "zh-TW", "zh-HK" and "zh-MO" another,
+// and a plain "zh" a third.
 LocalizedStrings localizedNameWithFallback(const std::vector<NameRecord>& records, uint16_t preferred,
                                            uint16_t fallback);
 

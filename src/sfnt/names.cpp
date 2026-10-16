@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cctype>
 
 #include "internal.h"
 #include "language_tables.h"
@@ -37,6 +38,41 @@ std::optional<std::string> decodeName(const NameRecord& record, std::span<const 
   if (decodeLegacy) value = decodeLegacy(platform, encoding, record.languageId, bytes);
   if (value && value->empty()) return std::nullopt;
   return value;
+}
+
+std::string lowercase(std::string text) {
+  std::transform(text.begin(), text.end(), text.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+  return text;
+}
+
+// What "the same language" means when the legacy family and style names
+// (nameIDs 1 and 2) stand in for the typographic ones (16 and 17). The two sets
+// come from different platforms, whose tags for one language differ in their
+// region ("en" on a Mac, "en-US" on Windows), so the key is the primary subtag.
+// Chinese is the exception: Simplified and Traditional are different written
+// languages that a font names separately, so its key also carries the script:
+// an explicit Hans or Hant, else the one the region implies (CN and SG are
+// Simplified; TW, HK and MO are Traditional), else plain "zh".
+std::string languageKey(const std::string& tag) {
+  std::vector<std::string> subtags;
+  size_t start = 0;
+  while (start <= tag.size()) {
+    size_t end = tag.find_first_of("-_", start);
+    if (end == std::string::npos) end = tag.size();
+    subtags.push_back(lowercase(tag.substr(start, end - start)));
+    start = end + 1;
+  }
+  if (subtags[0] != "zh") return subtags[0];
+
+  std::string impliedByRegion;
+  for (size_t i = 1; i < subtags.size(); ++i) {
+    const std::string& subtag = subtags[i];
+    if (subtag == "hans") return "zh-Hans";
+    if (subtag == "hant") return "zh-Hant";
+    if (subtag == "cn" || subtag == "sg") impliedByRegion = "zh-Hans";
+    if (subtag == "tw" || subtag == "hk" || subtag == "mo") impliedByRegion = "zh-Hant";
+  }
+  return impliedByRegion.empty() ? "zh" : impliedByRegion;
 }
 
 }  // namespace
@@ -122,8 +158,9 @@ LocalizedStrings localizedNameWithFallback(const std::vector<NameRecord>& record
   LocalizedStrings out = localizedName(records, preferred);
   const size_t preferredCount = out.size();
   for (const LocalizedString& candidate : localizedName(records, fallback)) {
+    const std::string key = languageKey(candidate.language);
     const bool languageCovered = std::any_of(out.begin(), out.begin() + preferredCount, [&](const LocalizedString& s) {
-      return s.language == candidate.language;
+      return languageKey(s.language) == key;
     });
     if (!languageCovered) out.push_back(candidate);
   }

@@ -47,6 +47,17 @@ because merging them is the JS layer's job. For each record:
 - A record whose string lies outside the table is a `ParseError` for the whole
   table, except a zero-length one, whose offset is ignored.
 
+## Legacy fallback
+
+`localizedNameWithFallback(16, 1)` (and `17, 2`) lists the typographic records,
+then the legacy records of every language the typographic ones do not cover.
+"Same language" compares a language key: the primary subtag, so a Mac "en"
+`ID 1` record does not appear next to a Windows "en-US" `ID 16` one. Chinese is
+the exception, because its two written languages are named separately: the key
+carries the script (explicit `Hans` / `Hant`, else CN and SG mean `Hans`, TW, HK
+and MO mean `Hant`, else plain "zh"), so a CJK font that has English typographic
+names keeps its Simplified or Traditional Chinese legacy names.
+
 ## Values
 
 `readFontTables` builds the `opentype` value described by `OpenTypeInfo` in
