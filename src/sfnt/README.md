@@ -58,6 +58,21 @@ carries the script (explicit `Hans` / `Hant`, else CN and SG mean `Hans`, TW, HK
 and MO mean `Hant`, else plain "zh"), so a CJK font that has English typographic
 names keeps its Simplified or Traditional Chinese legacy names.
 
+## Named instance full names
+
+A named instance has no full-name record. `instanceFullNames` builds its names
+as the OpenType `name` specification describes name ID 4: the typographic
+family name (16, else 1, with the fallback rule above), a space, and the
+instance's subfamily name (`fvar` `subfamilyNameID`, which the `fvar`
+specification says is equivalent to name ID 17). A "Regular" subfamily is not
+dropped: the specification's elision of "Regular" concerns name ID 2 on fonts
+that are not typographically regular, and says that name ID 4 built from 16 and
+17 needs no further qualification. Each subfamily record is paired with the
+family record of its own language (the same language key as the fallback rule;
+an identical language tag first) and carries the subfamily record's language; a
+subfamily record without a family name of its language gives no full name.
+Table order is kept.
+
 ## Values
 
 `readFontTables` builds the `opentype` value described by `OpenTypeInfo` in

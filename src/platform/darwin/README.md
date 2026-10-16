@@ -100,7 +100,7 @@ the tables are read from the descriptor's file through `sfnt::FontFile`, in the
 face whose `name` table gives the descriptor's PostScript name (a face of a
 variable font whose name is only an `fvar` instance name has no such record,
 so it gets no tables), the coordinates come from the descriptor's
-`kCTFontVariationAttribute`, a named instance gets no `fullNames`, and
+`kCTFontVariationAttribute`, and
 `platform.features` and `platform.metrics` are left out because only a CTFont
 provides them. This was not observed on macOS 27; it is a guard.
 
@@ -119,8 +119,10 @@ list.
   with 2; `fullNames`: 4.
 - A named instance of a variable font has no `name` records of its own for its
   full name. Its `styleNames` are the instance's subfamily name from `fvar`, and
-  its `fullNames` the single full name CoreText composes for it
-  (`CTFontCopyLocalizedName`, language mapped to a BCP 47 tag).
+  its `fullNames` are composed from the font's own names by
+  `sfnt::instanceFullNames` (family and subfamily name in every language both
+  have). CoreText's own composed string is `platform.displayName`; it is in one
+  language and its family part is not always the font's typographic family.
 - `axes`: `kCTFontVariationAxesAttribute` (tag, range, default); the names are
   those of the `fvar` axis with the same tag, and `hidden` falls back to the
   `fvar` axis flag when CoreText's dictionary has none. `coordinates`:

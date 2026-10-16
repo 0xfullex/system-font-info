@@ -167,6 +167,24 @@ LocalizedStrings localizedNameWithFallback(const std::vector<NameRecord>& record
   return out;
 }
 
+LocalizedStrings instanceFullNames(const std::vector<NameRecord>& records, const FvarInstance& instance) {
+  const LocalizedStrings families = localizedNameWithFallback(records, 16, 1);
+  LocalizedStrings out;
+  for (const LocalizedString& subfamily : localizedName(records, instance.subfamilyNameId)) {
+    const std::string key = languageKey(subfamily.language);
+    const LocalizedString* family = nullptr;
+    for (const LocalizedString& candidate : families) {
+      if (candidate.language == subfamily.language) {
+        family = &candidate;
+        break;
+      }
+      if (!family && languageKey(candidate.language) == key) family = &candidate;
+    }
+    if (family) out.push_back({subfamily.language, family->value + " " + subfamily.value});
+  }
+  return out;
+}
+
 Value localizedStringsToValue(const LocalizedStrings& strings) {
   Value out = Value::array();
   for (const LocalizedString& s : strings) {

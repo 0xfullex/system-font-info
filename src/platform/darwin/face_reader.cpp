@@ -35,25 +35,6 @@ std::vector<uint32_t> availableTags(CTFontRef font) {
   return tags;
 }
 
-// CoreText names languages with BCP 47 tags, written with an underscore at
-// times ("zh_Hans"); the BCP 47 separator is a hyphen.
-std::string languageTag(CFStringRef language) {
-  std::string tag = toUtf8(language);
-  std::replace(tag.begin(), tag.end(), '_', '-');
-  return tag;
-}
-
-// The face's own full name as CoreText reports it, in the one language it
-// picked. Named instances of a variable font have no `name` record of their
-// own for it; CoreText composes it from the family and the instance name.
-LocalizedStrings coreTextFullName(CTFontRef font) {
-  CFStringRef language = nullptr;
-  const Ref<CFStringRef> name(CTFontCopyLocalizedName(font, kCTFontFullNameKey, &language));
-  const Ref<CFStringRef> languageOwner(language);
-  if (!name) return {};
-  return {{languageTag(language), toUtf8(name.get())}};
-}
-
 }  // namespace
 
 FaceReader::FileFaces& FaceReader::fileFaces(const std::string& path) {
@@ -207,7 +188,8 @@ Face FaceReader::read(CTFontDescriptorRef descriptor, const std::vector<Shadowed
   face.fullNames = sfnt::localizedName(tables.names, 4);
   if (face.namedInstance) {
     face.styleNames = sfnt::localizedName(tables.names, tables.fvar->instances[*face.namedInstance].subfamilyNameId);
-    face.fullNames = substituted ? LocalizedStrings{} : coreTextFullName(font.get());
+    // A named instance has no full-name record of its own; its names are composed from the family and its subfamily name.
+    face.fullNames = sfnt::instanceFullNames(tables.names, tables.fvar->instances[*face.namedInstance]);
   }
 
   if (options_.coverage) face.coverage = coverageRanges(descriptor);

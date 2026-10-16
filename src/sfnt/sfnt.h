@@ -95,6 +95,20 @@ struct Fvar {
   std::vector<FvarInstance> instances;
 };
 
+// The full names of a named instance, which has no full-name record of its
+// own: for each record of the instance's subfamily name (`subfamilyNameId`),
+// the typographic family name (nameID 16, else 1, as localizedNameWithFallback
+// reads it) in the same language, a space, and the subfamily name. This is the
+// "combination of name IDs 16 and 17" the OpenType `name` specification
+// describes for name ID 4, where the subfamily name of an instance is
+// "equivalent to name ID 17" (`fvar`); a "Regular" subfamily is not left out.
+// "Same language" is the rule of localizedNameWithFallback; a subfamily record
+// takes the family record of its own language when there is one, else the
+// first of the same language. A subfamily record without a family name of its
+// language gives no full name. The result carries the subfamily record's
+// language, in table order.
+LocalizedStrings instanceFullNames(const std::vector<NameRecord>& records, const FvarInstance& instance);
+
 // Throws ParseError on a malformed table.
 Fvar parseFvar(std::span<const uint8_t> table);
 
