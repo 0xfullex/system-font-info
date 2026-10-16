@@ -37,6 +37,7 @@
               "GCC_SYMBOLS_PRIVATE_EXTERN": "YES",
               "MACOSX_DEPLOYMENT_TARGET": "11.0",
               "OTHER_CFLAGS": [
+                "-mmacosx-version-min=11.0",
                 "-Wall",
                 "-Wextra",
                 "-Wno-unused-parameter"
