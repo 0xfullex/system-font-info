@@ -1,6 +1,7 @@
 #include <napi.h>
 
 #include <atomic>
+#include <cmath>
 #include <exception>
 #include <memory>
 #include <string>
@@ -198,7 +199,9 @@ Napi::Value readFontFile(const Napi::CallbackInfo& info) {
 
   auto file = sfnt::FontFile::open(path);
   if (!file) throw Napi::Error::New(env, "readFontFile: cannot open '" + path + "' as an sfnt font or collection");
-  if (!(requested >= 0) || requested != static_cast<size_t>(requested) || requested >= static_cast<double>(file->faceCount())) {
+  // Compared as doubles before any conversion: casting a double outside the
+  // range of size_t (or a NaN) to size_t is undefined behavior.
+  if (!(requested >= 0) || requested >= static_cast<double>(file->faceCount()) || requested != std::trunc(requested)) {
     throw Napi::RangeError::New(env, "readFontFile: face index " + info[1].ToString().Utf8Value() + " is out of range; '" + path +
                                          "' has " + std::to_string(file->faceCount()) + " face(s)");
   }
