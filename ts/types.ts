@@ -301,10 +301,6 @@ export interface DarwinNative {
     openTypeTag?: string
     selectors: Array<{ id: number; name: string; default: boolean; openTypeTag?: string; openTypeValue?: number }>
   }>
-  /** NSFontManager availableMembersOfFontFamily: weight, 0-15. */
-  appKitWeight?: number
-  /** NSFontManager availableMembersOfFontFamily: NSFontTraitMask. */
-  appKitTraits?: number
   /** CTFont metrics in font units. Present when `tables` is on (it needs a CTFont). */
   metrics?: {
     ascent: number

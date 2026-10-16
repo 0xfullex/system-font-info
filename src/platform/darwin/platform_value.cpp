@@ -130,10 +130,6 @@ Value makePlatformValue(const PlatformValueInput& input) {
   out.set("localizedStyleName", localizedAttribute(descriptor, kCTFontStyleNameAttribute));
   if (const auto advance = numberValue(copyAttribute(descriptor, kCTFontFixedAdvanceAttribute).get())) out.set("fixedAdvance", *advance);
   if (input.features) out.set("features", *input.features);
-  if (input.appKitMember) {
-    out.set("appKitWeight", input.appKitMember->weight);
-    out.set("appKitTraits", static_cast<double>(input.appKitMember->traits));
-  }
   if (input.withMetrics && input.font) out.set("metrics", metricsValue(input.font));
   if (!input.shadowed.empty()) out.set("shadowed", shadowedValue(input.shadowed));
   return out;

@@ -245,8 +245,6 @@ const darwinNative = shape(
         { openTypeTag: str }
       )
     ),
-    appKitWeight: int,
-    appKitTraits: uint,
     metrics: shape({
       ascent: num,
       descent: num,

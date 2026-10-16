@@ -27,7 +27,6 @@
                 "-framework CoreText",
                 "-framework CoreFoundation",
                 "-framework CoreGraphics",
-                "-framework AppKit",
                 "-framework Foundation"
               ]
             },

@@ -9,7 +9,6 @@
 
 #include "../../core/model.h"
 #include "../../sfnt/sfnt.h"
-#include "appkit.h"
 #include "cf.h"
 
 namespace sfi::platform::darwin {
@@ -28,10 +27,7 @@ class FaceReader {
  public:
   explicit FaceReader(const EnumerateOptions& options) : options_(options) {}
 
-  // `appKitMember` is the face's entry in NSFontManager's member list of its
-  // family, when it has one.
-  Face read(CTFontDescriptorRef descriptor, const std::vector<ShadowedFile>& shadowed,
-            const AppKitMember* appKitMember);
+  Face read(CTFontDescriptorRef descriptor, const std::vector<ShadowedFile>& shadowed);
 
  private:
   // What is shared by every face of one font resource (one face of a file, or

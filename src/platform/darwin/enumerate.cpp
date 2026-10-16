@@ -4,7 +4,7 @@
 #include <unordered_map>
 
 #include "../../core/platform.h"
-#include "appkit.h"
+#include "autorelease_pool.h"
 #include "cf.h"
 #include "face_reader.h"
 
@@ -29,11 +29,16 @@ struct Group {
   std::vector<CTFontDescriptorRef> descriptors;  // owned by the collection's array
 };
 
-Ref<CFArrayRef> copyCollectionDescriptors() {
+// Disabled fonts are installed fonts too.
+Ref<CFDictionaryRef> collectionOptions() {
   const void* keys[] = {kCTFontCollectionIncludeDisabledFontsOption};
   const void* values[] = {kCFBooleanTrue};
-  const Ref<CFDictionaryRef> options(CFDictionaryCreate(kCFAllocatorDefault, keys, values, 1, &kCFTypeDictionaryKeyCallBacks,
-                                                        &kCFTypeDictionaryValueCallBacks));
+  return Ref<CFDictionaryRef>(CFDictionaryCreate(kCFAllocatorDefault, keys, values, 1, &kCFTypeDictionaryKeyCallBacks,
+                                                 &kCFTypeDictionaryValueCallBacks));
+}
+
+Ref<CFArrayRef> copyCollectionDescriptors() {
+  const Ref<CFDictionaryRef> options = collectionOptions();
   const Ref<CTFontCollectionRef> collection(CTFontCollectionCreateFromAvailableFonts(options.get()));
   if (!collection) throw std::runtime_error("system-font-info: CoreText cannot create the font collection");
   Ref<CFArrayRef> descriptors(CTFontCollectionCreateMatchingFontDescriptors(collection.get()));
@@ -132,34 +137,48 @@ std::vector<FamilySeeds> groupByFamily(const std::vector<Group>& groups) {
   return families;
 }
 
-// NSFontManager's order of the family's members first, then the faces it does
-// not list, in collection order.
-void orderLikeAppKit(FamilySeeds& family, const std::vector<AppKitMember>& members,
-                     std::vector<const AppKitMember*>& memberOfSeed) {
-  std::vector<size_t> order;
+// The PostScript names of a family's members in the order CoreText's matcher
+// lists them, which is the order a browser walks them. A name appears once
+// even when several files provide it.
+std::vector<std::string> memberOrder(const std::string& family) {
+  std::vector<std::string> names;
+  const auto familyName = makeString(family);
+  const void* attributeKeys[] = {kCTFontFamilyNameAttribute};
+  const void* attributeValues[] = {familyName.get()};
+  const Ref<CFDictionaryRef> attributes(CFDictionaryCreate(kCFAllocatorDefault, attributeKeys, attributeValues, 1,
+                                                           &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks));
+  const Ref<CTFontDescriptorRef> descriptor(CTFontDescriptorCreateWithAttributes(attributes.get()));
+  const void* descriptorList[] = {descriptor.get()};
+  const Ref<CFArrayRef> descriptors(CFArrayCreate(kCFAllocatorDefault, descriptorList, 1, &kCFTypeArrayCallBacks));
+  const Ref<CFDictionaryRef> options = collectionOptions();
+  const Ref<CTFontCollectionRef> collection(CTFontCollectionCreateWithFontDescriptors(descriptors.get(), options.get()));
+  if (!collection) return names;
+  const Ref<CFArrayRef> members(CTFontCollectionCreateMatchingFontDescriptors(collection.get()));
+  if (!members) return names;
+  for (CFIndex i = 0; i < CFArrayGetCount(members.get()); ++i) {
+    std::string name = postscriptNameOf(static_cast<CTFontDescriptorRef>(CFArrayGetValueAtIndex(members.get(), i)));
+    if (!name.empty() && std::find(names.begin(), names.end(), name) == names.end()) names.push_back(std::move(name));
+  }
+  return names;
+}
+
+// The family's members in CoreText's member order first, then the faces that
+// list does not name, in collection order.
+void orderLikeCoreText(FamilySeeds& family) {
+  std::vector<Seed> ordered;
   std::vector<bool> placed(family.seeds.size(), false);
-  memberOfSeed.assign(family.seeds.size(), nullptr);
-  for (const AppKitMember& member : members) {
+  for (const std::string& name : memberOrder(family.name)) {
     for (size_t i = 0; i < family.seeds.size(); ++i) {
-      if (placed[i] || family.seeds[i].postscriptName != member.postscriptName) continue;
+      if (placed[i] || family.seeds[i].postscriptName != name) continue;
       placed[i] = true;
-      memberOfSeed[i] = &member;
-      order.push_back(i);
+      ordered.push_back(std::move(family.seeds[i]));
       break;
     }
   }
   for (size_t i = 0; i < family.seeds.size(); ++i) {
-    if (!placed[i]) order.push_back(i);
-  }
-
-  std::vector<Seed> ordered;
-  std::vector<const AppKitMember*> orderedMembers;
-  for (size_t i : order) {
-    ordered.push_back(std::move(family.seeds[i]));
-    orderedMembers.push_back(memberOfSeed[i]);
+    if (!placed[i]) ordered.push_back(std::move(family.seeds[i]));
   }
   family.seeds = std::move(ordered);
-  memberOfSeed = std::move(orderedMembers);
 }
 
 std::vector<Family> enumerate(const EnumerateOptions& options) {
@@ -170,14 +189,12 @@ std::vector<Family> enumerate(const EnumerateOptions& options) {
   std::vector<Family> result;
   result.reserve(families.size());
   for (FamilySeeds& seeds : families) {
-    const std::vector<AppKitMember> members = appKitFamilyMembers(seeds.name);
-    std::vector<const AppKitMember*> memberOfSeed;
-    orderLikeAppKit(seeds, members, memberOfSeed);
+    orderLikeCoreText(seeds);
 
     Family family;
     family.family = seeds.name;
     for (size_t i = 0; i < seeds.seeds.size(); ++i) {
-      family.faces.push_back(reader.read(seeds.seeds[i].descriptor, seeds.seeds[i].shadowed, memberOfSeed[i]));
+      family.faces.push_back(reader.read(seeds.seeds[i].descriptor, seeds.seeds[i].shadowed));
     }
     result.push_back(std::move(family));
   }

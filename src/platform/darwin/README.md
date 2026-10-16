@@ -1,7 +1,8 @@
 # src/platform/darwin
 
-The macOS backend: CoreText for everything, one small AppKit file
-(`appkit.mm`) for the member order. Read `../README.md` first for the contract.
+The macOS backend: CoreText for everything, plus one small Objective-C++ file
+(`autorelease_pool.mm`) for a thread's autorelease pool. Read `../README.md`
+first for the contract.
 
 ## Files
 
@@ -16,7 +17,7 @@ The macOS backend: CoreText for everything, one small AppKit file
 | `legacy_name.cpp` | `decodeLegacyName` |
 | `watch.cpp` | `watchFonts` |
 | `testing.cpp` | the register / unregister test hooks |
-| `appkit.*` | NSFontManager member lists and the autorelease pool (the only Objective-C++) |
+| `autorelease_pool.*` | the autorelease pool the worker thread runs in (the only Objective-C++) |
 | `cf.*` | owning CF reference and checked accessors |
 
 ## One face per PostScript name
@@ -38,14 +39,15 @@ names the chosen file again is the same font and is merged without a trace.
 ## Families and member order
 
 A family is keyed by the chosen descriptor's `kCTFontFamilyNameAttribute`, in
-first-seen order (the JS layer sorts). The faces of a family follow
-`NSFontManager availableMembersOfFontFamily`, which is the order CoreText's own
-matcher returns and the order a browser walks; faces AppKit does not list come
-after, in collection order. `appKitWeight` / `appKitTraits` are the member's
-values. The AppKit call was measured to return the same list on a background
-thread as on the main thread, so it is made from the worker; it sits in its
-own file so the rest stays C++, and runs in an autorelease pool because a
-worker thread has none.
+first-seen order (the JS layer sorts). The faces of a family follow the order of
+`CTFontCollectionCreateWithFontDescriptors` over one descriptor that names the
+family (disabled fonts included), a PostScript name counted once at its first
+position; this is the order CoreText's own matcher returns and a browser walks.
+Faces that list does not name come after, in collection order. It equals
+`NSFontManager availableMembersOfFontFamily` for every family on the machine it
+was checked on (252 of 252), so AppKit is not needed. The enumeration runs in an
+autorelease pool because a worker thread has none and CoreText autoreleases
+objects internally.
 
 ## Source of each field
 

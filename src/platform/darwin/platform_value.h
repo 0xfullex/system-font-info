@@ -4,7 +4,6 @@
 #include <vector>
 
 #include "../../core/value.h"
-#include "appkit.h"
 #include "cf.h"
 #include "face_reader.h"
 #include "traits.h"
@@ -18,7 +17,6 @@ struct PlatformValueInput {
   CTFontRef font;  // null when CoreText created another font than the descriptor names
   const Value* features;  // from readFeatures; null leaves `features` out
   const Traits& traits;
-  const AppKitMember* appKitMember;  // null when AppKit does not list the face
   bool withMetrics;
   const std::vector<ShadowedFile>& shadowed;
 };

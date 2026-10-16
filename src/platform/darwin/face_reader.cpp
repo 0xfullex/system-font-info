@@ -150,8 +150,7 @@ std::optional<Value> FaceReader::featuresOf(CTFontRef font, const std::optional<
   return features_.emplace(key, readFeatures(font)).first->second;
 }
 
-Face FaceReader::read(CTFontDescriptorRef descriptor, const std::vector<ShadowedFile>& shadowed,
-                      const AppKitMember* appKitMember) {
+Face FaceReader::read(CTFontDescriptorRef descriptor, const std::vector<ShadowedFile>& shadowed) {
   Face face;
   face.postscriptName = stringAttribute(descriptor, kCTFontNameAttribute);
 
@@ -216,7 +215,7 @@ Face FaceReader::read(CTFontDescriptorRef descriptor, const std::vector<Shadowed
   // Only a CTFont provides the features and the metrics.
   const std::optional<Value> features = substituted ? std::nullopt : featuresOf(font.get(), face.file);
   face.platform = makePlatformValue({descriptor, substituted ? nullptr : font.get(), features ? &*features : nullptr, traits,
-                                     appKitMember, options_.tables, shadowed});
+                                     options_.tables, shadowed});
   return face;
 }
 
