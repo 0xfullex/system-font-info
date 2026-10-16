@@ -41,13 +41,6 @@ std::optional<std::string> decodeName(const NameRecord& record, std::span<const 
 
 }  // namespace
 
-void appendUniqueString(LocalizedStrings& out, const LocalizedString& candidate) {
-  const bool seen = std::any_of(out.begin(), out.end(), [&](const LocalizedString& s) {
-    return s.language == candidate.language && s.value == candidate.value;
-  });
-  if (!seen) out.push_back(candidate);
-}
-
 std::string lcidToBcp47(uint16_t lcid) {
   const LcidEntry* end = kLcidTable + kLcidTableSize;
   const LcidEntry* it = std::lower_bound(kLcidTable, end, lcid, [](const LcidEntry& e, uint16_t key) { return e.lcid < key; });
@@ -119,7 +112,7 @@ std::vector<NameRecord> parseNameTable(std::span<const uint8_t> table, const Leg
 LocalizedStrings localizedName(const std::vector<NameRecord>& records, uint16_t nameId) {
   LocalizedStrings out;
   for (const NameRecord& record : records) {
-    if (record.nameId == nameId && record.value) appendUniqueString(out, {record.language, *record.value});
+    if (record.nameId == nameId && record.value) out.push_back({record.language, *record.value});
   }
   return out;
 }

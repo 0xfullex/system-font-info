@@ -27,7 +27,9 @@ and both libraries are orders of magnitude larger than that.
 
 ## Name decoding
 
-Records stay in table order and nothing is merged. For each record:
+Records stay in table order and nothing is merged here: `localizedName` and
+the layout feature names list every decoded record, exact duplicates included,
+because merging them is the JS layer's job. For each record:
 
 - Language: platform 3 maps the LCID, platform 1 the Mac language code (binary
   search over the generated tables); a format 1 table's `languageId >= 0x8000`
@@ -69,7 +71,7 @@ Records stay in table order and nothing is merged. For each record:
   stored, so a three-letter tag keeps its trailing space (`"TRK "`).
   `featureNames` covers `ssXX` (FeatureParams UINameID) and `cvXX`
   (FeatUILabelNameID); a nameID of 0 means none, and features sharing a tag
-  contribute the union of their names.
+  contribute all of their name records, in feature order.
 - STAT is not read.
 
 ## Invariants

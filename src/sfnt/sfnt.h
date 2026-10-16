@@ -54,8 +54,8 @@ using LegacyDecoder = std::function<std::optional<std::string>(uint16_t platform
 // (language-tag records). Throws ParseError on a malformed table.
 std::vector<NameRecord> parseNameTable(std::span<const uint8_t> table, const LegacyDecoder& decodeLegacy);
 
-// The merged view of one nameID: decoded records only, exact (language, value)
-// duplicates removed, table order kept.
+// Every decoded record of one nameID, in table order. Duplicates are kept: the
+// JS layer merges them.
 LocalizedStrings localizedName(const std::vector<NameRecord>& records, uint16_t nameId);
 
 // Records of `preferred` (e.g. 16, typographic family), plus records of

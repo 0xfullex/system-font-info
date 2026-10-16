@@ -23,8 +23,6 @@ std::string toHex(std::span<const uint8_t> bytes);
 
 // ---- table values (the pieces of the `opentype` Value) -----------------------
 
-// Appends `candidate` unless the same (language, value) pair is already there.
-void appendUniqueString(LocalizedStrings& out, const LocalizedString& candidate);
 // [{ language, value }, ...]
 Value localizedStringsToValue(const LocalizedStrings& strings);
 // The `names` array: one object per record.

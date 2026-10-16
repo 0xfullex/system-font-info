@@ -89,7 +89,7 @@ Value layoutToValue(std::span<const uint8_t> table, const std::vector<NameRecord
 
   // ssXX carries FeatureParamsStylisticSet and cvXX FeatureParamsCharacterVariants;
   // both start with a version and then the nameID of the UI label (0 = none).
-  // Several features may share a tag, so the names of all of them are merged.
+  // Several features may share a tag; the names of all of them are listed.
   std::vector<std::string> distinctTags;
   std::vector<std::pair<std::string, LocalizedStrings>> featureNames;
   for (const Feature& feature : features) {
@@ -102,7 +102,7 @@ Value layoutToValue(std::span<const uint8_t> table, const std::vector<NameRecord
 
     auto entry = std::find_if(featureNames.begin(), featureNames.end(), [&](const auto& e) { return e.first == feature.tag; });
     if (entry == featureNames.end()) entry = featureNames.insert(featureNames.end(), {feature.tag, {}});
-    for (const LocalizedString& name : localizedName(names, nameId)) appendUniqueString(entry->second, name);
+    for (LocalizedString& name : localizedName(names, nameId)) entry->second.push_back(std::move(name));
   }
 
   Value featureTags = Value::array();

@@ -3,8 +3,9 @@ import * as path from 'node:path'
 import type { FontFace, GetFontsOptions, VariationAxis } from './types'
 
 // What the native addon returns, before the JS layer normalizes it: language
-// tags are not canonicalized, localized arrays may hold duplicates, and the
-// default strings (fullName, styleName, axis name) are not derived yet.
+// tags are not canonicalized, localized arrays may hold exact duplicates (the
+// native side lists every name record), and the default strings (fullName,
+// styleName, axis name) are not derived yet.
 
 export type RawAxis = Omit<VariationAxis, 'name'>
 export type RawFace = Omit<FontFace, 'fullName' | 'styleName' | 'axes'> & { axes?: RawAxis[] }

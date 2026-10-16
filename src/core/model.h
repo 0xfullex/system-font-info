@@ -15,7 +15,7 @@
 // specific to the native side.
 //
 // The native layer reports facts; the JS layer derives the rest: it
-// canonicalizes language tags, merges duplicates, picks the default strings
+// canonicalizes language tags, merges exact duplicates, picks the default strings
 // (fullName, styleName, axis name), computes family-level aggregates and sorts
 // families.
 
