@@ -19,6 +19,10 @@ Fonts written:
   SFITest-Collection.ttc Two static faces (TrueType and CFF) with different
                          name tables.
   SFITest-Symbol.ttf     A symbol font whose only cmap subtable is (3,0).
+  SFITest-Legacy.ttf     Windows typographic names (16, 17) in en-US only, and
+                         legacy names (1, 2) on the Macintosh platform only:
+                         English, plus Turkish and Icelandic text in the
+                         Mac Roman variants those languages use.
 """
 
 import struct
@@ -334,12 +338,49 @@ def build_symbol():
     return fb.font
 
 
+# ---- the font with Macintosh-only legacy names -----------------------------------
+
+
+def build_legacy():
+    fb = new_builder()
+    setup_common(fb, "SFITest Legacy", "Book", "SFITestLegacy-Book")
+    fb.setupGlyf(truetype_glyphs())
+    fb.setupOS2(sTypoAscender=800, sTypoDescender=-200, usWinAscent=800, usWinDescent=200, achVendID="SFI ")
+
+    name = fb.font["name"]
+    name.names = []
+    for name_id, text in {
+        0: "SFITest fixture, public domain",
+        3: "SFITestLegacy-Book;SFITest;1.000",
+        4: "SFITest Legacy Book",
+        5: "Version 1.000",
+        6: "SFITestLegacy-Book",
+    }.items():
+        name.setName(text, name_id, 3, 1, 0x0409)
+        name.setName(text, name_id, 1, 0, 0)
+    # Windows: the typographic family and subfamily, English only.
+    name.setName("SFITest Legacy", 16, 3, 1, 0x0409)
+    name.setName("Book", 17, 3, 1, 0x0409)
+    # Macintosh: the legacy family and subfamily, which differ from the
+    # typographic ones the way "Avenir Book" differs from "Avenir".
+    name.setName("SFITest Legacy Book", 1, 1, 0, 0)
+    name.setName("Regular", 2, 1, 0, 0)
+    # Turkish (language 17) and Icelandic (language 15) use their own Mac Roman
+    # variants: the same bytes mean other characters than in plain Mac Roman.
+    name.setName("Yaz\u0131 Tipi \u011e\u011f \u015e\u015f \u0130", 1, 1, 0, 17)
+    name.setName("D\u00fcz", 2, 1, 0, 17)
+    name.setName("Letur \u00de\u00fe \u00d0\u00f0", 1, 1, 0, 15)
+    name.setName("Venjulegt", 2, 1, 0, 15)
+    return fb.font
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     with name_table_format1():
         build_variable().save(OUT / "SFITest-Variable.ttf")
     build_collection().save(OUT / "SFITest-Collection.ttc")
     build_symbol().save(OUT / "SFITest-Symbol.ttf")
+    build_legacy().save(OUT / "SFITest-Legacy.ttf")
     print(f"wrote fixtures to {OUT}")
 
 
