@@ -32,6 +32,10 @@ double cssWeight(double coreTextWeight);
 // CoreText width trait -> CSS font-stretch percentage (50-200).
 double cssWidth(double coreTextWidth);
 
+// The italic symbolic bit makes a face italic, anything else is normal, which
+// is how a browser classifies a macOS face. The slant trait is not used: it is
+// non-zero for upright script faces (Zapfino) and does not mean the face is
+// slanted text. It stays available as `platform.slant`.
 Style styleOf(const Traits& traits);
 
 // kCTFontPriorityAttribute and kCTFontRegistrationScopeAttribute -> who

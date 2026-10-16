@@ -58,7 +58,10 @@ objects internally.
   would pick the face for. `width`: `100 + w * (w < 0 ? 50 : 100)` clamped to
   50..200 and rounded to a thousandth (CoreText keeps the trait as a 32-bit
   float, so 90% arrives as 89.99999985).
-- `style`: italic symbolic bit, else a non-zero slant is oblique.
+- `style`: italic symbolic bit is `italic`, everything else `normal`, as a
+  browser classifies a macOS face. `oblique` is never reported: CoreText's
+  slant trait is non-zero for upright script faces too (Zapfino, Apple
+  Chancery), so it is left raw in `platform.slant`.
 - `monospace`, `color`: symbolic bits. `symbol`: the cmap has a (3,0) subtable
   (from the tables). `enabled`: `kCTFontEnabledAttribute` (a number or a
   boolean). `hidden` and the simulations are always false: macOS has neither.

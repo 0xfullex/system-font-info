@@ -48,9 +48,7 @@ double cssWidth(double coreTextWidth) {
 }
 
 Style styleOf(const Traits& traits) {
-  if (traits.symbolic & kCTFontTraitItalic) return Style::Italic;
-  if (traits.slant != 0) return Style::Oblique;
-  return Style::Normal;
+  return (traits.symbolic & kCTFontTraitItalic) ? Style::Italic : Style::Normal;
 }
 
 Scope scopeOf(std::optional<int64_t> priority, std::optional<int64_t> registrationScope) {
