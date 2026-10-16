@@ -43,7 +43,15 @@ class RunLoopWatcher final : public FontWatcher {
       std::lock_guard lock(registryMutex());
       registry().insert(this);
     }
-    thread_ = std::thread([this] { run(); });
+    try {
+      thread_ = std::thread([this] { run(); });
+    } catch (...) {
+      // The destructor does not run for a constructor that throws, so the
+      // registry would keep an address that no longer exists.
+      std::lock_guard lock(registryMutex());
+      registry().erase(this);
+      throw;
+    }
     std::unique_lock lock(readyMutex_);
     ready_.wait(lock, [this] { return loop_ != nullptr; });
   }
