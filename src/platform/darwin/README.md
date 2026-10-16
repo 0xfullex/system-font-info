@@ -89,8 +89,20 @@ worker thread has none.
 
 ## Tables and sharing
 
+CoreText can create another font than the descriptor names (it substitutes one
+when it cannot use the file). The PostScript name of the created CTFont is
+compared with the descriptor's; when they differ, the CTFont is not trusted:
+the tables are read from the descriptor's file through `sfnt::FontFile`, in the
+face whose `name` table gives the descriptor's PostScript name (a face of a
+variable font whose name is only an `fvar` instance name has no such record,
+so it gets no tables), the coordinates come from the descriptor's
+`kCTFontVariationAttribute`, a named instance gets no `fullNames`, and
+`platform.features` and `platform.metrics` are left out because only a CTFont
+provides them. This was not observed on macOS 27; it is a guard.
+
 Every face is read through `sfnt::readFontTables` (tag list from
-`CTFontCopyAvailableTables`, bytes from `CTFontCopyTable`) whatever
+`CTFontCopyAvailableTables` in CoreText's own order, which the reader sorts;
+bytes from `CTFontCopyTable`) whatever
 `options.tables` says: the names, `fvar` and `cmap` feed fields that exist
 anyway. The option only decides whether `opentype` and `platform.metrics` are
 attached. The result is cached per font resource (file path and face index), so

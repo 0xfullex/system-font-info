@@ -14,7 +14,7 @@ namespace sfi::platform::darwin {
 // ts/types.ts), in that type's key order.
 struct PlatformValueInput {
   CTFontDescriptorRef descriptor;
-  CTFontRef font;
+  CTFontRef font;  // null when CoreText created another font than the descriptor names
   const Traits& traits;
   const AppKitMember* appKitMember;  // null when AppKit does not list the face
   bool withMetrics;

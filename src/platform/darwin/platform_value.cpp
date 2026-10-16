@@ -129,12 +129,14 @@ Value makePlatformValue(const PlatformValueInput& input) {
   out.set("localizedFamilyName", localizedAttribute(descriptor, kCTFontFamilyNameAttribute));
   out.set("localizedStyleName", localizedAttribute(descriptor, kCTFontStyleNameAttribute));
   if (const auto advance = numberValue(copyAttribute(descriptor, kCTFontFixedAdvanceAttribute).get())) out.set("fixedAdvance", *advance);
-  if (auto features = featuresValue(input.font)) out.set("features", std::move(*features));
+  if (input.font) {
+    if (auto features = featuresValue(input.font)) out.set("features", std::move(*features));
+  }
   if (input.appKitMember) {
     out.set("appKitWeight", input.appKitMember->weight);
     out.set("appKitTraits", static_cast<double>(input.appKitMember->traits));
   }
-  if (input.withMetrics) out.set("metrics", metricsValue(input.font));
+  if (input.withMetrics && input.font) out.set("metrics", metricsValue(input.font));
   if (!input.shadowed.empty()) out.set("shadowed", shadowedValue(input.shadowed));
   return out;
 }

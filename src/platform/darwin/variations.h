@@ -17,10 +17,11 @@ using Coordinates = std::vector<std::pair<std::string, double>>;
 // `fvar` table gives each axis. Null when the font has no axes.
 SharedAxes makeAxes(CFArrayRef coreTextAxes, const sfnt::FontTables& tables);
 
-// The face's value on every axis, in axis order. CoreText reports only the
-// axes that differ from their default (none at all for a default instance), so
-// the others are filled in from the axis defaults.
-Coordinates coordinatesOf(CTFontRef font, const std::vector<VariationAxis>& axes);
+// The face's value on every axis, in axis order. `variation` is CoreText's
+// variation dictionary (axis identifier to value; null for none), which lists
+// only the axes that differ from their default, so the others are filled in
+// from the axis defaults.
+Coordinates coordinatesOf(CFDictionaryRef variation, const std::vector<VariationAxis>& axes);
 
 // Index of the first `fvar` instance whose coordinates equal the face's.
 std::optional<uint32_t> namedInstanceOf(const Coordinates& coordinates, const std::optional<sfnt::Fvar>& fvar);

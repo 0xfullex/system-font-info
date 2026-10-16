@@ -46,12 +46,11 @@ SharedAxes makeAxes(CFArrayRef coreTextAxes, const sfnt::FontTables& tables) {
   return axes;
 }
 
-Coordinates coordinatesOf(CTFontRef font, const std::vector<VariationAxis>& axes) {
+Coordinates coordinatesOf(CFDictionaryRef variation, const std::vector<VariationAxis>& axes) {
   std::map<std::string, double> explicitValues;
-  const Ref<CFDictionaryRef> variation(CTFontCopyVariation(font));
   if (variation) {
     CFDictionaryApplyFunction(
-        variation.get(),
+        variation,
         [](const void* key, const void* value, void* context) {
           const auto id = integerValue(static_cast<CFTypeRef>(key));
           const auto number = numberValue(static_cast<CFTypeRef>(value));

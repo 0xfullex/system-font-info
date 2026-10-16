@@ -48,9 +48,17 @@ class FaceReader {
     std::vector<std::vector<uint8_t>> nameTables;
   };
 
-  std::shared_ptr<const Resource> loadResource(CTFontRef font, CTFontDescriptorRef descriptor,
-                                               const std::vector<uint32_t>& tags,
+  // Where the tables of one face come from, and which face of its file it is.
+  struct TableSource {
+    std::vector<uint32_t> tags;
+    sfnt::TableFetcher fetch;
+    std::optional<uint32_t> index;
+  };
+
+  std::shared_ptr<const Resource> loadResource(const TableSource& source, CTFontDescriptorRef descriptor,
                                                const std::optional<FileLocation>& file);
+  TableSource tablesFromFont(CTFontRef font, const std::string& path);
+  TableSource tablesFromFile(const std::string& path, const std::string& postscriptName);
   std::optional<uint32_t> faceIndexInFile(const std::string& path, const std::vector<uint32_t>& tags, CTFontRef font);
   FileFaces& fileFaces(const std::string& path);
 
