@@ -37,9 +37,10 @@
     "build:native:debug": "node-gyp rebuild --debug",
     "build:ts": "tsc -p tsconfig.json",
     "build": "npm run build:native && npm run build:ts",
-    "test": "node --test test/",
+    "test": "node --test",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "copy-prebuild": "node scripts/copy-prebuild.mjs"
+    "copy-prebuild": "node scripts/copy-prebuild.mjs",
+    "pretest": "npm run build:ts"
   },
   "keywords": [
     "fonts",
