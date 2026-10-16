@@ -97,12 +97,12 @@ CoreText can create another font than the descriptor names (it substitutes one
 when it cannot use the file). The PostScript name of the created CTFont is
 compared with the descriptor's; when they differ, the CTFont is not trusted:
 the tables are read from the descriptor's file through `sfnt::FontFile`, in the
-face whose `name` table gives the descriptor's PostScript name (a face of a
-variable font whose name is only an `fvar` instance name has no such record,
-so it gets no tables), the coordinates come from the descriptor's
-`kCTFontVariationAttribute`, and
-`platform.features` and `platform.metrics` are left out because only a CTFont
-provides them. This was not observed on macOS 27; it is a guard.
+face that has the descriptor's PostScript name, either as its own `name`
+record (nameID 6) or as the PostScript name of one of its `fvar` named
+instances (so a substituted named instance gets the tables of its variable
+font), the coordinates come from the descriptor's `kCTFontVariationAttribute`,
+and `platform.features` and `platform.metrics` are left out because only a
+CTFont provides them. This was not observed on macOS 27; it is a guard.
 
 Every face is read through `sfnt::readFontTables` (tag list from
 `CTFontCopyAvailableTables` in CoreText's own order, which the reader sorts;
