@@ -47,6 +47,10 @@ std::optional<bool> booleanValue(CFTypeRef value) {
 std::string filePath(CFTypeRef url) {
   CFURLRef fileUrl = asUrl(url);
   if (!fileUrl) return {};
+  // CFURLCopyFileSystemPath returns the path part of any URL, so a URL of
+  // another scheme would pass for a file path.
+  const Ref<CFStringRef> scheme(CFURLCopyScheme(fileUrl));
+  if (!scheme || CFStringCompare(scheme.get(), CFSTR("file"), kCFCompareCaseInsensitive) != kCFCompareEqualTo) return {};
   Ref<CFStringRef> path(CFURLCopyFileSystemPath(fileUrl, kCFURLPOSIXPathStyle));
   return toUtf8(path.get());
 }
