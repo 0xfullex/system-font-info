@@ -74,6 +74,9 @@ Records stay in table order and nothing is merged. For each record:
 
 ## Invariants
 
+- `readFontTables` takes the tag list in any order and with repeats; it sorts
+  and de-duplicates it, so `opentype.tables` is ascending whatever the caller
+  passes.
 - Malformed data throws `ParseError` from the parsing functions; nothing reads
   out of bounds. `readFontTables` never throws for table content: a table that
   is present but cannot be fetched or parsed is left out and its tag is listed
