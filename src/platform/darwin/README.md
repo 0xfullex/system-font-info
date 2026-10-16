@@ -60,13 +60,14 @@ worker thread has none.
   (from the tables). `enabled`: `kCTFontEnabledAttribute` (a number or a
   boolean). `hidden` and the simulations are always false: macOS has neither.
 - `languages`: `kCTFontLanguagesAttribute`.
-- `scope`: `kCTFontPriorityAttribute` 10000 / 20000 / 30000 is system, 40000
-  user, 60000 process; any other priority falls back to
-  `kCTFontRegistrationScopeAttribute` being the process scope, else unknown.
-  Measured on macOS 27: the downloaded system font assets (under
-  `/System/Library/AssetsV2`, `downloadable` and `downloaded` both true) also
-  carry priority 60000, together with registration scope 2 (persistent);
-  a font registered for the process has priority 60000 and registration scope 1.
+- `scope`, first rule that applies: `kCTFontRegistrationScopeAttribute` is the
+  process scope: process. `kCTFontPriorityAttribute` 40000: user; 10000 /
+  20000 / 30000: system; 60000 with the persistent registration scope: system;
+  anything else: unknown. Priority 60000 alone is ambiguous. Measured on
+  macOS 27: a font registered for the process has priority 60000 and
+  registration scope 1, while the downloaded system font assets (under
+  `/System/Library/AssetsV2`, `downloadable` and `downloaded` both true) have
+  priority 60000 and registration scope 2 (persistent).
 - `format`: `kCTFontFormatAttribute`; an OpenType PostScript font is `cff2`
   when it has a `CFF2` table.
 - `file.path`: `kCTFontURLAttribute`. `file.index`: CoreText does not say which

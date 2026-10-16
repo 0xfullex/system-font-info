@@ -54,20 +54,22 @@ Style styleOf(const Traits& traits) {
 }
 
 Scope scopeOf(std::optional<int64_t> priority, std::optional<int64_t> registrationScope) {
+  // Priority 60000 does not say who registered the font: a process-registered
+  // font has it, and so do the system font assets the OS downloads (under
+  // /System/Library/AssetsV2), which are registered persistently.
+  if (registrationScope == kCTFontManagerScopeProcess) return Scope::Process;
   switch (priority.value_or(0)) {
+    case kCTFontPriorityUser:
+      return Scope::User;
     case kCTFontPrioritySystem:
     case kCTFontPriorityNetwork:
     case kCTFontPriorityComputer:
       return Scope::System;
-    case kCTFontPriorityUser:
-      return Scope::User;
     case kCTFontPriorityProcess:
-      return Scope::Process;
+      return registrationScope == kCTFontManagerScopePersistent ? Scope::System : Scope::Unknown;
     default:
-      break;
+      return Scope::Unknown;
   }
-  if (registrationScope == kCTFontManagerScopeProcess) return Scope::Process;
-  return Scope::Unknown;
 }
 
 Format formatOf(std::optional<int64_t> coreTextFormat, bool hasCff2) {
