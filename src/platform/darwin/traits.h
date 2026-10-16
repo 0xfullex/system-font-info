@@ -12,25 +12,26 @@
 
 namespace sfi::platform::darwin {
 
+// The entries of kCTFontTraitsAttribute; an entry the descriptor lacks is unset.
 struct Traits {
-  double weight = 0;  // kCTFontWeightTrait, -1...1
-  double width = 0;   // kCTFontWidthTrait, -1...1
-  double slant = 0;   // kCTFontSlantTrait, -1...1
-  uint32_t symbolic = 0;  // kCTFontSymbolicTrait, class bits included
+  std::optional<double> weight;  // kCTFontWeightTrait, -1...1
+  std::optional<double> width;   // kCTFontWidthTrait, -1...1
+  std::optional<double> slant;   // kCTFontSlantTrait, -1...1
+  std::optional<uint32_t> symbolic;  // kCTFontSymbolicTrait, class bits included
 };
 
-// Reads kCTFontTraitsAttribute; absent entries stay 0.
 Traits readTraits(CTFontDescriptorRef descriptor);
 
 // CoreText weight trait -> CSS font-weight, with the same bucket boundaries as
 // Chromium's mapping for macOS. A browser that picks a face by CSS weight
 // should pick the same face this library reports for that weight, which is
 // why the boundaries are copied rather than derived from the nominal weight
-// values of the system fonts.
-double cssWeight(double coreTextWeight);
+// values of the system fonts. A missing trait is the neutral 0 (CSS 400).
+double cssWeight(std::optional<double> coreTextWeight);
 
-// CoreText width trait -> CSS font-stretch percentage (50-200).
-double cssWidth(double coreTextWidth);
+// CoreText width trait -> CSS font-stretch percentage (50-200). A missing
+// trait is the neutral 0 (100).
+double cssWidth(std::optional<double> coreTextWidth);
 
 // The italic symbolic bit makes a face italic, anything else is normal, which
 // is how a browser classifies a macOS face. The slant trait is not used: it is

@@ -263,37 +263,38 @@ export interface LayoutTable {
 
 // ---- platform-specific -------------------------------------------------------
 
+/** CoreText's raw values. A value CoreText does not provide for a face is absent, never a default. */
 export interface DarwinNative {
   os: 'darwin'
   /** kCTFontWeightTrait, -1...1 */
-  weight: number
+  weight?: number
   /** kCTFontWidthTrait, -1...1 */
-  width: number
+  width?: number
   /** kCTFontSlantTrait, -1...1 */
-  slant: number
+  slant?: number
   /** kCTFontSymbolicTrait, including the class bits. */
-  symbolicTraits: number
+  symbolicTraits?: number
   /** kCTFontFormatAttribute */
-  format: number
+  format?: number
   /** kCTFontPriorityAttribute (system 10000 ... process 60000) */
-  priority: number
+  priority?: number
   /** kCTFontRegistrationScopeAttribute */
-  registrationScope: number
+  registrationScope?: number
   /** kCTFontDownloadableAttribute */
-  downloadable: boolean
+  downloadable?: boolean
   /** kCTFontDownloadedAttribute */
-  downloaded: boolean
+  downloaded?: boolean
   /** kCTFontStyleNameAttribute (not localized) */
-  styleName: string
+  styleName?: string
   /** kCTFontDisplayNameAttribute, localized in the language the process first used CoreText in. */
-  displayName: string
+  displayName?: string
   /** CTFontDescriptorCopyLocalizedAttribute(kCTFontFamilyNameAttribute), same language caveat. */
-  localizedFamilyName: string
+  localizedFamilyName?: string
   /** CTFontDescriptorCopyLocalizedAttribute(kCTFontStyleNameAttribute), same language caveat. */
-  localizedStyleName: string
+  localizedStyleName?: string
   /** kCTFontFixedAdvanceAttribute, when set. */
   fixedAdvance?: number
-  /** kCTFontFeaturesAttribute. Names are in the process language. */
+  /** CTFontCopyFeatures. Names are in the process language. */
   features?: Array<{
     id: number
     name: string

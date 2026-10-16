@@ -1,5 +1,6 @@
 #include "platform_value.h"
 
+#include <optional>
 #include <string>
 
 #include "../../sfnt/sfnt.h"
@@ -7,23 +8,25 @@
 namespace sfi::platform::darwin {
 namespace {
 
-std::string stringAttribute(CTFontDescriptorRef descriptor, CFStringRef attribute) {
-  return toUtf8(asString(copyAttribute(descriptor, attribute).get()));
+std::optional<std::string> stringAttribute(CTFontDescriptorRef descriptor, CFStringRef attribute) {
+  const auto value = copyAttribute(descriptor, attribute);
+  if (CFStringRef text = asString(value.get())) return toUtf8(text);
+  return std::nullopt;
 }
 
-double numberAttribute(CTFontDescriptorRef descriptor, CFStringRef attribute) {
-  return numberValue(copyAttribute(descriptor, attribute).get()).value_or(0);
-}
-
-bool booleanAttribute(CTFontDescriptorRef descriptor, CFStringRef attribute) {
-  return booleanValue(copyAttribute(descriptor, attribute).get()).value_or(false);
-}
-
-std::string localizedAttribute(CTFontDescriptorRef descriptor, CFStringRef attribute) {
+std::optional<std::string> localizedAttribute(CTFontDescriptorRef descriptor, CFStringRef attribute) {
   CFStringRef language = nullptr;
   const Ref<CFTypeRef> value(CTFontDescriptorCopyLocalizedAttribute(descriptor, attribute, &language));
   const Ref<CFStringRef> languageOwner(language);
-  return toUtf8(asString(value.get()));
+  if (CFStringRef text = asString(value.get())) return toUtf8(text);
+  return std::nullopt;
+}
+
+// Sets `key` when the value is there: a value CoreText does not give is left
+// out, not replaced by a default.
+template <typename T>
+void setIfPresent(Value& object, const char* key, const std::optional<T>& value) {
+  if (value) object.set(key, *value);
 }
 
 // An OpenType tag CoreText reports as text ("liga") or as a four-character code.
@@ -115,20 +118,20 @@ Value makePlatformValue(const PlatformValueInput& input) {
 
   Value out = Value::object();
   out.set("os", "darwin");
-  out.set("weight", input.traits.weight);
-  out.set("width", input.traits.width);
-  out.set("slant", input.traits.slant);
-  out.set("symbolicTraits", input.traits.symbolic);
-  out.set("format", numberAttribute(descriptor, kCTFontFormatAttribute));
-  out.set("priority", numberAttribute(descriptor, kCTFontPriorityAttribute));
-  out.set("registrationScope", numberAttribute(descriptor, kCTFontRegistrationScopeAttribute));
-  out.set("downloadable", booleanAttribute(descriptor, kCTFontDownloadableAttribute));
-  out.set("downloaded", booleanAttribute(descriptor, kCTFontDownloadedAttribute));
-  out.set("styleName", stringAttribute(descriptor, kCTFontStyleNameAttribute));
-  out.set("displayName", stringAttribute(descriptor, kCTFontDisplayNameAttribute));
-  out.set("localizedFamilyName", localizedAttribute(descriptor, kCTFontFamilyNameAttribute));
-  out.set("localizedStyleName", localizedAttribute(descriptor, kCTFontStyleNameAttribute));
-  if (const auto advance = numberValue(copyAttribute(descriptor, kCTFontFixedAdvanceAttribute).get())) out.set("fixedAdvance", *advance);
+  setIfPresent(out, "weight", input.traits.weight);
+  setIfPresent(out, "width", input.traits.width);
+  setIfPresent(out, "slant", input.traits.slant);
+  setIfPresent(out, "symbolicTraits", input.traits.symbolic);
+  setIfPresent(out, "format", numberValue(copyAttribute(descriptor, kCTFontFormatAttribute).get()));
+  setIfPresent(out, "priority", numberValue(copyAttribute(descriptor, kCTFontPriorityAttribute).get()));
+  setIfPresent(out, "registrationScope", numberValue(copyAttribute(descriptor, kCTFontRegistrationScopeAttribute).get()));
+  setIfPresent(out, "downloadable", booleanValue(copyAttribute(descriptor, kCTFontDownloadableAttribute).get()));
+  setIfPresent(out, "downloaded", booleanValue(copyAttribute(descriptor, kCTFontDownloadedAttribute).get()));
+  setIfPresent(out, "styleName", stringAttribute(descriptor, kCTFontStyleNameAttribute));
+  setIfPresent(out, "displayName", stringAttribute(descriptor, kCTFontDisplayNameAttribute));
+  setIfPresent(out, "localizedFamilyName", localizedAttribute(descriptor, kCTFontFamilyNameAttribute));
+  setIfPresent(out, "localizedStyleName", localizedAttribute(descriptor, kCTFontStyleNameAttribute));
+  setIfPresent(out, "fixedAdvance", numberValue(copyAttribute(descriptor, kCTFontFixedAdvanceAttribute).get()));
   if (input.features) out.set("features", *input.features);
   if (input.withMetrics && input.font) out.set("metrics", metricsValue(input.font));
   if (!input.shadowed.empty()) out.set("shadowed", shadowedValue(input.shadowed));

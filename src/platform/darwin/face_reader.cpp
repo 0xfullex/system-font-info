@@ -175,8 +175,8 @@ Face FaceReader::read(CTFontDescriptorRef descriptor, const std::vector<Shadowed
   face.weight = cssWeight(traits.weight);
   face.width = cssWidth(traits.width);
   face.style = styleOf(traits);
-  face.monospace = traits.symbolic & kCTFontTraitMonoSpace;
-  face.color = traits.symbolic & kCTFontTraitColorGlyphs;
+  face.monospace = traits.symbolic.value_or(0) & kCTFontTraitMonoSpace;
+  face.color = traits.symbolic.value_or(0) & kCTFontTraitColorGlyphs;
   face.symbol = tables.symbolCmap;
   // CoreText stores the enabled state as a number or a boolean; a font without one is enabled.
   face.enabled = booleanValue(copyAttribute(descriptor, kCTFontEnabledAttribute).get()).value_or(true);

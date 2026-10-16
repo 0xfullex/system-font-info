@@ -221,8 +221,8 @@ const openTypeInfo = shape(
 const variationAxis = shape({ tag: tag4, name: str, names: localizedStrings, min: num, max: num, default: num, hidden: bool })
 
 const darwinNative = shape(
+  { os: literal('darwin') },
   {
-    os: literal('darwin'),
     weight: num,
     width: num,
     slant: num,
@@ -235,9 +235,7 @@ const darwinNative = shape(
     styleName: str,
     displayName: str,
     localizedFamilyName: str,
-    localizedStyleName: str
-  },
-  {
+    localizedStyleName: str,
     fixedAdvance: num,
     features: arrayOf(
       shape(

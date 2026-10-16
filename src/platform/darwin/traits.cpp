@@ -26,21 +26,25 @@ Traits readTraits(CTFontDescriptorRef descriptor) {
   Traits traits;
   const auto dictionary = copyAttribute(descriptor, kCTFontTraitsAttribute);
   CFDictionaryRef values = asDictionary(dictionary.get());
-  traits.weight = numberValue(dictionaryValue(values, kCTFontWeightTrait)).value_or(0);
-  traits.width = numberValue(dictionaryValue(values, kCTFontWidthTrait)).value_or(0);
-  traits.slant = numberValue(dictionaryValue(values, kCTFontSlantTrait)).value_or(0);
-  traits.symbolic = static_cast<uint32_t>(integerValue(dictionaryValue(values, kCTFontSymbolicTrait)).value_or(0));
+  traits.weight = numberValue(dictionaryValue(values, kCTFontWeightTrait));
+  traits.width = numberValue(dictionaryValue(values, kCTFontWidthTrait));
+  traits.slant = numberValue(dictionaryValue(values, kCTFontSlantTrait));
+  if (const auto symbolic = integerValue(dictionaryValue(values, kCTFontSymbolicTrait))) {
+    traits.symbolic = static_cast<uint32_t>(*symbolic);
+  }
   return traits;
 }
 
-double cssWeight(double coreTextWeight) {
+double cssWeight(std::optional<double> trait) {
+  const double coreTextWeight = trait.value_or(0);
   const auto bucket = std::find_if(std::begin(kWeightBuckets), std::end(kWeightBuckets), [&](const WeightBucket& b) {
     return b.low <= coreTextWeight && coreTextWeight <= b.high;
   });
   return bucket == std::end(kWeightBuckets) ? 400 : bucket->css;
 }
 
-double cssWidth(double coreTextWidth) {
+double cssWidth(std::optional<double> trait) {
+  const double coreTextWidth = trait.value_or(0);
   const double percentage = 100 + coreTextWidth * (coreTextWidth < 0 ? 50 : 100);
   // CoreText stores the trait as a 32-bit float, so 90% arrives as 89.99999985.
   const double rounded = std::round(percentage * 1000) / 1000;
@@ -48,7 +52,7 @@ double cssWidth(double coreTextWidth) {
 }
 
 Style styleOf(const Traits& traits) {
-  return (traits.symbolic & kCTFontTraitItalic) ? Style::Italic : Style::Normal;
+  return (traits.symbolic.value_or(0) & kCTFontTraitItalic) ? Style::Italic : Style::Normal;
 }
 
 Scope scopeOf(std::optional<int64_t> priority, std::optional<int64_t> registrationScope) {

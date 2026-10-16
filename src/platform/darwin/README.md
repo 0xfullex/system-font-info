@@ -76,7 +76,8 @@ objects internally.
   priority 60000 and registration scope 2 (persistent).
 - `format`: `kCTFontFormatAttribute`; an OpenType PostScript font is `cff2`
   when it has a `CFF2` table.
-- `file.path`: `kCTFontURLAttribute`. `file.index`: CoreText does not say which
+- `file.path`: `kCTFontURLAttribute`, when it is a file URL (any other URL gives
+  no path). `file.index`: CoreText does not say which
   face of a collection a font is, so it is the face whose `name` table equals
   the font's `name` table (the collection is read through `sfnt::FontFile`, once
   per file). A collection face that cannot be told apart, and an sfnt font in
@@ -88,6 +89,9 @@ objects internally.
   `CFCharacterSetCreateBitmapRepresentation` (the BMP bitmap, then a plane
   number byte and bitmap for every further plane).
 - `platform`: see `ts/types.ts` (`DarwinNative`) for the meaning of each key.
+  A value CoreText does not provide for a face (an attribute that is missing) is
+  left out of the object; no default is written in its place. The traits that
+  feed `weight`, `width`, `style`, `monospace` and `color` count as 0 then.
   `features` come from `CTFontCopyFeatures` because the attribute carries
   identifiers without names; the call is made once per font resource (the
   named instances of a variable font report the same list). `metrics` are CoreText's lengths scaled from the
