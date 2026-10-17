@@ -29,8 +29,6 @@ export interface FontFamily {
   variable: boolean
   /** Any face is enabled. */
   enabled: boolean
-  /** Every face is hidden. */
-  hidden: boolean
   /** In the platform's own member order (the order a browser on that platform walks them). */
   faces: FontFace[]
 }
@@ -63,8 +61,6 @@ export interface FontFace {
   symbol: boolean
   /** False when the user disabled the font (macOS Font Book). True where the platform has no such state. */
   enabled: boolean
-  /** Installed and usable, but the platform hides it from font lists. */
-  hidden: boolean
   /** Styles the platform synthesizes for this face (Windows); false on other platforms. */
   simulations: { bold: boolean; oblique: boolean }
   /** BCP 47 tags the platform says the face supports. macOS: declared by the font (kCTFontLanguagesAttribute). Windows: DirectWrite's supported script/language tags. Linux: fontconfig's FC_LANG, computed from character coverage. */

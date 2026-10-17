@@ -299,7 +299,6 @@ const fontFace = shape(
     color: bool,
     symbol: bool,
     enabled: bool,
-    hidden: bool,
     simulations: shape({ bold: bool, oblique: bool }),
     languages: arrayOf(languageTag),
     scope: literal('system', 'user', 'process', 'unknown'),
@@ -327,7 +326,6 @@ const fontFamily = shape({
   languages: arrayOf(languageTag),
   variable: bool,
   enabled: bool,
-  hidden: bool,
   faces: arrayOf(fontFace)
 })
 
@@ -385,7 +383,6 @@ function validateResult(families, { tables, coverage }) {
     )
     expect(family.variable === family.faces.some((face) => face.variable), 'variable is not any-of the faces')
     expect(family.enabled === family.faces.some((face) => face.enabled), 'enabled is not any-of the faces')
-    expect(family.hidden === family.faces.every((face) => face.hidden), 'hidden is not every-of the faces')
 
     family.faces.forEach((face, i) => {
       const at = `${where} face ${i} (${face.postscriptName})`

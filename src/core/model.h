@@ -64,7 +64,6 @@ struct Face {
   bool color = false;
   bool symbol = false;
   bool enabled = true;
-  bool hidden = false;
   bool simulatedBold = false;
   bool simulatedOblique = false;
   std::vector<std::string> languages;

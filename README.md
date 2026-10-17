@@ -55,13 +55,13 @@ To react to installed fonts changing, call `getFonts()` again at a moment that s
 
 ## The result
 
-`FontFamily` groups `FontFace` objects under the name the platform matcher uses (what goes into CSS `font-family`). The family-level `familyNames`, `languages`, `variable`, `enabled` and `hidden` are derived from its faces. The complete, documented shape is in [`ts/types.ts`](ts/types.ts); the public types are exported from the package.
+`FontFamily` groups `FontFace` objects under the name the platform matcher uses (what goes into CSS `font-family`). The family-level `familyNames`, `languages`, `variable` and `enabled` are derived from its faces. The complete, documented shape is in [`ts/types.ts`](ts/types.ts); the public types are exported from the package.
 
 Highlights of a `FontFace`:
 
 - Identity: `postscriptName`, `fullName` / `fullNames`, `styleName` / `styleNames`, `familyNames`. Language tags are canonical BCP 47 (`Intl.getCanonicalLocales`); localized arrays hold no exact duplicates.
 - Normalized traits: `weight` (CSS 1-1000), `width` (CSS percentage), `style`, `monospace`, `color`, `symbol`.
-- State: `enabled`, `hidden`, `simulations`, `scope`, `format`, `file`.
+- State: `enabled`, `simulations`, `scope`, `format`, `file`.
 - Variations: `variable`, `axes`, `coordinates`, `namedInstance` (an index into `opentype.fvar.instances`). Faces of one font share their `axes` and `opentype` objects.
 - `opentype`: `head`, `hhea`, `vhea`, `os2`, `post`, `maxp`, `cmap`, `fvar`, `meta` and the GSUB/GPOS feature lists, as stored in the font, plus every `name` record unmerged.
 - `platform`: raw platform values and platform-only information, tagged by `os`.

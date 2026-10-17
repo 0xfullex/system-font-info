@@ -18,7 +18,6 @@ function rawFace(overrides = {}) {
     color: false,
     symbol: false,
     enabled: true,
-    hidden: false,
     simulations: { bold: false, oblique: false },
     languages: [],
     scope: 'system',
@@ -132,14 +131,12 @@ test('family aggregates', () => {
       rawFace({
         familyNames: names(['en-us', 'F'], ['de', 'Fd']),
         languages: ['en', 'de'],
-        enabled: false,
-        hidden: true
+        enabled: false
       }),
       rawFace({
         familyNames: names(['en-US', 'F'], ['fr', 'Ff']),
         languages: ['fr', 'en'],
         enabled: true,
-        hidden: true,
         variable: true
       })
     )
@@ -148,16 +145,12 @@ test('family aggregates', () => {
   assert.deepEqual(family.languages, ['en', 'de', 'fr'])
   assert.equal(family.variable, true)
   assert.equal(family.enabled, true)
-  assert.equal(family.hidden, true)
 })
 
-test('aggregates: not variable, none enabled, not every face hidden', () => {
-  const [family] = normalizeFamilies([
-    rawFamily('F', rawFace({ enabled: false, hidden: true }), rawFace({ enabled: false, hidden: false }))
-  ])
+test('aggregates: not variable, none enabled', () => {
+  const [family] = normalizeFamilies([rawFamily('F', rawFace({ enabled: false }), rawFace({ enabled: false }))])
   assert.equal(family.variable, false)
   assert.equal(family.enabled, false)
-  assert.equal(family.hidden, false)
 })
 
 test("the family aggregates do not alias the faces' arrays", () => {

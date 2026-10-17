@@ -156,7 +156,6 @@ class Converter {
     out.Set("color", Napi::Boolean::New(env_, f.color));
     out.Set("symbol", Napi::Boolean::New(env_, f.symbol));
     out.Set("enabled", Napi::Boolean::New(env_, f.enabled));
-    out.Set("hidden", Napi::Boolean::New(env_, f.hidden));
 
     auto simulations = Napi::Object::New(env_);
     simulations.Set("bold", Napi::Boolean::New(env_, f.simulatedBold));

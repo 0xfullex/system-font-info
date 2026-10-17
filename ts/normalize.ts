@@ -138,7 +138,6 @@ function normalizeFamily(raw: RawFamily, done: WeakSet<object>): FontFamily {
     languages,
     variable: faces.some((face) => face.variable),
     enabled: faces.some((face) => face.enabled),
-    hidden: faces.every((face) => face.hidden),
     faces
   }
 }

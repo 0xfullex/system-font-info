@@ -63,7 +63,7 @@ objects internally.
   Chancery), so it is left raw in `platform.slant`.
 - `monospace`, `color`: symbolic bits. `symbol`: the cmap has a (3,0) subtable
   (from the tables). `enabled`: `kCTFontEnabledAttribute` (a number or a
-  boolean). `hidden` and the simulations are always false: macOS has neither.
+  boolean). The simulations are always false: macOS has none.
 - `languages`: `kCTFontLanguagesAttribute`.
 - `scope`, first rule that applies: `kCTFontRegistrationScopeAttribute` is the
   process scope: process. `kCTFontPriorityAttribute` 40000: user; 10000 /
