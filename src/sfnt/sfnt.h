@@ -121,9 +121,9 @@ struct FontTables {
   std::vector<uint32_t> tags;     // tables present, ascending
   std::vector<NameRecord> names;  // empty when there is no usable name table
   std::optional<Fvar> fvar;
-  bool symbolCmap = false;        // cmap has a (3,0) subtable
+  bool symbolCmap = false;  // cmap has a (3,0) subtable
   bool hasCff2 = false;
-  Value::Shared opentype;         // the `opentype` object of a face (see ts/types.ts OpenTypeInfo)
+  Value::Shared opentype;  // the `opentype` object of a face (see ts/types.ts OpenTypeInfo)
 };
 
 // Reads and parses the standard tables listed in OpenTypeInfo. A table that

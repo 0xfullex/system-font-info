@@ -41,8 +41,7 @@ type Matcher = (requested: TagInfo, candidate: TagInfo) => boolean
 // From the exact tag down to the bare language.
 const matchLevels: Matcher[] = [
   (requested, candidate) => requested.canonical === candidate.canonical,
-  (requested, candidate) =>
-    requested.maximized !== undefined && requested.maximized.tag === candidate.maximized?.tag,
+  (requested, candidate) => requested.maximized !== undefined && requested.maximized.tag === candidate.maximized?.tag,
   (requested, candidate) =>
     requested.maximized !== undefined &&
     requested.maximized.language === candidate.maximized?.language &&

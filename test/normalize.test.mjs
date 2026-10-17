@@ -38,9 +38,7 @@ test('language tags are canonicalized in every place that carries one', () => {
     names: [{ platformId: 3, encodingId: 1, languageId: 0x804, nameId: 1, language: 'zh-cn', value: 'x' }],
     fvar: {
       axes: [{ tag: 'wght', min: 1, default: 4, max: 9, flags: 0, nameId: 256, names: names(['zh-cn', 'a']) }],
-      instances: [
-        { subfamilyNameId: 257, subfamilyNames: names(['zh-tw', 'b']), flags: 0, coordinates: { wght: 4 } }
-      ]
+      instances: [{ subfamilyNameId: 257, subfamilyNames: names(['zh-tw', 'b']), flags: 0, coordinates: { wght: 4 } }]
     },
     layout: {
       gsub: { scripts: {}, features: [], featureNames: { ss01: names(['en-us', 'c']) } },
@@ -79,9 +77,7 @@ test('language tags are canonicalized in every place that carries one', () => {
 })
 
 test('an empty tag stays empty and an unparseable tag is kept as written', () => {
-  const [family] = normalizeFamilies([
-    rawFamily('F', rawFace({ fullNames: names(['', 'a'], ['not_a_tag', 'b']) }))
-  ])
+  const [family] = normalizeFamilies([rawFamily('F', rawFace({ fullNames: names(['', 'a'], ['not_a_tag', 'b']) }))])
   assert.deepEqual(family.faces[0].fullNames, names(['', 'a'], ['not_a_tag', 'b']))
 })
 
@@ -107,8 +103,7 @@ test('opentype.names is a raw view and is never merged', () => {
 })
 
 test('default string: en-US, else en / en-*, else "", else the first, else ""', () => {
-  const fullName = (list) =>
-    normalizeFamilies([rawFamily('F', rawFace({ fullNames: list }))])[0].faces[0].fullName
+  const fullName = (list) => normalizeFamilies([rawFamily('F', rawFace({ fullNames: list }))])[0].faces[0].fullName
   assert.equal(fullName(names(['de', 'd'], ['en-GB', 'gb'], ['en-US', 'us'])), 'us')
   assert.equal(fullName(names(['de', 'd'], ['en-AU', 'au'], ['en', 'plain'])), 'au')
   assert.equal(fullName(names(['de', 'd'], ['en', 'plain'])), 'plain')
@@ -124,9 +119,7 @@ test('default strings are set for styleName and for each axis name', () => {
     { tag: 'wght', names: names(['de', 'Gewicht'], ['en-us', 'Weight']), min: 1, max: 9, default: 4, hidden: false },
     { tag: 'XXXX', names: [], min: 0, max: 1, default: 0, hidden: true }
   ]
-  const [family] = normalizeFamilies([
-    rawFamily('F', rawFace({ styleNames: names(['en', 'Bold']), variable: true, axes }))
-  ])
+  const [family] = normalizeFamilies([rawFamily('F', rawFace({ styleNames: names(['en', 'Bold']), variable: true, axes }))])
   assert.equal(family.faces[0].styleName, 'Bold')
   assert.equal(family.faces[0].axes[0].name, 'Weight')
   assert.equal(family.faces[0].axes[1].name, '')
@@ -167,23 +160,21 @@ test('aggregates: not variable, none enabled, not every face hidden', () => {
   assert.equal(family.hidden, false)
 })
 
-test('the family aggregates do not alias the faces\' arrays', () => {
+test("the family aggregates do not alias the faces' arrays", () => {
   const [family] = normalizeFamilies([rawFamily('F', rawFace({ familyNames: names(['en', 'F']) }))])
   assert.notEqual(family.familyNames, family.faces[0].familyNames)
 })
 
 test('families are sorted by lowercase code units, ties by the raw string', () => {
-  const sorted = normalizeFamilies(
-    ['b', 'a', 'Z', 'B', 'ä', 'A', 'z', 'Éa', 'ea'].map((name) => rawFamily(name, rawFace()))
-  ).map((family) => family.family)
+  const sorted = normalizeFamilies(['b', 'a', 'Z', 'B', 'ä', 'A', 'z', 'Éa', 'ea'].map((name) => rawFamily(name, rawFace()))).map(
+    (family) => family.family
+  )
   // Case is folded first, so "ea" sorts before "z"; "ä" and "Éa" come after ASCII by code unit; the raw string breaks ties.
   assert.deepEqual(sorted, ['A', 'a', 'B', 'b', 'ea', 'Z', 'z', 'ä', 'Éa'])
 })
 
 test('faces keep their order', () => {
-  const [family] = normalizeFamilies([
-    rawFamily('F', rawFace({ postscriptName: 'z' }), rawFace({ postscriptName: 'a' }))
-  ])
+  const [family] = normalizeFamilies([rawFamily('F', rawFace({ postscriptName: 'z' }), rawFace({ postscriptName: 'a' }))])
   assert.deepEqual(
     family.faces.map((face) => face.postscriptName),
     ['z', 'a']

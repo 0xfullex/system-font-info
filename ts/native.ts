@@ -45,7 +45,5 @@ export function loadNative(): NativeBinding {
       failures.push(`  ${candidate}: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
-  throw new Error(
-    `system-font-info: cannot load the native addon for ${process.platform}-${process.arch}. Tried:\n${failures.join('\n')}`
-  )
+  throw new Error(`system-font-info: cannot load the native addon for ${process.platform}-${process.arch}. Tried:\n${failures.join('\n')}`)
 }

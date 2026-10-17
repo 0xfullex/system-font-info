@@ -101,7 +101,11 @@ describe('registered test fonts', { skip }, () => {
 
   test('the named instances of the variable font share one font resource', async () => {
     const { faces } = (await testFamilies()).find((entry) => entry.family === 'SFITest Variable')
-    assert.deepEqual(faces.map((face) => face.postscriptName).sort(), ['SFITestVariable-Bold', 'SFITestVariable-Regular', 'SFITestVariable-Thin'])
+    assert.deepEqual(faces.map((face) => face.postscriptName).sort(), [
+      'SFITestVariable-Bold',
+      'SFITestVariable-Regular',
+      'SFITestVariable-Thin'
+    ])
     assert.ok(faces.every((face) => face.opentype === faces[0].opentype && face.axes === faces[0].axes))
     assert.deepEqual(
       faces.map((face) => face.coordinates.wght).sort((a, b) => a - b),
@@ -132,7 +136,10 @@ describe('registered test fonts', { skip }, () => {
     const languages = variable.familyNames.map((name) => name.language)
     // ID 16 exists on both platforms in English; every other language comes from ID 1.
     for (const language of ['zh-CN', 'zh-Hans', 'ja-JP', 'ru-RU', 'ar-SA', 'gsw']) assert.ok(languages.includes(language), language)
-    assert.deepEqual(variable.familyNames.filter((name) => name.language.startsWith('en')).map((name) => name.language), ['en', 'en-US'])
+    assert.deepEqual(
+      variable.familyNames.filter((name) => name.language.startsWith('en')).map((name) => name.language),
+      ['en', 'en-US']
+    )
   })
 
   test('compose the full names of a named instance from its family and subfamily names, per language', async () => {
@@ -141,7 +148,10 @@ describe('registered test fonts', { skip }, () => {
     const pairs = (strings) => strings.map((entry) => [entry.language, entry.value])
 
     // Thin and Regular have English subfamily names on both platforms.
-    assert.deepEqual(pairs(face('SFITestVariable-Thin').styleNames), [['en', 'Thin'], ['en-US', 'Thin']])
+    assert.deepEqual(pairs(face('SFITestVariable-Thin').styleNames), [
+      ['en', 'Thin'],
+      ['en-US', 'Thin']
+    ])
     assert.deepEqual(pairs(face('SFITestVariable-Thin').fullNames), [
       ['en', 'SFITest Variable Thin'],
       ['en-US', 'SFITest Variable Thin']
@@ -152,7 +162,12 @@ describe('registered test fonts', { skip }, () => {
       ['en-US', 'SFITest Variable Regular']
     ])
     // Bold also has Chinese: Macintosh zh-Hans and Windows zh-CN, each paired with the family name of its own script.
-    assert.deepEqual(pairs(face('SFITestVariable-Bold').styleNames), [['en', 'Bold'], ['zh-Hans', '粗体'], ['en-US', 'Bold'], ['zh-CN', '粗体']])
+    assert.deepEqual(pairs(face('SFITestVariable-Bold').styleNames), [
+      ['en', 'Bold'],
+      ['zh-Hans', '粗体'],
+      ['en-US', 'Bold'],
+      ['zh-CN', '粗体']
+    ])
     assert.deepEqual(pairs(face('SFITestVariable-Bold').fullNames), [
       ['en', 'SFITest Variable Bold'],
       ['zh-Hans', 'SFITest 变量 粗体'],
@@ -160,7 +175,9 @@ describe('registered test fonts', { skip }, () => {
       ['zh-CN', 'SFITest 变量 粗体']
     ])
     // The languages that have a family name but no subfamily name (ja-JP, ru-RU, ...) get no full name.
-    assert.ok(faces.every((candidate) => candidate.fullNames.every((entry) => ['en', 'en-US', 'zh-Hans', 'zh-CN'].includes(entry.language))))
+    assert.ok(
+      faces.every((candidate) => candidate.fullNames.every((entry) => ['en', 'en-US', 'zh-Hans', 'zh-CN'].includes(entry.language)))
+    )
     // CoreText's own composed string is kept for reference.
     assert.equal(typeof face('SFITestVariable-Bold').platform.displayName, 'string')
   })

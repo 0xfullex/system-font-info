@@ -49,8 +49,8 @@ std::vector<std::pair<uint32_t, uint32_t>> coverageRanges(CTFontDescriptorRef de
 
   // The bitmap representation is the BMP's bitmap, then for each further
   // plane a plane number byte (1-16) followed by that plane's bitmap.
-  const Ref<CFDataRef> data(CFCharacterSetCreateBitmapRepresentation(
-      kCFAllocatorDefault, static_cast<CFCharacterSetRef>(attribute.get())));
+  const Ref<CFDataRef> data(
+      CFCharacterSetCreateBitmapRepresentation(kCFAllocatorDefault, static_cast<CFCharacterSetRef>(attribute.get())));
   if (!data) return ranges;
   const uint8_t* bytes = CFDataGetBytePtr(data.get());
   const size_t length = static_cast<size_t>(CFDataGetLength(data.get()));

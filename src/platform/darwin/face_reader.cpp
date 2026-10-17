@@ -66,7 +66,8 @@ FaceReader::FileFaces& FaceReader::fileFaces(const std::string& path) {
     entry->second.file = sfnt::FontFile::open(path);
     if (entry->second.file && entry->second.file->faceCount() > 1) {
       for (size_t i = 0; i < entry->second.file->faceCount(); ++i) {
-        entry->second.nameTables.push_back(entry->second.file->table(i, sfnt::makeTag("name")).value_or(std::vector<uint8_t>{}));
+        entry->second.nameTables.push_back(
+            entry->second.file->table(i, sfnt::makeTag("name")).value_or(std::vector<uint8_t>{}));
       }
     }
   }
@@ -81,7 +82,8 @@ FaceReader::FileFaces& FaceReader::fileFaces(const std::string& path) {
 std::optional<uint32_t> FaceReader::faceIndexInFile(const std::string& path, const std::vector<uint32_t>& tags,
                                                     CTFontRef font) {
   const FileFaces& faces = fileFaces(path);
-  if (!faces.file) return tags.empty() ? std::make_optional(0u) : std::nullopt;  // no tables: not an sfnt, so not a collection
+  if (!faces.file)
+    return tags.empty() ? std::make_optional(0u) : std::nullopt;  // no tables: not an sfnt, so not a collection
   if (faces.file->faceCount() <= 1) return 0;
 
   const auto name = copyTable(font, sfnt::makeTag("name"));
@@ -205,7 +207,8 @@ Face FaceReader::read(CTFontDescriptorRef descriptor, const std::vector<Shadowed
   face.fullNames = sfnt::localizedName(tables.names, 4);
   if (face.namedInstance) {
     face.styleNames = sfnt::localizedName(tables.names, tables.fvar->instances[*face.namedInstance].subfamilyNameId);
-    // A named instance has no full-name record of its own; its names are composed from the family and its subfamily name.
+    // A named instance has no full-name record of its own; its names are composed from the family and its subfamily
+    // name.
     face.fullNames = sfnt::instanceFullNames(tables.names, tables.fvar->instances[*face.namedInstance]);
   }
 
@@ -213,8 +216,8 @@ Face FaceReader::read(CTFontDescriptorRef descriptor, const std::vector<Shadowed
 
   // Only a CTFont provides the features and the metrics.
   const std::optional<Value> features = substituted ? std::nullopt : featuresOf(font.get(), face.file);
-  face.platform = makePlatformValue({descriptor, substituted ? nullptr : font.get(), features ? &*features : nullptr, traits,
-                                     options_.tables, shadowed});
+  face.platform = makePlatformValue({descriptor, substituted ? nullptr : font.get(), features ? &*features : nullptr,
+                                     traits, options_.tables, shadowed});
   return face;
 }
 

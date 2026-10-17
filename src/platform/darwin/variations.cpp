@@ -22,8 +22,8 @@ SharedAxes makeAxes(CFArrayRef coreTextAxes, const sfnt::FontTables& tables) {
     CFDictionaryRef dictionary = asDictionary(CFArrayGetValueAtIndex(coreTextAxes, i));
     if (!dictionary) continue;
     VariationAxis axis;
-    axis.tag = sfnt::tagToString(
-        static_cast<uint32_t>(integerValue(dictionaryValue(dictionary, kCTFontVariationAxisIdentifierKey)).value_or(0)));
+    axis.tag = sfnt::tagToString(static_cast<uint32_t>(
+        integerValue(dictionaryValue(dictionary, kCTFontVariationAxisIdentifierKey)).value_or(0)));
     axis.min = numberValue(dictionaryValue(dictionary, kCTFontVariationAxisMinimumValueKey)).value_or(0);
     axis.max = numberValue(dictionaryValue(dictionary, kCTFontVariationAxisMaximumValueKey)).value_or(0);
     axis.defaultValue = numberValue(dictionaryValue(dictionary, kCTFontVariationAxisDefaultValueKey)).value_or(0);
@@ -54,7 +54,9 @@ Coordinates coordinatesOf(CFDictionaryRef variation, const std::vector<Variation
         [](const void* key, const void* value, void* context) {
           const auto id = integerValue(static_cast<CFTypeRef>(key));
           const auto number = numberValue(static_cast<CFTypeRef>(value));
-          if (id && number) (*static_cast<std::map<std::string, double>*>(context))[sfnt::tagToString(static_cast<uint32_t>(*id))] = *number;
+          if (id && number)
+            (*static_cast<std::map<std::string, double>*>(context))[sfnt::tagToString(static_cast<uint32_t>(*id))] =
+                *number;
         },
         &explicitValues);
   }

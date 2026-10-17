@@ -88,7 +88,8 @@ CTFontDescriptorRef resolve(const Group& group, Ref<CTFontDescriptorRef>& resolv
     const auto name = makeString(group.postscriptName);
     const Ref<CTFontDescriptorRef> byName(CTFontDescriptorCreateWithNameAndSize(name.get(), 0));
     resolvedStorage = Ref<CTFontDescriptorRef>(CTFontDescriptorCreateMatchingFontDescriptor(byName.get(), nullptr));
-    if (resolvedStorage && postscriptNameOf(resolvedStorage.get()) == group.postscriptName) return resolvedStorage.get();
+    if (resolvedStorage && postscriptNameOf(resolvedStorage.get()) == group.postscriptName)
+      return resolvedStorage.get();
   }
   return group.descriptors.front();
 }
@@ -146,12 +147,14 @@ std::vector<std::string> memberOrder(const std::string& family) {
   const void* attributeKeys[] = {kCTFontFamilyNameAttribute};
   const void* attributeValues[] = {familyName.get()};
   const Ref<CFDictionaryRef> attributes(CFDictionaryCreate(kCFAllocatorDefault, attributeKeys, attributeValues, 1,
-                                                           &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks));
+                                                           &kCFTypeDictionaryKeyCallBacks,
+                                                           &kCFTypeDictionaryValueCallBacks));
   const Ref<CTFontDescriptorRef> descriptor(CTFontDescriptorCreateWithAttributes(attributes.get()));
   const void* descriptorList[] = {descriptor.get()};
   const Ref<CFArrayRef> descriptors(CFArrayCreate(kCFAllocatorDefault, descriptorList, 1, &kCFTypeArrayCallBacks));
   const Ref<CFDictionaryRef> options = collectionOptions();
-  const Ref<CTFontCollectionRef> collection(CTFontCollectionCreateWithFontDescriptors(descriptors.get(), options.get()));
+  const Ref<CTFontCollectionRef> collection(
+      CTFontCollectionCreateWithFontDescriptors(descriptors.get(), options.get()));
   if (!collection) return names;
   const Ref<CFArrayRef> members(CTFontCollectionCreateMatchingFontDescriptors(collection.get()));
   if (!members) return names;

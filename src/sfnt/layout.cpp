@@ -24,8 +24,8 @@ void addUnique(std::vector<std::string>& list, const std::string& tag) {
 }
 
 bool isNumberedTag(const std::string& tag, char first, char second) {
-  return tag.size() == 4 && tag[0] == first && tag[1] == second && tag[2] >= '0' && tag[2] <= '9' &&
-         tag[3] >= '0' && tag[3] <= '9';
+  return tag.size() == 4 && tag[0] == first && tag[1] == second && tag[2] >= '0' && tag[2] <= '9' && tag[3] >= '0' &&
+         tag[3] <= '9';
 }
 
 // The feature tags a language system enables: the required feature first, then
@@ -80,8 +80,7 @@ Value layoutToValue(std::span<const uint8_t> table, const std::vector<NameRecord
       if (defaultLangSys != 0) languages.set("dflt", languageSystemFeatures(r, script + defaultLangSys, features));
       for (size_t j = 0; j < langSysCount; ++j) {
         const size_t langAt = script + 4 + j * kTagRecordSize;
-        languages.set(tagToString(r.u32(langAt)),
-                      languageSystemFeatures(r, script + r.u16(langAt + 4), features));
+        languages.set(tagToString(r.u32(langAt)), languageSystemFeatures(r, script + r.u16(langAt + 4), features));
       }
       scripts.set(tagToString(r.u32(at)), std::move(languages));
     }
@@ -100,7 +99,8 @@ Value layoutToValue(std::span<const uint8_t> table, const std::vector<NameRecord
     const uint16_t nameId = r.u16(feature.offset + paramsOffset + 2);
     if (nameId == 0) continue;
 
-    auto entry = std::find_if(featureNames.begin(), featureNames.end(), [&](const auto& e) { return e.first == feature.tag; });
+    auto entry =
+        std::find_if(featureNames.begin(), featureNames.end(), [&](const auto& e) { return e.first == feature.tag; });
     if (entry == featureNames.end()) entry = featureNames.insert(featureNames.end(), {feature.tag, {}});
     for (LocalizedString& name : localizedName(names, nameId)) entry->second.push_back(std::move(name));
   }

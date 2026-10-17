@@ -12,14 +12,17 @@
 // The SDK does not ship ICU headers; declare the two stable C APIs we need.
 typedef int32_t UErrorCode;
 typedef int8_t UBool;
-int32_t uloc_getLocaleForLCID(uint32_t hostID, char *locale, int32_t capacity, UErrorCode *status);
-int32_t uloc_toLanguageTag(const char *localeID, char *langtag, int32_t capacity, UBool strict, UErrorCode *status);
-uint32_t uloc_getLCID(const char *localeID);
+int32_t uloc_getLocaleForLCID(uint32_t hostID, char* locale, int32_t capacity, UErrorCode* status);
+int32_t uloc_toLanguageTag(const char* localeID, char* langtag, int32_t capacity, UBool strict, UErrorCode* status);
+uint32_t uloc_getLCID(const char* localeID);
 
 // Windows LocaleNameToLCID / LCIDToLocaleName omit the script for Chinese
 // regional locales; match that so tags agree with what DirectWrite reports.
-static void windowsStyle(uint32_t lcid, char *tag) {
-  struct { uint32_t lcid; const char *tag; } fixes[] = {
+static void windowsStyle(uint32_t lcid, char* tag) {
+  struct {
+    uint32_t lcid;
+    const char* tag;
+  } fixes[] = {
       {0x0004, "zh-Hans"}, {0x7C04, "zh-Hant"}, {0x0804, "zh-CN"}, {0x0404, "zh-TW"},
       {0x0C04, "zh-HK"},   {0x1004, "zh-SG"},   {0x1404, "zh-MO"},
   };
@@ -27,7 +30,7 @@ static void windowsStyle(uint32_t lcid, char *tag) {
     if (fixes[i].lcid == lcid) strcpy(tag, fixes[i].tag);
 }
 
-static int toTag(const char *icu, char *out, int cap) {
+static int toTag(const char* icu, char* out, int cap) {
   UErrorCode st = 0;
   uloc_toLanguageTag(icu, out, cap, 1, &st);
   return st <= 0 && out[0] && strcmp(out, "und") != 0;

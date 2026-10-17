@@ -14,9 +14,9 @@ namespace sfi::platform::darwin {
 
 // The entries of kCTFontTraitsAttribute; an entry the descriptor lacks is unset.
 struct Traits {
-  std::optional<double> weight;  // kCTFontWeightTrait, -1...1
-  std::optional<double> width;   // kCTFontWidthTrait, -1...1
-  std::optional<double> slant;   // kCTFontSlantTrait, -1...1
+  std::optional<double> weight;      // kCTFontWeightTrait, -1...1
+  std::optional<double> width;       // kCTFontWidthTrait, -1...1
+  std::optional<double> slant;       // kCTFontSlantTrait, -1...1
   std::optional<uint32_t> symbolic;  // kCTFontSymbolicTrait, class bits included
 };
 

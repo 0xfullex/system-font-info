@@ -119,7 +119,8 @@ class Converter {
 
   Napi::Array stringArray(const std::vector<std::string>& strings) {
     auto array = Napi::Array::New(env_, strings.size());
-    for (size_t i = 0; i < strings.size(); ++i) array.Set(static_cast<uint32_t>(i), Napi::String::New(env_, strings[i]));
+    for (size_t i = 0; i < strings.size(); ++i)
+      array.Set(static_cast<uint32_t>(i), Napi::String::New(env_, strings[i]));
     return array;
   }
 

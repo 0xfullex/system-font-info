@@ -22,7 +22,8 @@ std::optional<std::string> decodeName(const NameRecord& record, std::span<const 
                                       const LegacyDecoder& decodeLegacy) {
   const uint16_t platform = record.platformId;
   const uint16_t encoding = record.encodingId;
-  if (platform == kPlatformUnicode || (platform == kPlatformWindows && (encoding == 0 || encoding == 1 || encoding == 10)) ||
+  if (platform == kPlatformUnicode ||
+      (platform == kPlatformWindows && (encoding == 0 || encoding == 1 || encoding == 10)) ||
       (platform == kPlatformIso && encoding == 1)) {
     return utf16beToUtf8(bytes);
   }
@@ -79,14 +80,15 @@ std::string languageKey(const std::string& tag) {
 
 std::string lcidToBcp47(uint16_t lcid) {
   const LcidEntry* end = kLcidTable + kLcidTableSize;
-  const LcidEntry* it = std::lower_bound(kLcidTable, end, lcid, [](const LcidEntry& e, uint16_t key) { return e.lcid < key; });
+  const LcidEntry* it =
+      std::lower_bound(kLcidTable, end, lcid, [](const LcidEntry& e, uint16_t key) { return e.lcid < key; });
   return it != end && it->lcid == lcid ? it->tag : "";
 }
 
 std::string macLanguageToBcp47(uint16_t code) {
   const MacLanguageEntry* end = kMacLanguageTable + kMacLanguageTableSize;
-  const MacLanguageEntry* it =
-      std::lower_bound(kMacLanguageTable, end, code, [](const MacLanguageEntry& e, uint16_t key) { return e.code < key; });
+  const MacLanguageEntry* it = std::lower_bound(kMacLanguageTable, end, code,
+                                                [](const MacLanguageEntry& e, uint16_t key) { return e.code < key; });
   return it != end && it->code == code ? it->tag : "";
 }
 
@@ -137,7 +139,8 @@ std::vector<NameRecord> parseNameTable(std::span<const uint8_t> table, const Leg
     }
 
     // A zero-length string needs no storage, and some fonts leave its offset arbitrary.
-    const std::span<const uint8_t> bytes = length == 0 ? std::span<const uint8_t>() : r.bytes(storageOffset + offset, length);
+    const std::span<const uint8_t> bytes =
+        length == 0 ? std::span<const uint8_t>() : r.bytes(storageOffset + offset, length);
     record.value = decodeName(record, bytes, decodeLegacy);
     if (!record.value) record.bytesHex = toHex(bytes);
     records.push_back(std::move(record));
@@ -159,9 +162,8 @@ LocalizedStrings localizedNameWithFallback(const std::vector<NameRecord>& record
   const size_t preferredCount = out.size();
   for (const LocalizedString& candidate : localizedName(records, fallback)) {
     const std::string key = languageKey(candidate.language);
-    const bool languageCovered = std::any_of(out.begin(), out.begin() + preferredCount, [&](const LocalizedString& s) {
-      return languageKey(s.language) == key;
-    });
+    const bool languageCovered = std::any_of(out.begin(), out.begin() + preferredCount,
+                                             [&](const LocalizedString& s) { return languageKey(s.language) == key; });
     if (!languageCovered) out.push_back(candidate);
   }
   return out;

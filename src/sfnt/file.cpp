@@ -19,7 +19,8 @@ std::filesystem::path pathFromUtf8(const std::string& path) {
 }
 
 bool isSfntVersion(uint32_t version) {
-  return version == 0x00010000 || version == makeTag("OTTO") || version == makeTag("true") || version == makeTag("typ1");
+  return version == 0x00010000 || version == makeTag("OTTO") || version == makeTag("true") ||
+         version == makeTag("typ1");
 }
 
 std::optional<std::vector<uint8_t>> readRange(std::ifstream& file, uint64_t offset, uint64_t length) {

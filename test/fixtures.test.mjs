@@ -25,7 +25,23 @@ const windows = (opentype, nameId, languageId) =>
 
 describe('SFITest-Variable.ttf', () => {
   test('lists its tables in ascending order', () => {
-    assert.deepEqual(variable.tables, ['GSUB', 'OS/2', 'STAT', 'cmap', 'fvar', 'glyf', 'gvar', 'head', 'hhea', 'hmtx', 'loca', 'maxp', 'meta', 'name', 'post'])
+    assert.deepEqual(variable.tables, [
+      'GSUB',
+      'OS/2',
+      'STAT',
+      'cmap',
+      'fvar',
+      'glyf',
+      'gvar',
+      'head',
+      'hhea',
+      'hmtx',
+      'loca',
+      'maxp',
+      'meta',
+      'name',
+      'post'
+    ])
     assert.equal(variable.errors, undefined)
   })
 
@@ -45,10 +61,7 @@ describe('SFITest-Variable.ttf', () => {
       [0x0401, 'ar-SA', 'SFITest متغير', 'SFITest متغير Regular']
     ]
     for (const [languageId, language, family, full] of expected) {
-      assert.deepEqual(
-        [windows(variable, 1, languageId)?.language, windows(variable, 1, languageId)?.value],
-        [language, family]
-      )
+      assert.deepEqual([windows(variable, 1, languageId)?.language, windows(variable, 1, languageId)?.value], [language, family])
       assert.deepEqual([windows(variable, 4, languageId)?.language, windows(variable, 4, languageId)?.value], [language, full])
     }
   })
@@ -66,7 +79,9 @@ describe('SFITest-Variable.ttf', () => {
     assert.equal(record.value, 'SFITest Alemannisch')
   })
 
-  test('decodes the Mac Chinese Simplified record, or keeps its bytes', { skip: process.platform !== 'darwin' && 'only the macOS decoder is certain to know the encoding' }, () => {
+  test('decodes the Mac Chinese Simplified record, or keeps its bytes', {
+    skip: process.platform !== 'darwin' && 'only the macOS decoder is certain to know the encoding'
+  }, () => {
     const mac = variable.names.filter((record) => record.platformId === 1 && record.encodingId === 25)
     assert.deepEqual(
       mac.map((record) => [record.nameId, record.languageId, record.language, record.value]),
@@ -106,7 +121,12 @@ describe('SFITest-Variable.ttf', () => {
     )
     assert.deepEqual(
       axes[0].names.map((name) => [name.language, name.value]),
-      [['en', 'Weight'], ['zh-Hans', '字重'], ['en-US', 'Weight'], ['zh-CN', '字重']]
+      [
+        ['en', 'Weight'],
+        ['zh-Hans', '字重'],
+        ['en-US', 'Weight'],
+        ['zh-CN', '字重']
+      ]
     )
     assert.deepEqual(
       instances.map((instance) => [instance.coordinates, instance.subfamilyNameId, instance.postscriptNameId, instance.postscriptName]),
@@ -179,8 +199,14 @@ describe('SFITest-Collection.ttc', () => {
   })
 
   test('reads each face OS/2 and maxp', () => {
-    assert.deepEqual(collection.map((face) => face.os2.weightClass), [400, 700])
-    assert.deepEqual(collection.map((face) => face.maxp.version), [1, 0.5])
+    assert.deepEqual(
+      collection.map((face) => face.os2.weightClass),
+      [400, 700]
+    )
+    assert.deepEqual(
+      collection.map((face) => face.maxp.version),
+      [1, 0.5]
+    )
     assert.ok(collection.every((face) => face.maxp.numGlyphs === 8))
   })
 
@@ -216,24 +242,29 @@ describe('SFITest-Legacy.ttf', () => {
     assert.deepEqual(idsOn(1, [16, 17]), [])
     assert.deepEqual(
       idsOn(1, [1, 2]).map((record) => [record.nameId, record.language]),
-      [[1, 'en'], [2, 'en'], [1, 'is'], [2, 'is'], [1, 'tr'], [2, 'tr']]
+      [
+        [1, 'en'],
+        [2, 'en'],
+        [1, 'is'],
+        [2, 'is'],
+        [1, 'tr'],
+        [2, 'tr']
+      ]
     )
   })
 
   // The same bytes mean other characters in the Turkish and Icelandic Mac Roman
   // variants than in plain Mac Roman (0xDA is Ğ in Mac Turkish, the fraction slash in Mac Roman).
-  test(
-    'decodes the Mac Roman variants of Turkish and Icelandic',
-    { skip: process.platform !== 'darwin' && 'only the macOS decoder is certain to know the encodings' },
-    () => {
-      const value = (nameId, language) => legacy.names.find((r) => r.platformId === 1 && r.nameId === nameId && r.language === language)
-      assert.equal(value(1, 'tr').value, 'Yazı Tipi Ğğ Şş İ')
-      assert.equal(value(2, 'tr').value, 'Düz')
-      assert.equal(value(1, 'is').value, 'Letur Þþ Ðð')
-      assert.equal(value(2, 'is').value, 'Venjulegt')
-      assert.ok(legacy.names.every((record) => record.bytes === undefined))
-    }
-  )
+  test('decodes the Mac Roman variants of Turkish and Icelandic', {
+    skip: process.platform !== 'darwin' && 'only the macOS decoder is certain to know the encodings'
+  }, () => {
+    const value = (nameId, language) => legacy.names.find((r) => r.platformId === 1 && r.nameId === nameId && r.language === language)
+    assert.equal(value(1, 'tr').value, 'Yazı Tipi Ğğ Şş İ')
+    assert.equal(value(2, 'tr').value, 'Düz')
+    assert.equal(value(1, 'is').value, 'Letur Þþ Ðð')
+    assert.equal(value(2, 'is').value, 'Venjulegt')
+    assert.ok(legacy.names.every((record) => record.bytes === undefined))
+  })
 })
 
 describe('opentype.errors', () => {
@@ -280,7 +311,10 @@ describe('opentype.errors', () => {
     assert.deepEqual(font.errors, ['name'])
     assert.deepEqual(font.names, [])
     assert.deepEqual(font.fvar.axes[0].names, [])
-    assert.deepEqual(font.fvar.instances.map((instance) => instance.subfamilyNames), [[], [], []])
+    assert.deepEqual(
+      font.fvar.instances.map((instance) => instance.subfamilyNames),
+      [[], [], []]
+    )
     assert.equal(font.fvar.instances[0].postscriptName, undefined)
     assert.equal(font.head.unitsPerEm, 1000)
   })

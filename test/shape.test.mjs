@@ -28,48 +28,55 @@ const int = (value, path, errors) => {
 const uint = (value, path, errors) => {
   if (!Number.isInteger(value) || value < 0) errors.push(`${path}: expected a non-negative integer, got ${describe_(value)}`)
 }
-const literal = (...allowed) => (value, path, errors) => {
-  if (!allowed.includes(value)) errors.push(`${path}: expected one of ${allowed.join(' | ')}, got ${describe_(value)}`)
-}
+const literal =
+  (...allowed) =>
+  (value, path, errors) => {
+    if (!allowed.includes(value)) errors.push(`${path}: expected one of ${allowed.join(' | ')}, got ${describe_(value)}`)
+  }
 const arrayOf = (item) => (value, path, errors) => {
   if (!Array.isArray(value)) return errors.push(`${path}: expected an array, got ${describe_(value)}`)
   value.forEach((entry, i) => item(entry, `${path}[${i}]`, errors))
 }
 const tuple = (length, item) => (value, path, errors) => {
-  if (!Array.isArray(value) || value.length !== length) return errors.push(`${path}: expected an array of ${length}, got ${describe_(value)}`)
+  if (!Array.isArray(value) || value.length !== length)
+    return errors.push(`${path}: expected an array of ${length}, got ${describe_(value)}`)
   value.forEach((entry, i) => item(entry, `${path}[${i}]`, errors))
 }
 const recordOf = (item) => (value, path, errors) => {
   if (!isObject(value)) return errors.push(`${path}: expected an object, got ${describe_(value)}`)
   for (const [key, entry] of Object.entries(value)) item(entry, `${path}.${key}`, errors)
 }
-const shape = (required, optional = {}) => (value, path, errors) => {
-  if (!isObject(value)) return errors.push(`${path}: expected an object, got ${describe_(value)}`)
-  for (const [key, schema] of Object.entries(required)) {
-    if (!(key in value)) errors.push(`${path}.${key}: missing`)
-    else schema(value[key], `${path}.${key}`, errors)
-  }
-  for (const [key, schema] of Object.entries(optional)) {
-    if (key in value) {
-      // An optional field is absent, never present with undefined.
-      if (value[key] === undefined) errors.push(`${path}.${key}: present with undefined`)
+const shape =
+  (required, optional = {}) =>
+  (value, path, errors) => {
+    if (!isObject(value)) return errors.push(`${path}: expected an object, got ${describe_(value)}`)
+    for (const [key, schema] of Object.entries(required)) {
+      if (!(key in value)) errors.push(`${path}.${key}: missing`)
       else schema(value[key], `${path}.${key}`, errors)
     }
+    for (const [key, schema] of Object.entries(optional)) {
+      if (key in value) {
+        // An optional field is absent, never present with undefined.
+        if (value[key] === undefined) errors.push(`${path}.${key}: present with undefined`)
+        else schema(value[key], `${path}.${key}`, errors)
+      }
+    }
+    for (const key of Object.keys(value)) {
+      if (!(key in required) && !(key in optional)) errors.push(`${path}.${key}: not in the type`)
+    }
   }
-  for (const key of Object.keys(value)) {
-    if (!(key in required) && !(key in optional)) errors.push(`${path}.${key}: not in the type`)
-  }
-}
 const check = (predicate, message) => (value, path, errors) => {
   if (!predicate(value)) errors.push(`${path}: ${message}, got ${describe_(value)}`)
 }
-const all = (...schemas) => (value, path, errors) => {
-  for (const schema of schemas) {
-    const before = errors.length
-    schema(value, path, errors)
-    if (errors.length > before) return
+const all =
+  (...schemas) =>
+  (value, path, errors) => {
+    for (const schema of schemas) {
+      const before = errors.length
+      schema(value, path, errors)
+      if (errors.length > before) return
+    }
   }
-}
 
 function describe_(value) {
   const text = JSON.stringify(value)
@@ -105,11 +112,8 @@ const isoDate = check((value) => {
 }, 'expected an ISO 8601 UTC date in years 0001-9999')
 
 const nameRecord = all(
-  shape(
-    { platformId: uint, encodingId: uint, languageId: uint, nameId: uint, language: languageTag },
-    { value: str, bytes: hex }
-  ),
-  check((record) => ('value' in record) !== ('bytes' in record), 'expected exactly one of value and bytes')
+  shape({ platformId: uint, encodingId: uint, languageId: uint, nameId: uint, language: languageTag }, { value: str, bytes: hex }),
+  check((record) => 'value' in record !== 'bytes' in record, 'expected exactly one of value and bytes')
 )
 
 const horizontalHeader = shape({
@@ -166,7 +170,16 @@ const os2 = all(
   ),
   // A field group of a newer table version is present only in a table of that version.
   check((table) => {
-    const needs = { codePageRanges: 1, xHeight: 2, capHeight: 2, defaultChar: 2, breakChar: 2, maxContext: 2, lowerOpticalPointSize: 5, upperOpticalPointSize: 5 }
+    const needs = {
+      codePageRanges: 1,
+      xHeight: 2,
+      capHeight: 2,
+      defaultChar: 2,
+      breakChar: 2,
+      maxContext: 2,
+      lowerOpticalPointSize: 5,
+      upperOpticalPointSize: 5
+    }
     return Object.entries(needs).every(([key, version]) => !(key in table) || table.version >= version)
   }, 'expected fields only of tables at least as new as their group')
 )
@@ -239,7 +252,12 @@ const darwinNative = shape(
     fixedAdvance: num,
     features: arrayOf(
       shape(
-        { id: int, name: str, exclusive: bool, selectors: arrayOf(shape({ id: int, name: str, default: bool }, { openTypeTag: str, openTypeValue: int })) },
+        {
+          id: int,
+          name: str,
+          exclusive: bool,
+          selectors: arrayOf(shape({ id: int, name: str, default: bool }, { openTypeTag: str, openTypeValue: int }))
+        },
         { openTypeTag: str }
       )
     ),
@@ -314,11 +332,13 @@ const fontFamily = shape({
 /** en-US, else any en / en-*, else language "", else the first, else "". */
 function defaultString(strings) {
   return (
-    strings.find((s) => s.language === 'en-US') ??
-    strings.find((s) => s.language === 'en' || s.language.startsWith('en-')) ??
-    strings.find((s) => s.language === '') ??
-    strings[0]
-  )?.value ?? ''
+    (
+      strings.find((s) => s.language === 'en-US') ??
+      strings.find((s) => s.language === 'en' || s.language.startsWith('en-')) ??
+      strings.find((s) => s.language === '') ??
+      strings[0]
+    )?.value ?? ''
+  )
 }
 
 function mergeLocalized(strings) {
@@ -416,7 +436,8 @@ function validateResult(families, { tables, coverage }) {
         else {
           face.coverage.forEach(([start, end], r) => {
             if (!(start <= end && end <= 0x10ffff)) fail(`coverage range ${start}-${end} is invalid`)
-            if (r > 0 && !(face.coverage[r - 1][1] + 1 < start)) fail(`coverage range ${start}-${end} overlaps or touches ${face.coverage[r - 1]}`)
+            if (r > 0 && !(face.coverage[r - 1][1] + 1 < start))
+              fail(`coverage range ${start}-${end} overlaps or touches ${face.coverage[r - 1]}`)
           })
         }
       } else if (face.coverage !== undefined) fail('coverage was not requested')

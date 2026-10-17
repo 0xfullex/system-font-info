@@ -23,7 +23,8 @@ Ref<CFStringRef> makeString(const std::string& utf8) {
 }
 
 std::optional<double> numberValue(CFTypeRef value) {
-  if (value && CFGetTypeID(value) == CFBooleanGetTypeID()) return CFBooleanGetValue(static_cast<CFBooleanRef>(value)) ? 1.0 : 0.0;
+  if (value && CFGetTypeID(value) == CFBooleanGetTypeID())
+    return CFBooleanGetValue(static_cast<CFBooleanRef>(value)) ? 1.0 : 0.0;
   CFNumberRef number = asNumber(value);
   double result = 0;
   if (!number || !CFNumberGetValue(number, kCFNumberDoubleType, &result)) return std::nullopt;
@@ -31,7 +32,8 @@ std::optional<double> numberValue(CFTypeRef value) {
 }
 
 std::optional<int64_t> integerValue(CFTypeRef value) {
-  if (value && CFGetTypeID(value) == CFBooleanGetTypeID()) return CFBooleanGetValue(static_cast<CFBooleanRef>(value)) ? 1 : 0;
+  if (value && CFGetTypeID(value) == CFBooleanGetTypeID())
+    return CFBooleanGetValue(static_cast<CFBooleanRef>(value)) ? 1 : 0;
   CFNumberRef number = asNumber(value);
   int64_t result = 0;
   if (!number || !CFNumberGetValue(number, kCFNumberSInt64Type, &result)) return std::nullopt;
@@ -50,7 +52,8 @@ std::string filePath(CFTypeRef url) {
   // CFURLCopyFileSystemPath returns the path part of any URL, so a URL of
   // another scheme would pass for a file path.
   const Ref<CFStringRef> scheme(CFURLCopyScheme(fileUrl));
-  if (!scheme || CFStringCompare(scheme.get(), CFSTR("file"), kCFCompareCaseInsensitive) != kCFCompareEqualTo) return {};
+  if (!scheme || CFStringCompare(scheme.get(), CFSTR("file"), kCFCompareCaseInsensitive) != kCFCompareEqualTo)
+    return {};
   Ref<CFStringRef> path(CFURLCopyFileSystemPath(fileUrl, kCFURLPOSIXPathStyle));
   return toUtf8(path.get());
 }

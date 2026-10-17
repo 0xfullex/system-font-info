@@ -37,7 +37,9 @@ EnumerateOptions parseEnumerateOptions(const Napi::CallbackInfo& info) {
 class GetFontsWorker : public Napi::AsyncWorker {
  public:
   GetFontsWorker(Napi::Env env, EnumerateOptions options)
-      : Napi::AsyncWorker(env, "system-font-info:getFonts"), deferred_(Napi::Promise::Deferred::New(env)), options_(options) {}
+      : Napi::AsyncWorker(env, "system-font-info:getFonts"),
+        deferred_(Napi::Promise::Deferred::New(env)),
+        options_(options) {}
 
   Napi::Promise promise() const { return deferred_.Promise(); }
 
@@ -120,8 +122,9 @@ Napi::Value readFontFile(const Napi::CallbackInfo& info) {
   // Compared as doubles before any conversion: casting a double outside the
   // range of size_t (or a NaN) to size_t is undefined behavior.
   if (!(requested >= 0) || requested >= static_cast<double>(file->faceCount()) || requested != std::trunc(requested)) {
-    throw Napi::RangeError::New(env, "readFontFile: face index " + info[1].ToString().Utf8Value() + " is out of range; '" + path +
-                                         "' has " + std::to_string(file->faceCount()) + " face(s)");
+    throw Napi::RangeError::New(env, "readFontFile: face index " + info[1].ToString().Utf8Value() +
+                                         " is out of range; '" + path + "' has " + std::to_string(file->faceCount()) +
+                                         " face(s)");
   }
   size_t index = static_cast<size_t>(requested);
 

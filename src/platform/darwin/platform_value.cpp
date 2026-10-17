@@ -43,7 +43,8 @@ Value selectorValue(CFDictionaryRef selector) {
   out.set("name", toUtf8(asString(dictionaryValue(selector, kCTFontFeatureSelectorNameKey))));
   out.set("default", booleanValue(dictionaryValue(selector, kCTFontFeatureSelectorDefaultKey)).value_or(false));
   if (const auto tag = openTypeTag(selector)) out.set("openTypeTag", *tag);
-  if (const auto value = integerValue(dictionaryValue(selector, kCTFontOpenTypeFeatureValue))) out.set("openTypeValue", *value);
+  if (const auto value = integerValue(dictionaryValue(selector, kCTFontOpenTypeFeatureValue)))
+    out.set("openTypeValue", *value);
   return out;
 }
 
@@ -56,7 +57,8 @@ Value featureValue(CFDictionaryRef feature) {
   Value selectors = Value::array();
   if (CFArrayRef list = asArray(dictionaryValue(feature, kCTFontFeatureTypeSelectorsKey))) {
     for (CFIndex i = 0; i < CFArrayGetCount(list); ++i) {
-      if (CFDictionaryRef selector = asDictionary(CFArrayGetValueAtIndex(list, i))) selectors.push(selectorValue(selector));
+      if (CFDictionaryRef selector = asDictionary(CFArrayGetValueAtIndex(list, i)))
+        selectors.push(selectorValue(selector));
     }
   }
   out.set("selectors", std::move(selectors));
@@ -82,7 +84,8 @@ Value metricsValue(CTFontRef font) {
   out.set("unitsPerEm", unitsPerEm);
   out.set("glyphCount", static_cast<double>(CTFontGetGlyphCount(font)));
   Value boundingBox = Value::array();
-  for (const CGFloat component : {box.origin.x, box.origin.y, box.size.width, box.size.height}) boundingBox.push(component * toFontUnits);
+  for (const CGFloat component : {box.origin.x, box.origin.y, box.size.width, box.size.height})
+    boundingBox.push(component * toFontUnits);
   out.set("boundingBox", std::move(boundingBox));
   return out;
 }
@@ -108,7 +111,8 @@ std::optional<Value> readFeatures(CTFontRef font) {
   if (!features) return std::nullopt;
   Value out = Value::array();
   for (CFIndex i = 0; i < CFArrayGetCount(features.get()); ++i) {
-    if (CFDictionaryRef feature = asDictionary(CFArrayGetValueAtIndex(features.get(), i))) out.push(featureValue(feature));
+    if (CFDictionaryRef feature = asDictionary(CFArrayGetValueAtIndex(features.get(), i)))
+      out.push(featureValue(feature));
   }
   return out;
 }
@@ -124,7 +128,8 @@ Value makePlatformValue(const PlatformValueInput& input) {
   setIfPresent(out, "symbolicTraits", input.traits.symbolic);
   setIfPresent(out, "format", numberValue(copyAttribute(descriptor, kCTFontFormatAttribute).get()));
   setIfPresent(out, "priority", numberValue(copyAttribute(descriptor, kCTFontPriorityAttribute).get()));
-  setIfPresent(out, "registrationScope", numberValue(copyAttribute(descriptor, kCTFontRegistrationScopeAttribute).get()));
+  setIfPresent(out, "registrationScope",
+               numberValue(copyAttribute(descriptor, kCTFontRegistrationScopeAttribute).get()));
   setIfPresent(out, "downloadable", booleanValue(copyAttribute(descriptor, kCTFontDownloadableAttribute).get()));
   setIfPresent(out, "downloaded", booleanValue(copyAttribute(descriptor, kCTFontDownloadedAttribute).get()));
   setIfPresent(out, "styleName", stringAttribute(descriptor, kCTFontStyleNameAttribute));

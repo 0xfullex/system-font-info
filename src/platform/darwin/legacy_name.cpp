@@ -121,8 +121,8 @@ std::optional<std::string> decodeLegacyName(uint16_t platformId, uint16_t encodi
     bytes = multiByte;
   }
 
-  Ref<CFStringRef> text(CFStringCreateWithBytes(kCFAllocatorDefault, bytes.data(), static_cast<CFIndex>(bytes.size()),
-                                                *encoding, false));
+  Ref<CFStringRef> text(
+      CFStringCreateWithBytes(kCFAllocatorDefault, bytes.data(), static_cast<CFIndex>(bytes.size()), *encoding, false));
   if (!text) return std::nullopt;
   return darwin::toUtf8(text.get());
 }
