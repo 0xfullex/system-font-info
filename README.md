@@ -23,18 +23,13 @@ Node.js 18 or newer. The package ships a binary per platform and architecture un
 ## Usage
 
 ```js
-const { getFonts, pickName, watch } = require('system-font-info')
+const { getFonts, pickName } = require('system-font-info')
 
 const families = await getFonts()
 for (const family of families) {
   const face = family.faces[0]
   console.log(family.family, face.postscriptName, pickName(face.fullNames, ['zh-CN', 'en']))
 }
-
-const stop = watch(() => {
-  // The installed fonts may have changed; call getFonts() again.
-})
-stop()
 ```
 
 ### `getFonts(options?)`
@@ -52,9 +47,11 @@ Picks the entry of a `LocalizedString[]` (for example `face.fullNames`) that bes
 
 The default strings `fullName`, `styleName` and `axes[].name` are already chosen for you: `en-US`, else any English, else the entry without a language, else the first.
 
-### `watch(onChange)`
+## Font changes
 
-Calls `onChange()` whenever the set of installed fonts may have changed, and returns a function that stops the subscription (calling it again does nothing). The callback carries no detail and may fire when nothing observable changed; call `getFonts()` again to see the new state. Notifications that arrive while one is still waiting to be delivered are merged. Watching never keeps the process alive. An error thrown by one subscriber does not stop the others; it is rethrown from a microtask and surfaces as an uncaught exception.
+The module runs nothing between calls: no background thread, no operating system listener, no timer. Each `getFonts()` call asks the operating system at that moment and keeps no result, so it reflects the fonts installed when it is called. The tests cover fonts registered in the same process; fonts installed by another process while yours is running have not been measured.
+
+To react to installed fonts changing, call `getFonts()` again at a moment that suits your application, for example when a window regains focus or a font picker opens. In the main process of an Electron app on macOS you can instead observe `kCTFontManagerRegisteredFontsChangedNotification` yourself. The OS delivers it only on the main thread's run loop, which plain Node does not service, so this module cannot receive it without running an event loop of its own.
 
 ## The result
 

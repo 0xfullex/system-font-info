@@ -17,8 +17,6 @@ namespace {
 
 std::vector<Family> enumerateFonts(const EnumerateOptions&) { notImplemented(); }
 
-std::unique_ptr<FontWatcher> watchFonts(std::function<void()>) { notImplemented(); }
-
 std::optional<std::string> decodeLegacyName(uint16_t, uint16_t, uint16_t, std::span<const uint8_t>) {
   return std::nullopt;
 }

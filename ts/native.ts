@@ -16,10 +16,6 @@ export interface RawFamily {
 
 export interface NativeBinding {
   getFonts(options: Required<GetFontsOptions>): Promise<RawFamily[]>
-  /** Throws when already watching. `callback` is called without arguments, never more than once per pending notification. */
-  startWatching(callback: () => void): void
-  /** A no-op when not watching. */
-  stopWatching(): void
   __testing: {
     registerFont(path: string): void
     unregisterFont(path: string): void

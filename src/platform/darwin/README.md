@@ -9,13 +9,12 @@ first for the contract.
 | File | Role |
 | --- | --- |
 | `enumerate.cpp` | `enumerateFonts`: collection, grouping by PostScript name and family, member order |
-| `face_reader.*` | builds one `Face`; caches the parsed tables, the axes and the collection face lookups |
+| `face_reader.*` | builds one `Face`; caches the parsed tables, the axes and the collection face lookups for one enumeration |
 | `traits.*` | pure conversions: CSS weight and width, style, scope, format |
 | `variations.*` | axes, coordinates, named instance |
 | `platform_value.*` | the `platform` value (`DarwinNative`) |
 | `coverage.*` | character set to code point ranges |
 | `legacy_name.cpp` | `decodeLegacyName` |
-| `watch.cpp` | `watchFonts` |
 | `testing.cpp` | the register / unregister test hooks |
 | `autorelease_pool.*` | the autorelease pool the worker thread runs in (the only Objective-C++) |
 | `cf.*` | owning CF reference and checked accessors |
@@ -116,7 +115,7 @@ Every face is read through `sfnt::readFontTables` (tag list from
 bytes from `CTFontCopyTable`) whatever
 `options.tables` says: the names, `fvar` and `cmap` feed fields that exist
 anyway. The option only decides whether `opentype` and `platform.metrics` are
-attached. The result is cached per font resource (file path and face index), so
+attached. The result is cached per font resource (file path and face index) for the length of one enumeration, so
 the named instances of a variable font share one `opentype` value and one axes
 list.
 
@@ -148,30 +147,6 @@ Turkish, Croatian, Romanian, Central European languages). Windows encodings
 byte; the zero bytes are dropped and the Windows code pages (932, 936, 950,
 949) decode the rest. Johab is not available in CoreFoundation and gives
 `nullopt`, like every unsupported combination.
-
-## Change notifications
-
-`kCTFontManagerRegisteredFontsChangedNotification` is observed on the local and
-on the distributed notification center, by a dedicated thread running its own
-`CFRunLoop` (plain Node has no usable main run loop). The run loop stays alive
-through a signalled-on-demand stop source; the destructor signals it, so a
-destructor racing the thread start still ends the loop, and joins.
-
-Measured on macOS 27 (a C++ driver, fonts registered from another thread):
-
-- The notification arrives on the **local** center, **on the main thread**, and
-  only while the main thread services its run loop (an app with an event loop,
-  such as Electron). Registering or unregistering a font each posts one
-  notification, for process, session and persistent scope alike.
-- In a process whose main thread never runs its run loop (plain Node) nothing
-  is delivered at all, to an observer on any thread and on either center.
-- The distributed center never fired in these tests, including for session and
-  persistent registrations made by another process.
-
-So the watcher works where the host runs a main run loop and is silent
-elsewhere; the callbacks run on the main thread, not on the watcher thread.
-Callbacks run under a lock that the destructor also takes, so `onChange` must
-not create or destroy a watcher synchronously.
 
 ## Test hooks
 

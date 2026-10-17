@@ -1,8 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <functional>
-#include <memory>
 #include <optional>
 #include <span>
 #include <string>
@@ -18,17 +16,6 @@ namespace sfi::platform {
 // Lists the installed fonts through the OS font service. Runs on a worker
 // thread, never on the JS thread. Throws std::exception on failure.
 std::vector<Family> enumerateFonts(const EnumerateOptions& options);
-
-// A running subscription to OS font-set changes. Destroying it stops the
-// subscription and joins any thread it owns; no callback runs afterwards.
-class FontWatcher {
- public:
-  virtual ~FontWatcher() = default;
-};
-
-// Starts watching. `onChange` may be called from any thread, may be called
-// more than once per change, and carries no detail about what changed.
-std::unique_ptr<FontWatcher> watchFonts(std::function<void()> onChange);
 
 // Decodes a `name` table string stored in a legacy (non-UTF-16) encoding, such
 // as Mac platform records in MacRoman or MacChineseSimp. Returns nullopt when

@@ -1,17 +1,14 @@
 // The macOS backend against the fonts of the machine and the generated test
 // fonts registered for this process. Skipped elsewhere.
 import assert from 'node:assert/strict'
-import { execFile } from 'node:child_process'
 import { after, before, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { promisify } from 'node:util'
 
-import { getFonts, pickName, watch } from '../lib/index.js'
+import { getFonts, pickName } from '../lib/index.js'
 import { loadNative } from '../lib/native.js'
 
 const skip = process.platform !== 'darwin' && 'macOS only'
 const fixture = (name) => fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url))
-const libraryEntry = fileURLToPath(new URL('../lib/index.js', import.meta.url))
 
 describe('system fonts', { skip }, () => {
   let families
@@ -174,27 +171,19 @@ describe('registered test fonts', { skip }, () => {
   })
 })
 
-describe('watch()', { skip }, () => {
-  test('returns an unsubscribe function that can be called twice', () => {
-    const stop = watch(() => {})
-    assert.equal(typeof stop, 'function')
-    stop()
-    stop()
-  })
+describe('getFonts() freshness', { skip }, () => {
+  const { registerFont, unregisterFont } = loadNative().__testing
+  const file = fixture('SFITest-Symbol.ttf')
+  const hasSymbolFamily = async () => (await getFonts()).some((entry) => entry.family === 'SFITest Symbol')
 
-  test('can be started again after the last subscriber stopped', () => {
-    watch(() => {})()
-    const first = watch(() => {})
-    const second = watch(() => {})
-    first()
-    second()
-  })
-
-  test('does not keep the process alive, subscribed or not', async () => {
-    const run = promisify(execFile)
-    for (const script of [`require(${JSON.stringify(libraryEntry)}).watch(() => {})`, `require(${JSON.stringify(libraryEntry)}).watch(() => {})()`]) {
-      const { stderr } = await run(process.execPath, ['-e', script], { timeout: 20000 })
-      assert.equal(stderr, '')
+  test('each call reflects the fonts registered at that moment', async () => {
+    assert.equal(await hasSymbolFamily(), false)
+    registerFont(file)
+    try {
+      assert.equal(await hasSymbolFamily(), true)
+    } finally {
+      unregisterFont(file)
     }
+    assert.equal(await hasSymbolFamily(), false)
   })
 })

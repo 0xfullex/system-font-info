@@ -1,9 +1,7 @@
 #include <napi.h>
 
-#include <atomic>
 #include <cmath>
 #include <exception>
-#include <memory>
 #include <string>
 #include <vector>
 
@@ -80,86 +78,6 @@ Napi::Value getFonts(const Napi::CallbackInfo& info) {
   return promise;
 }
 
-// ---- watching ---------------------------------------------------------------
-
-// One startWatching .. stopWatching span.
-struct WatchSession {
-  Napi::ThreadSafeFunction callback;
-  // Set when a call is queued and not yet delivered; further notifications are
-  // dropped meanwhile. Cleared on the JS thread right before `cb()` runs.
-  std::atomic<bool> queued{false};
-  // Set on the JS thread when the session ends, so a call that was already
-  // queued does not reach `cb` afterwards.
-  std::atomic<bool> stopped{false};
-  std::unique_ptr<platform::FontWatcher> watcher;
-};
-
-// Calls `cb()`. A JS exception thrown by `cb` stays pending and is reported by
-// Node as usual. Any other failure means the environment is shutting down and
-// can no longer run JS, in which case the notification is moot.
-void callWithoutArguments(Napi::Env env, const Napi::Function& cb) {
-  napi_value undefined;
-  napi_get_undefined(env, &undefined);
-  napi_call_function(env, undefined, cb, 0, nullptr, nullptr);
-}
-
-// Per-environment state (one native watcher per env).
-class AddonData {
- public:
-  ~AddonData() { stopWatching(); }
-
-  bool watching() const { return session_ != nullptr; }
-
-  void startWatching(Napi::Env env, Napi::Function callback) {
-    auto session = std::make_shared<WatchSession>();
-    session->callback = Napi::ThreadSafeFunction::New(env, callback, "system-font-info:watch", 0, 1);
-    // Watching must never keep the process alive.
-    session->callback.Unref(env);
-    try {
-      session->watcher = platform::watchFonts([session] {
-        if (session->queued.exchange(true)) return;
-        napi_status status = session->callback.NonBlockingCall([session](Napi::Env env, Napi::Function cb) {
-          session->queued = false;
-          if (!session->stopped) callWithoutArguments(env, cb);
-        });
-        if (status != napi_ok) session->queued = false;
-      });
-    } catch (const std::exception& e) {
-      session->stopped = true;
-      session->callback.Release();
-      throw Napi::Error::New(env, e.what());
-    }
-    session_ = std::move(session);
-  }
-
-  // Destroying the watcher joins its thread, so no notification arrives after
-  // it; only then is the callback released. A no-op when not watching.
-  void stopWatching() {
-    if (!session_) return;
-    std::shared_ptr<WatchSession> session = std::move(session_);
-    session->stopped = true;
-    session->watcher.reset();
-    session->callback.Release();
-  }
-
- private:
-  std::shared_ptr<WatchSession> session_;
-};
-
-Napi::Value startWatching(const Napi::CallbackInfo& info) {
-  Napi::Env env = info.Env();
-  auto* data = static_cast<AddonData*>(info.Data());
-  if (info.Length() < 1 || !info[0].IsFunction()) throw Napi::TypeError::New(env, "startWatching: callback must be a function");
-  if (data->watching()) throw Napi::Error::New(env, "startWatching: already watching; call stopWatching first");
-  data->startWatching(env, info[0].As<Napi::Function>());
-  return env.Undefined();
-}
-
-Napi::Value stopWatching(const Napi::CallbackInfo& info) {
-  static_cast<AddonData*>(info.Data())->stopWatching();
-  return info.Env().Undefined();
-}
-
 // ---- test hooks -------------------------------------------------------------
 
 std::string pathArgument(const Napi::CallbackInfo& info, const char* what) {
@@ -221,15 +139,7 @@ Napi::Value readFontFile(const Napi::CallbackInfo& info) {
 // ---- module -----------------------------------------------------------------
 
 Napi::Object initModule(Napi::Env env, Napi::Object exports) {
-  auto* data = new AddonData();
-  env.SetInstanceData(data);
-  // Teardown (process exit, worker or renderer shutdown) must join the watcher
-  // thread before the environment goes away.
-  env.AddCleanupHook([data] { data->stopWatching(); });
-
   exports.Set("getFonts", Napi::Function::New(env, getFonts, "getFonts"));
-  exports.Set("startWatching", Napi::Function::New(env, startWatching, "startWatching", data));
-  exports.Set("stopWatching", Napi::Function::New(env, stopWatching, "stopWatching", data));
 
   Napi::Object testing = Napi::Object::New(env);
   testing.Set("registerFont", Napi::Function::New(env, registerFont, "registerFont"));

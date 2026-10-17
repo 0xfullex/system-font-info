@@ -10,11 +10,9 @@ the interface in `../core/platform.h` and fills the structs of
 
 - `enumerateFonts(options)` lists every installed font as `Family` / `Face`
   structs. It runs on a worker thread, never the JS thread, and throws a
-  `std::exception` when the OS font service fails.
-- `watchFonts(onChange)` returns a handle; destroying it stops the
-  subscription, joins any thread it owns and guarantees `onChange` is not
-  called afterwards. `onChange` may come from any thread, may fire more than
-  once per change and carries no detail.
+  `std::exception` when the OS font service fails. It reflects the fonts
+  installed at the moment of the call: a backend keeps nothing between two
+  calls, no cache, no handle to the OS font service, no thread.
 - `decodeLegacyName(...)` decodes `name` table strings that are not UTF-16BE
   (Mac script encodings, Windows multi-byte code pages). It returns `nullopt`
   for what the OS cannot decode and must be thread-safe.

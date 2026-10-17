@@ -6,7 +6,7 @@ The native addon: C++20, Node-API through node-addon-api, built by node-gyp (`bi
 
 | Directory | Contents |
 | --- | --- |
-| `core/` | The platform-independent model, the interface a backend implements, and everything that touches JS (module init, `getFonts`, watching, test hooks, conversion to JS values). |
+| `core/` | The platform-independent model, the interface a backend implements, and everything that touches JS (module init, `getFonts`, test hooks, conversion to JS values). |
 | `sfnt/` | A platform-independent reader for the standard OpenType tables, and the generated language-ID tables. Backends feed it table bytes, so all platforms report the font's own metadata identically. |
 | `platform/darwin`, `platform/win32`, `platform/linux` | One backend per OS. `binding.gyp` compiles exactly one of them. |
 
@@ -18,7 +18,7 @@ These headers are the seams between the parts; change one only as its own piece 
 
 - `core/value.h`: the JSON-like `Value` tree for open-ended data, with `Shared` subtrees.
 - `core/model.h`: `Family`, `Face` and the small structs and enums of the result.
-- `core/platform.h`: what a backend implements (`enumerateFonts`, `watchFonts`, `decodeLegacyName`, the test hooks).
+- `core/platform.h`: what a backend implements (`enumerateFonts`, `decodeLegacyName`, the test hooks).
 - `sfnt/sfnt.h`: the table reader API.
 - `../ts/types.ts`: the public TypeScript types, which the native result and the JS layer must agree with.
 
