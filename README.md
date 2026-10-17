@@ -121,6 +121,8 @@ TypeScript and JavaScript are formatted and linted by [Biome](https://biomejs.de
 
 `src/sfnt/language_tables.cpp` is generated and passes the format check as generated; `scripts/gen-language-tables.c` marks its tables with `clang-format off` / `on` so a regenerated file needs no formatting pass.
 
+To make `git blame` skip the commit that formatted the whole tree, run `git config blame.ignoreRevsFile .git-blame-ignore-revs` once per clone.
+
 ## License
 
 MIT
