@@ -39,6 +39,9 @@
     "build": "npm run build:native && npm run build:ts",
     "test": "node --test",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "biome lint --error-on-warnings",
+    "format": "biome format --write && node scripts/clang-format.mjs --fix",
+    "format:check": "biome format && node scripts/clang-format.mjs --check",
     "copy-prebuild": "node scripts/copy-prebuild.mjs",
     "pretest": "npm run build:ts"
   },
@@ -58,6 +61,7 @@
     "electron"
   ],
   "devDependencies": {
+    "@biomejs/biome": "2.5.15",
     "@types/node": "^24.19.2",
     "node-addon-api": "^8.9.2",
     "node-gyp": "^13.1.0",

@@ -4,6 +4,7 @@
 
 namespace sfi::sfnt {
 
+// clang-format off
 const LcidEntry kLcidTable[] = {
     {0x0001, "ar"},
     {0x0002, "bg"},
@@ -438,8 +439,10 @@ const LcidEntry kLcidTable[] = {
     {0x7C92, "ckb-Arab"},
     {0xE40C, "fr-015"},
 };
+// clang-format on
 const size_t kLcidTableSize = 432;
 
+// clang-format off
 const MacLanguageEntry kMacLanguageTable[] = {
     {0, "en"},
     {1, "fr"},
@@ -560,6 +563,7 @@ const MacLanguageEntry kMacLanguageTable[] = {
     {149, "kl"},
     {150, "az"},
 };
+// clang-format on
 const size_t kMacLanguageTableSize = 118;
 
 }  // namespace sfi::sfnt

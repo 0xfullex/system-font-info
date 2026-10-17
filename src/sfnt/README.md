@@ -119,7 +119,9 @@ Table order is kept.
 ## Regenerating
 
 - `language_tables.cpp` is generated, never edited by hand: see the header of
-  `scripts/gen-language-tables.c` (macOS only).
+  `scripts/gen-language-tables.c` (macOS only). The generator brackets its tables
+  with `clang-format off` / `on`, so the file passes `npm run format:check` as
+  generated.
 - The test fonts in `test/fixtures/` come from `scripts/make-test-fonts.py`
   (fontTools; the script's header says how to run it). Output is deterministic,
   so regenerating produces no diff unless the script or fontTools changes.

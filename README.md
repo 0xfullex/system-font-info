@@ -105,6 +105,22 @@ npm test
 
 `npm run copy-prebuild -- --arch x64` names the target architecture of a cross build.
 
+## Development
+
+```sh
+npm run typecheck      # tsc --noEmit
+npm run lint           # Biome lint of the TypeScript and JavaScript
+npm run format:check   # Biome and clang-format, check only
+npm run format         # Biome and clang-format, rewrite the files
+```
+
+TypeScript and JavaScript are formatted and linted by [Biome](https://biomejs.dev) (`biome.json`), installed with `npm install`. The C, C++ and Objective-C++ sources are formatted by clang-format (`.clang-format`), which is not an npm dependency: install **major version 20** and put it on your `PATH`. `scripts/clang-format.mjs` stops with a message when the version found is another major, because clang-format changes its output between majors.
+
+- macOS: `brew install clang-format` installs the current major, which may be newer than 20 later on; check that `clang-format --version` prints 20.x.
+- Other platforms: the LLVM 20 release, or `pipx run clang-format==20.1.8` (the `clang-format` wheel on PyPI).
+
+`src/sfnt/language_tables.cpp` is generated and passes the format check as generated; `scripts/gen-language-tables.c` marks its tables with `clang-format off` / `on` so a regenerated file needs no formatting pass.
+
 ## License
 
 MIT
