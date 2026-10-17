@@ -49,7 +49,7 @@ The default strings `fullName`, `styleName` and `axes[].name` are already chosen
 
 ## Font changes
 
-The module runs nothing between calls: no background thread, no operating system listener, no timer. Each `getFonts()` call asks the operating system at that moment and keeps no result, so it reflects the fonts installed when it is called. The tests cover fonts registered in the same process; fonts installed by another process while yours is running have not been measured.
+The module runs nothing between calls: no background thread, no operating system listener, no timer. Each `getFonts()` call asks the operating system at that moment and keeps no result, so it reflects the fonts installed when it is called. On macOS this holds for a long-running plain Node process too: a font copied into `~/Library/Fonts` or removed from it by another process was visible to the next `getFonts()` call about a second later, the time the system font service took to register the change. The tests cover fonts registered in the same process; on Windows and Linux, fonts installed by another process have not been measured yet.
 
 To react to installed fonts changing, call `getFonts()` again at a moment that suits your application, for example when a window regains focus or a font picker opens. In the main process of an Electron app on macOS you can instead observe `kCTFontManagerRegisteredFontsChangedNotification` yourself. The OS delivers it only on the main thread's run loop, which plain Node does not service, so this module cannot receive it without running an event loop of its own.
 
