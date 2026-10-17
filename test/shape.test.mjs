@@ -35,12 +35,16 @@ const literal =
   }
 const arrayOf = (item) => (value, path, errors) => {
   if (!Array.isArray(value)) return errors.push(`${path}: expected an array, got ${describe_(value)}`)
-  value.forEach((entry, i) => item(entry, `${path}[${i}]`, errors))
+  value.forEach((entry, i) => {
+    item(entry, `${path}[${i}]`, errors)
+  })
 }
 const tuple = (length, item) => (value, path, errors) => {
   if (!Array.isArray(value) || value.length !== length)
     return errors.push(`${path}: expected an array of ${length}, got ${describe_(value)}`)
-  value.forEach((entry, i) => item(entry, `${path}[${i}]`, errors))
+  value.forEach((entry, i) => {
+    item(entry, `${path}[${i}]`, errors)
+  })
 }
 const recordOf = (item) => (value, path, errors) => {
   if (!isObject(value)) return errors.push(`${path}: expected an object, got ${describe_(value)}`)
