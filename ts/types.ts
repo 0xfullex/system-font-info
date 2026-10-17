@@ -33,10 +33,17 @@ export interface FontFamily {
   faces: FontFace[]
 }
 
+/**
+ * One face of a font family.
+ *
+ * The identity of a face is `(file.path, file.index, coordinates, simulations)`. Every face the platform
+ * enumerates is returned; none is merged, so two faces differ in at least one of those four fields. A part
+ * a face does not have (`file`, `file.index`, `coordinates`) counts as absent in the comparison.
+ */
 export interface FontFace {
   // ---- identity, as the platform reports this face (instance-aware for variable fonts)
 
-  /** What CSS `local()` resolves. "" when the face has none. `(postscriptName, simulations)` is unique across the result. */
+  /** What CSS `local()` resolves. "" when the face has none. Not unique and not a key: on Windows several coordinates of one variable font can share a name, and a font installed as two files gives two faces with one name. See the identity of a face in `FontFace`. */
   postscriptName: string
   /** Default string of `fullNames`: en-US, else any en-*, else language "", else the first. */
   fullName: string

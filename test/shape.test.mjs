@@ -353,6 +353,22 @@ function mergeLocalized(strings) {
   })
 }
 
+/**
+ * The identity of a face: (file.path, file.index, coordinates, simulations). PostScript names are not part of it:
+ * they repeat on Windows. Absent parts are null, so two different faces never produce the same key.
+ */
+function faceIdentity(face) {
+  const coordinates =
+    face.coordinates && Object.fromEntries(Object.entries(face.coordinates).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+  return JSON.stringify([
+    face.file?.path ?? null,
+    face.file?.index ?? null,
+    coordinates ?? null,
+    face.simulations.bold,
+    face.simulations.oblique
+  ])
+}
+
 /** Everything that can be said about a result without knowing which fonts the machine has. */
 function validateResult(families, { tables, coverage }) {
   const errors = []
@@ -389,8 +405,8 @@ function validateResult(families, { tables, coverage }) {
       const fail = (message) => problems.push(`${at}: ${message}`)
 
       if (face.platform.os !== process.platform) fail(`platform.os is ${face.platform.os}`)
-      const identity = `${face.postscriptName}\u0000${face.simulations.bold}\u0000${face.simulations.oblique}`
-      if (seenIdentity.has(identity)) fail(`(postscriptName, simulations) repeats ${seenIdentity.get(identity)}`)
+      const identity = faceIdentity(face)
+      if (seenIdentity.has(identity)) fail(`(file.path, file.index, coordinates, simulations) repeats ${seenIdentity.get(identity)}`)
       seenIdentity.set(identity, at)
 
       if (!(face.weight >= 1 && face.weight <= 1000)) fail(`weight ${face.weight} is outside 1-1000`)

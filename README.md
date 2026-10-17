@@ -59,12 +59,14 @@ To react to installed fonts changing, call `getFonts()` again at a moment that s
 
 Highlights of a `FontFace`:
 
-- Identity: `postscriptName`, `fullName` / `fullNames`, `styleName` / `styleNames`, `familyNames`. Language tags are canonical BCP 47 (`Intl.getCanonicalLocales`); localized arrays hold no exact duplicates.
+- Identity: `postscriptName` (not a key), `fullName` / `fullNames`, `styleName` / `styleNames`, `familyNames`. Language tags are canonical BCP 47 (`Intl.getCanonicalLocales`); localized arrays hold no exact duplicates.
 - Normalized traits: `weight` (CSS 1-1000), `width` (CSS percentage), `style`, `monospace`, `color`, `symbol`.
 - State: `enabled`, `simulations`, `scope`, `format`, `file`.
 - Variations: `variable`, `axes`, `coordinates`, `namedInstance` (an index into `opentype.fvar.instances`). Faces of one font share their `axes` and `opentype` objects.
 - `opentype`: `head`, `hhea`, `vhea`, `os2`, `post`, `maxp`, `cmap`, `fvar`, `meta` and the GSUB/GPOS feature lists, as stored in the font, plus every `name` record unmerged.
 - `platform`: raw platform values and platform-only information, tagged by `os`.
+
+PostScript names are not keys: on Windows several coordinates of one variable font can share a name, and a font installed as two files gives two faces with one name. The identity of a face is `(file.path, file.index, coordinates, simulations)`; a part a face does not have counts as absent. Every face the platform enumerates is returned and none is merged. On macOS CoreText resolves each PostScript name to one face, so the library reports one face per name there (the others are listed in `platform.shadowed`).
 
 Nothing is filtered: every language and every name a font carries is kept; only exact duplicates are merged.
 
