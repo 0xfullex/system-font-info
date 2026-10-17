@@ -21,8 +21,10 @@ Fonts written:
   SFITest-Symbol.ttf     A symbol font whose only cmap subtable is (3,0).
   SFITest-Legacy.ttf     Windows typographic names (16, 17) in en-US only, and
                          legacy names (1, 2) on the Macintosh platform only:
-                         English, plus Turkish and Icelandic text in the
-                         Mac Roman variants those languages use.
+                         English, plus Turkish, Icelandic and Polish text in
+                         the Mac Roman variants those languages use, and
+                         description records (nameID 10) in the East Asian
+                         Windows code pages, stored as 16-bit units.
 """
 
 import struct
@@ -341,6 +343,15 @@ def build_symbol():
 # ---- the font with Macintosh-only legacy names -----------------------------------
 
 
+def windows_code_page_units(text, codec):
+    """`text` in a Windows multi-byte code page, one 16-bit unit per character."""
+    units = b""
+    for char in text:
+        encoded = char.encode(codec)
+        units += encoded if len(encoded) == 2 else b"\x00" + encoded
+    return units
+
+
 def build_legacy():
     fb = new_builder()
     setup_common(fb, "SFITest Legacy", "Book", "SFITestLegacy-Book")
@@ -371,6 +382,19 @@ def build_legacy():
     name.setName("D\u00fcz", 2, 1, 0, 17)
     name.setName("Letur \u00de\u00fe \u00d0\u00f0", 1, 1, 0, 15)
     name.setName("Venjulegt", 2, 1, 0, 15)
+    # Descriptions (nameID 10), which no family or style name reads. Polish
+    # (language 25) uses the Central European Mac Roman variant.
+    name.setName("Opis kr\u00f3j \u0105\u0119\u015b\u017c\u0142", 10, 1, 0, 25)
+    # The East Asian Windows code pages (encodings 2-5). Each character is a
+    # 16-bit unit: a double-byte character keeps its two bytes and a
+    # single-byte one gets a zero high byte, so the strings hold zero bytes.
+    for encoding_id, codec, language_id, text in [
+        (2, "cp932", 0x0411, "\u65e5\u672c\u8a9e ABC"),
+        (3, "cp936", 0x0804, "\u7b80\u4f53\u4e2d\u6587 ABC"),
+        (4, "cp950", 0x0404, "\u7e41\u9ad4\u4e2d\u6587 ABC"),
+        (5, "cp949", 0x0412, "\ud55c\uad6d\uc5b4 ABC"),
+    ]:
+        name.names.append(_n_a_m_e.makeName(windows_code_page_units(text, codec), 10, 3, encoding_id, language_id))
     return fb.font
 
 

@@ -265,6 +265,32 @@ describe('SFITest-Legacy.ttf', () => {
     assert.equal(value(2, 'is').value, 'Venjulegt')
     assert.ok(legacy.names.every((record) => record.bytes === undefined))
   })
+
+  // Polish text with ł and ś: plain Mac Roman has other characters at those bytes, so the
+  // Central European variant is selected by the record's language.
+  test('decodes a Mac Roman record in a Central European language with its own variant', {
+    skip: process.platform !== 'darwin' && 'only the macOS decoder is certain to know the encodings'
+  }, () => {
+    const record = legacy.names.find((r) => r.platformId === 1 && r.nameId === 10)
+    assert.deepEqual([record.language, record.value], ['pl', 'Opis krój ąęśżł'])
+  })
+
+  // The Windows East Asian code pages are stored as 16-bit units, so the single-byte characters
+  // (the digits and Latin letters after the CJK text) carry zero bytes that must be dropped.
+  test('decodes the Windows East Asian code pages stored as 16-bit units', {
+    skip: process.platform !== 'darwin' && 'only the macOS decoder is certain to know the encodings'
+  }, () => {
+    const records = legacy.names.filter((r) => r.platformId === 3 && r.nameId === 10)
+    assert.deepEqual(
+      records.map((r) => [r.encodingId, r.language, r.value]),
+      [
+        [2, 'ja-JP', '日本語 ABC'],
+        [3, 'zh-CN', '简体中文 ABC'],
+        [4, 'zh-TW', '繁體中文 ABC'],
+        [5, 'ko-KR', '한국어 ABC']
+      ]
+    )
+  })
 })
 
 describe('opentype.errors', () => {
