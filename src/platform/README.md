@@ -13,9 +13,13 @@ the interface in `../core/platform.h` and fills the structs of
   `std::exception` when the OS font service fails. It reflects the fonts
   installed at the moment of the call: a backend keeps nothing between two
   calls, no cache, no handle to the OS font service, no thread.
-- `decodeLegacyName(...)` decodes `name` table strings that are not UTF-16BE
-  (Mac script encodings, Windows multi-byte code pages). It returns `nullopt`
-  for what the OS cannot decode and must be thread-safe.
+- `decodeLegacyText(encoding, bytes)` converts bytes in a legacy character
+  encoding (`sfnt::LegacyEncoding`: Mac script encodings, Windows multi-byte
+  code pages) to UTF-8 with the OS's own converter. It is only the converter:
+  which encoding a `name` record uses, and how its bytes are stored, is decided
+  once in `../sfnt` for all platforms. It returns `nullopt` for an encoding the
+  OS has no converter for, and must be thread-safe. A backend must handle every
+  enumerator, so a new one is a compile error until each backend maps it.
 - `registerFontForTesting` / `unregisterFontForTesting` make a font file
   available to the current process only, through the service enumeration reads
   from, and throw `std::runtime_error` with the OS error text on failure.

@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cctype>
+#include <iterator>
 
 #include "internal.h"
 #include "language_tables.h"
@@ -15,9 +16,134 @@ constexpr uint16_t kPlatformIso = 2;
 constexpr uint16_t kPlatformWindows = 3;
 constexpr uint16_t kFirstLanguageTagId = 0x8000;
 
-// UTF-16BE and the two ISO encodings are decoded here. Every other encoding
-// (Macintosh, and the East Asian Windows code pages) goes to the platform's
-// LegacyDecoder, which knows those code pages.
+// The rule that assigns a LegacyEncoding to a record is described, with its
+// source, in legacy_encoding.h.
+
+// Mac platform, encoding 0 (Roman): old fonts store text in the Roman variant
+// that suits the record's language. The numbers are Macintosh language codes.
+LegacyEncoding macRomanVariantForLanguage(uint16_t languageId) {
+  switch (languageId) {
+    case 15:  // Icelandic
+      return LegacyEncoding::MacIcelandic;
+    case 17:  // Turkish
+      return LegacyEncoding::MacTurkish;
+    case 18:  // Croatian
+      return LegacyEncoding::MacCroatian;
+    case 37:  // Romanian
+      return LegacyEncoding::MacRomanian;
+    case 24:  // Lithuanian
+    case 25:  // Polish
+    case 26:  // Hungarian
+    case 27:  // Estonian
+    case 28:  // Latvian
+    case 36:  // Albanian
+    case 38:  // Czech
+    case 39:  // Slovak
+    case 40:  // Slovenian
+      return LegacyEncoding::MacCentralEuropean;
+    default:
+      return LegacyEncoding::MacRoman;
+  }
+}
+
+// Mac platform, other encodings: the encoding ID is the Mac script code. Script
+// 8 (right-to-left symbols) and 32 (uninterpreted) have no text encoding.
+// Script 29 is the Central European Roman set. IDs 35 and 37 are read as
+// Turkish and Icelandic, as fontTools does.
+std::optional<LegacyEncoding> macEncoding(uint16_t encodingId, uint16_t languageId) {
+  switch (encodingId) {
+    case 0:
+      return macRomanVariantForLanguage(languageId);
+    case 1:
+      return LegacyEncoding::MacJapanese;
+    case 2:
+      return LegacyEncoding::MacChineseTraditional;
+    case 3:
+      return LegacyEncoding::MacKorean;
+    case 4:
+      return LegacyEncoding::MacArabic;
+    case 5:
+      return LegacyEncoding::MacHebrew;
+    case 6:
+      return LegacyEncoding::MacGreek;
+    case 7:
+      return LegacyEncoding::MacCyrillic;
+    case 9:
+      return LegacyEncoding::MacDevanagari;
+    case 10:
+      return LegacyEncoding::MacGurmukhi;
+    case 11:
+      return LegacyEncoding::MacGujarati;
+    case 12:
+      return LegacyEncoding::MacOriya;
+    case 13:
+      return LegacyEncoding::MacBengali;
+    case 14:
+      return LegacyEncoding::MacTamil;
+    case 15:
+      return LegacyEncoding::MacTelugu;
+    case 16:
+      return LegacyEncoding::MacKannada;
+    case 17:
+      return LegacyEncoding::MacMalayalam;
+    case 18:
+      return LegacyEncoding::MacSinhalese;
+    case 19:
+      return LegacyEncoding::MacBurmese;
+    case 20:
+      return LegacyEncoding::MacKhmer;
+    case 21:
+      return LegacyEncoding::MacThai;
+    case 22:
+      return LegacyEncoding::MacLao;
+    case 23:
+      return LegacyEncoding::MacGeorgian;
+    case 24:
+      return LegacyEncoding::MacArmenian;
+    case 25:
+      return LegacyEncoding::MacChineseSimplified;
+    case 26:
+      return LegacyEncoding::MacTibetan;
+    case 27:
+      return LegacyEncoding::MacMongolian;
+    case 28:
+      return LegacyEncoding::MacEthiopic;
+    case 29:
+      return LegacyEncoding::MacCentralEuropean;
+    case 30:
+      return LegacyEncoding::MacVietnamese;
+    case 31:
+      return LegacyEncoding::MacExtendedArabic;
+    case 35:
+      return LegacyEncoding::MacTurkish;
+    case 37:
+      return LegacyEncoding::MacIcelandic;
+    default:
+      return std::nullopt;
+  }
+}
+
+// Windows platform, encodings 2-6: the East Asian code pages.
+std::optional<LegacyEncoding> windowsMultiByteEncoding(uint16_t encodingId) {
+  switch (encodingId) {
+    case 2:
+      return LegacyEncoding::Windows932;
+    case 3:
+      return LegacyEncoding::Windows936;
+    case 4:
+      return LegacyEncoding::Windows950;
+    case 5:
+      return LegacyEncoding::Windows949;
+    case 6:
+      return LegacyEncoding::Windows1361;
+    default:
+      return std::nullopt;
+  }
+}
+
+// UTF-16BE and the two ISO encodings are decoded here. Every other record is
+// assigned a LegacyEncoding by the rule above and converted by the
+// LegacyDecoder; a record no rule covers stays undecoded.
 std::optional<std::string> decodeName(const NameRecord& record, std::span<const uint8_t> bytes,
                                       const LegacyDecoder& decodeLegacy) {
   const uint16_t platform = record.platformId;
@@ -35,8 +161,24 @@ std::optional<std::string> decodeName(const NameRecord& record, std::span<const 
   }
 
   if (bytes.empty()) return std::string();
-  std::optional<std::string> value;
-  if (decodeLegacy) value = decodeLegacy(platform, encoding, record.languageId, bytes);
+  std::optional<LegacyEncoding> legacyEncoding;
+  std::vector<uint8_t> multiByte;
+  if (platform == kPlatformMacintosh) {
+    legacyEncoding = macEncoding(encoding, record.languageId);
+  } else if (platform == kPlatformWindows) {
+    legacyEncoding = windowsMultiByteEncoding(encoding);
+    if (legacyEncoding) {
+      // Windows multi-byte names are stored as 16-bit units: a double-byte
+      // character keeps its two bytes, a single-byte character gets a zero high
+      // byte. No lead or trail byte of these encodings is zero, so removing
+      // every zero byte restores the plain multi-byte stream.
+      std::copy_if(bytes.begin(), bytes.end(), std::back_inserter(multiByte), [](uint8_t b) { return b != 0; });
+      bytes = multiByte;
+    }
+  }
+  if (!legacyEncoding || !decodeLegacy) return std::nullopt;
+
+  std::optional<std::string> value = decodeLegacy(*legacyEncoding, bytes);
   if (value && value->empty()) return std::nullopt;
   return value;
 }

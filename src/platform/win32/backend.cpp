@@ -17,9 +17,7 @@ namespace {
 
 std::vector<Family> enumerateFonts(const EnumerateOptions&) { notImplemented(); }
 
-std::optional<std::string> decodeLegacyName(uint16_t, uint16_t, uint16_t, std::span<const uint8_t>) {
-  return std::nullopt;
-}
+std::optional<std::string> decodeLegacyText(sfnt::LegacyEncoding, std::span<const uint8_t>) { return std::nullopt; }
 
 void registerFontForTesting(const std::string&) { notImplemented(); }
 

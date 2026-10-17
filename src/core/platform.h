@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "../sfnt/legacy_encoding.h"
 #include "model.h"
 
 // The interface each platform backend implements (src/platform/darwin,
@@ -17,11 +18,12 @@ namespace sfi::platform {
 // thread, never on the JS thread. Throws std::exception on failure.
 std::vector<Family> enumerateFonts(const EnumerateOptions& options);
 
-// Decodes a `name` table string stored in a legacy (non-UTF-16) encoding, such
-// as Mac platform records in MacRoman or MacChineseSimp. Returns nullopt when
-// the platform cannot decode that encoding. Thread-safe.
-std::optional<std::string> decodeLegacyName(uint16_t platformId, uint16_t encodingId, uint16_t languageId,
-                                            std::span<const uint8_t> bytes);
+// Converts bytes in a legacy character encoding (a `name` table string that is
+// not UTF-16BE) to UTF-8, with the platform's own converter. Which encoding a
+// record uses is decided by sfnt, never here: this only converts. Returns
+// nullopt when the platform has no converter for `encoding` or the bytes do not
+// convert. Thread-safe.
+std::optional<std::string> decodeLegacyText(sfnt::LegacyEncoding encoding, std::span<const uint8_t> bytes);
 
 // Test hooks: make a font file available to the current process only, through
 // the same OS service enumeration reads from, and take it away again.

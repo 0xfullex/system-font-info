@@ -10,6 +10,7 @@
 
 #include "../core/model.h"
 #include "../core/value.h"
+#include "legacy_encoding.h"
 
 // A platform-independent reader for the standard OpenType tables. Every
 // backend feeds it table bytes (from CTFontCopyTable, IDWriteFontFace::
@@ -34,7 +35,8 @@ struct ParseError : std::runtime_error {
 // One record of the `name` table, as stored. `language` is the BCP 47 tag
 // mapped from `languageId` ("" when no mapping exists; `languageId` keeps the
 // raw value). `value` is the decoded text; when the encoding cannot be
-// decoded, `value` is nullopt and `bytesHex` holds the raw bytes.
+// decoded (or is not one of LegacyEncoding), `value` is nullopt and `bytesHex`
+// holds the raw bytes.
 struct NameRecord {
   uint16_t platformId = 0;
   uint16_t encodingId = 0;
@@ -45,10 +47,11 @@ struct NameRecord {
   std::string bytesHex;
 };
 
-// Decodes strings in encodings other than UTF-16BE; supplied by the platform
-// layer (platform::decodeLegacyName). Returns nullopt when unsupported.
-using LegacyDecoder = std::function<std::optional<std::string>(uint16_t platformId, uint16_t encodingId,
-                                                               uint16_t languageId, std::span<const uint8_t> bytes)>;
+// Turns bytes of a legacy encoding into UTF-8; supplied by the platform layer
+// (platform::decodeLegacyText). sfnt chooses the encoding of each record, so the
+// decoder only converts. Returns nullopt when it has no converter for the
+// encoding or the bytes do not convert.
+using LegacyDecoder = std::function<std::optional<std::string>(LegacyEncoding, std::span<const uint8_t>)>;
 
 // Every record in table order, nothing merged. Handles format 0 and format 1
 // (language-tag records). Throws ParseError on a malformed table.
@@ -145,7 +148,17 @@ class FontFile {
   std::vector<uint32_t> tableTags(size_t faceIndex) const;
   std::optional<std::vector<uint8_t>> table(size_t faceIndex, uint32_t tag) const;
 
+  // The first face that has `postscriptName`: as its own PostScript name
+  // (nameID 6) or as the PostScript name of one of its fvar named instances
+  // (the record of the instance's postScriptNameID). Names are compared as
+  // decoded by parseNameTable with `decodeLegacy`, in any language. A face whose
+  // name or fvar table is missing or malformed does not match.
+  std::optional<size_t> faceWithPostscriptName(const std::string& postscriptName,
+                                               const LegacyDecoder& decodeLegacy) const;
+
  private:
+  bool hasPostscriptName(size_t faceIndex, const std::string& postscriptName, const LegacyDecoder& decodeLegacy) const;
+
   struct TableRecord {
     uint32_t tag;
     uint32_t offset;

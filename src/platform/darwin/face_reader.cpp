@@ -35,29 +35,6 @@ std::vector<uint32_t> availableTags(CTFontRef font) {
   return tags;
 }
 
-// Whether `postscriptName` is the PostScript name of face `index` of the file:
-// the face's own (nameID 6), or one of its named instances' (fvar
-// postScriptNameID).
-bool hasPostscriptName(const sfnt::FontFile& file, size_t index, const std::string& postscriptName) {
-  const auto name = file.table(index, sfnt::makeTag("name"));
-  if (!name) return false;
-  try {
-    const std::vector<sfnt::NameRecord> records = sfnt::parseNameTable(*name, decodeLegacyName);
-    const auto named = [&](uint16_t nameId) {
-      return std::any_of(records.begin(), records.end(),
-                         [&](const sfnt::NameRecord& r) { return r.nameId == nameId && r.value == postscriptName; });
-    };
-    if (named(6)) return true;
-    const auto fvarTable = file.table(index, sfnt::makeTag("fvar"));
-    if (!fvarTable) return false;
-    const sfnt::Fvar fvar = sfnt::parseFvar(*fvarTable);
-    return std::any_of(fvar.instances.begin(), fvar.instances.end(),
-                       [&](const sfnt::FvarInstance& i) { return i.postscriptNameId && named(*i.postscriptNameId); });
-  } catch (const sfnt::ParseError&) {
-    return false;
-  }
-}
-
 }  // namespace
 
 FaceReader::FileFaces& FaceReader::fileFaces(const std::string& path) {
@@ -113,13 +90,10 @@ FaceReader::TableSource FaceReader::tablesFromFile(const std::string& path, cons
   const std::optional<sfnt::FontFile>& openedFile = fileFaces(path).file;
   if (!openedFile) return source;
   const sfnt::FontFile* file = &*openedFile;
-  for (size_t i = 0; i < file->faceCount() && !source.index; ++i) {
-    if (hasPostscriptName(*file, i, postscriptName)) source.index = static_cast<uint32_t>(i);
-  }
-  if (source.index) {
-    const size_t faceIndex = *source.index;
-    source.tags = file->tableTags(faceIndex);
-    source.fetch = [file, faceIndex](uint32_t tag) { return file->table(faceIndex, tag); };
+  if (const auto faceIndex = file->faceWithPostscriptName(postscriptName, decodeLegacyText)) {
+    source.index = static_cast<uint32_t>(*faceIndex);
+    source.tags = file->tableTags(*faceIndex);
+    source.fetch = [file, face = *faceIndex](uint32_t tag) { return file->table(face, tag); };
   }
   return source;
 }
@@ -135,7 +109,7 @@ std::shared_ptr<const FaceReader::Resource> FaceReader::loadResource(const Table
   }
 
   auto resource = std::make_shared<Resource>();
-  resource->tables = sfnt::readFontTables(source.tags, source.fetch, decodeLegacyName);
+  resource->tables = sfnt::readFontTables(source.tags, source.fetch, decodeLegacyText);
   const auto axes = copyAttribute(descriptor, kCTFontVariationAxesAttribute);
   resource->axes = makeAxes(asArray(axes.get()), resource->tables);
   if (key) resources_.emplace(*key, resource);

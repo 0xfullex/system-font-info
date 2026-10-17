@@ -130,7 +130,7 @@ Napi::Value readFontFile(const Napi::CallbackInfo& info) {
 
   try {
     sfnt::FontTables tables = sfnt::readFontTables(
-        file->tableTags(index), [&](uint32_t tag) { return file->table(index, tag); }, platform::decodeLegacyName);
+        file->tableTags(index), [&](uint32_t tag) { return file->table(index, tag); }, platform::decodeLegacyText);
     return sharedToJs(env, tables.opentype);
   } catch (const std::exception& e) {
     throw Napi::Error::New(env, std::string("readFontFile: ") + e.what());

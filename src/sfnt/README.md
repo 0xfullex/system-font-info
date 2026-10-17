@@ -17,12 +17,13 @@ and both libraries are orders of magnitude larger than that.
 | `sfnt.h` | The public API and the types it exchanges. |
 | `reader.h` | `Reader`: bounds-checked big-endian access; every read past the table throws `ParseError`. |
 | `text.cpp` | UTF-16BE and Latin-1 to UTF-8, hex. |
-| `names.cpp` | `name` table parsing, `localizedName*`, LCID / Mac language lookup. |
+| `legacy_encoding.h` | `LegacyEncoding`: the legacy character encodings a `name` record can use, and the source of the rule that picks one. |
+| `names.cpp` | `name` table parsing, the record-to-`LegacyEncoding` rule, `localizedName*`, LCID / Mac language lookup. |
 | `fvar.cpp` | `fvar` parsing and its `opentype.fvar` value. |
 | `layout.cpp` | GSUB / GPOS script, language system and feature lists, feature UI names. |
 | `opentype_tables.cpp` | head, hhea/vhea, OS/2, post, maxp, cmap, meta. |
 | `font_tables.cpp` | `readFontTables`: fetches the tables and assembles the `opentype` value. |
-| `file.cpp` | `FontFile`: sfnt and collection directories, table bytes on demand. |
+| `file.cpp` | `FontFile`: sfnt and collection directories, table bytes on demand, face lookup by PostScript name. |
 | `language_tables.{h,cpp}` | Generated LCID and Mac language code to BCP 47 tables. |
 
 ## Name decoding
@@ -40,10 +41,18 @@ because merging them is the JS layer's job. For each record:
   surrogate or a trailing odd byte becomes U+FFFD. Platform 2 encoding 2 is
   ISO 8859-1; encoding 0 is ASCII, and a byte above 0x7F leaves the record
   undecoded. A zero-length string is "" in every encoding.
-- Everything else (platform 1, platform 3 encodings 2-6, unknown pairs) goes to
-  the `LegacyDecoder` with the raw `languageId`, because a Mac code page can
-  depend on the language (MacIcelandic, MacTurkish...). When it returns nothing
-  (or an empty string), `value` is absent and `bytesHex` holds the raw bytes.
+- Everything else is a legacy encoding. `names.cpp` owns the rule that picks a
+  `LegacyEncoding` from (platformId, encodingId, languageId), the same on every
+  platform; it follows fontTools (`legacy_encoding.h` lists the encodings and
+  the source). Platform 1 encoding 0 depends on the language (Mac Icelandic,
+  Turkish, Croatian, Romanian, Central European), the other Mac encoding IDs are
+  script codes, and platform 3 encodings 2-6 are the East Asian Windows code
+  pages. A record no rule covers (Mac script 8 and 32, unknown pairs) is left
+  undecoded. A Windows multi-byte string is stored as 16-bit units, so its zero
+  bytes are dropped before decoding. The `LegacyDecoder` (a platform's
+  `decodeLegacyText`) then only converts bytes of that encoding to UTF-8. When
+  it returns nothing (or an empty string), `value` is absent and `bytesHex`
+  holds the raw bytes.
 - A record whose string lies outside the table is a `ParseError` for the whole
   table, except a zero-length one, whose offset is ignored.
 
@@ -115,6 +124,10 @@ Table order is kept.
   collection whose directory cannot be read keeps its index with no tables.
   Table bytes are read from disk on demand; only directories are kept in memory.
   Paths are UTF-8 and go through `std::filesystem`.
+- `FontFile::faceWithPostscriptName` returns the first face whose `name` table
+  has the PostScript name (nameID 6) or whose `fvar` has a named instance with
+  that PostScript name (the record of its `postScriptNameID`), in any language.
+  A face whose `name` or `fvar` table is missing or malformed does not match.
 
 ## Regenerating
 

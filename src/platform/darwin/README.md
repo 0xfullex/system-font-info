@@ -14,7 +14,7 @@ first for the contract.
 | `variations.*` | axes, coordinates, named instance |
 | `platform_value.*` | the `platform` value (`DarwinNative`) |
 | `coverage.*` | character set to code point ranges |
-| `legacy_name.cpp` | `decodeLegacyName` |
+| `legacy_text.cpp` | `decodeLegacyText` |
 | `testing.cpp` | the register / unregister test hooks |
 | `autorelease_pool.*` | the autorelease pool the worker thread runs in (the only Objective-C++) |
 | `cf.*` | owning CF reference and checked accessors |
@@ -106,7 +106,7 @@ the tables are read from the descriptor's file through `sfnt::FontFile`, in the
 face that has the descriptor's PostScript name, either as its own `name`
 record (nameID 6) or as the PostScript name of one of its `fvar` named
 instances (so a substituted named instance gets the tables of its variable
-font), the coordinates come from the descriptor's `kCTFontVariationAttribute`,
+font; `sfnt::FontFile::faceWithPostscriptName` finds it), the coordinates come from the descriptor's `kCTFontVariationAttribute`,
 and `platform.features` and `platform.metrics` are left out because only a
 CTFont provides them. This was not observed on macOS 27; it is a guard.
 
@@ -139,14 +139,12 @@ list.
 
 ## Legacy names
 
-`decodeLegacyName` uses CoreFoundation string encodings and picks the encoding
-the way fontTools does: the Mac encoding ID is the script code, and with
-encoding 0 the record's language selects the Roman variant (Icelandic,
-Turkish, Croatian, Romanian, Central European languages). Windows encodings
-2-6 are stored as 16-bit units whose single-byte characters have a zero high
-byte; the zero bytes are dropped and the Windows code pages (932, 936, 950,
-949) decode the rest. Johab is not available in CoreFoundation and gives
-`nullopt`, like every unsupported combination.
+`decodeLegacyText` is only the converter: it maps each `sfnt::LegacyEncoding`
+to the CoreFoundation string encoding of the same character set and converts
+with `CFStringCreateWithBytes`. The choice of encoding for a record, and the
+dropping of the zero bytes of Windows multi-byte strings, belong to `../../sfnt`.
+Johab (`Windows1361`) is not available in CoreFoundation and gives `nullopt`
+(`CFStringIsEncodingAvailable`).
 
 ## Test hooks
 

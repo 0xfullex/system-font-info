@@ -18,7 +18,7 @@ These headers are the seams between the parts; change one only as its own piece 
 
 - `core/value.h`: the JSON-like `Value` tree for open-ended data, with `Shared` subtrees.
 - `core/model.h`: `Family`, `Face` and the small structs and enums of the result.
-- `core/platform.h`: what a backend implements (`enumerateFonts`, `decodeLegacyName`, the test hooks).
+- `core/platform.h`: what a backend implements (`enumerateFonts`, `decodeLegacyText`, the test hooks).
 - `sfnt/sfnt.h`: the table reader API.
 - `../ts/types.ts`: the public TypeScript types, which the native result and the JS layer must agree with.
 

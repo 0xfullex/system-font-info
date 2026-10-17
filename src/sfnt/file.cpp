@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 
@@ -11,6 +12,7 @@ namespace {
 constexpr uint32_t kCollectionTag = makeTag("ttcf");
 constexpr size_t kDirectoryHeaderSize = 12;
 constexpr size_t kTableRecordSize = 16;
+constexpr uint16_t kPostscriptNameId = 6;
 
 // `path` is UTF-8; going through char8_t makes std::filesystem convert it to
 // the native encoding (UTF-16 on Windows).
@@ -104,6 +106,35 @@ std::optional<std::vector<uint8_t>> FontFile::table(size_t faceIndex, uint32_t t
     return readRange(file, record.offset, record.length);
   }
   return std::nullopt;
+}
+
+std::optional<size_t> FontFile::faceWithPostscriptName(const std::string& postscriptName,
+                                                       const LegacyDecoder& decodeLegacy) const {
+  for (size_t index = 0; index < faces_.size(); ++index) {
+    if (hasPostscriptName(index, postscriptName, decodeLegacy)) return index;
+  }
+  return std::nullopt;
+}
+
+bool FontFile::hasPostscriptName(size_t faceIndex, const std::string& postscriptName,
+                                 const LegacyDecoder& decodeLegacy) const {
+  const auto nameTable = table(faceIndex, makeTag("name"));
+  if (!nameTable) return false;
+  try {
+    const std::vector<NameRecord> records = parseNameTable(*nameTable, decodeLegacy);
+    const auto named = [&](uint16_t nameId) {
+      return std::any_of(records.begin(), records.end(),
+                         [&](const NameRecord& r) { return r.nameId == nameId && r.value == postscriptName; });
+    };
+    if (named(kPostscriptNameId)) return true;
+    const auto fvarTable = table(faceIndex, makeTag("fvar"));
+    if (!fvarTable) return false;
+    const Fvar fvar = parseFvar(*fvarTable);
+    return std::any_of(fvar.instances.begin(), fvar.instances.end(),
+                       [&](const FvarInstance& i) { return i.postscriptNameId && named(*i.postscriptNameId); });
+  } catch (const ParseError&) {
+    return false;
+  }
 }
 
 }  // namespace sfi::sfnt
