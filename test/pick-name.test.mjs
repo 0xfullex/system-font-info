@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { pickName } from '../lib/pick-name.js'
+import { pickName } from '../dist/pick-name.js'
 
 const names = (...pairs) => pairs.map(([language, value]) => ({ language, value }))
 

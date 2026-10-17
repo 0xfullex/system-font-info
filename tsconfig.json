@@ -9,7 +9,7 @@
       "node"
     ],
     "rootDir": "ts",
-    "outDir": "lib",
+    "outDir": "dist",
     "declaration": true,
     "strict": true,
     "noUncheckedIndexedAccess": true,

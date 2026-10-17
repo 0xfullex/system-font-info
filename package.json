@@ -8,17 +8,17 @@
     "type": "git",
     "url": "git+https://github.com/0xfullex/system-font-info.git"
   },
-  "main": "lib/index.js",
-  "types": "lib/index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./lib/index.d.ts",
-      "default": "./lib/index.js"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     },
     "./package.json": "./package.json"
   },
   "files": [
-    "lib/",
+    "dist/",
     "prebuilds/",
     "README.md",
     "LICENSE"
@@ -35,7 +35,7 @@
   "scripts": {
     "build:native": "node-gyp rebuild",
     "build:native:debug": "node-gyp rebuild --debug",
-    "build:ts": "tsc -p tsconfig.json",
+    "build:ts": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.json",
     "build": "npm run build:native && npm run build:ts",
     "test": "node --test",
     "typecheck": "tsc -p tsconfig.json --noEmit",

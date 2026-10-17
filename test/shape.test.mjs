@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict'
 import { before, describe, test } from 'node:test'
 
-import { getFonts } from '../lib/index.js'
+import { getFonts } from '../dist/index.js'
 
 // ---- a small schema language -------------------------------------------------
 // A schema is a function (value, path, errors) that pushes a message for every

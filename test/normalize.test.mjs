@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { normalizeFamilies } from '../lib/normalize.js'
+import { normalizeFamilies } from '../dist/normalize.js'
 
 const names = (...pairs) => pairs.map(([language, value]) => ({ language, value }))
 

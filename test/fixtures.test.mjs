@@ -9,7 +9,7 @@ import { join } from 'node:path'
 import { after, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
-import { loadNative } from '../lib/native.js'
+import { loadNative } from '../dist/native.js'
 
 const { readFontFile } = loadNative().__testing
 const fixture = (name) => fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url))

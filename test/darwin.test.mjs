@@ -4,8 +4,8 @@ import assert from 'node:assert/strict'
 import { after, before, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
-import { getFonts, pickName } from '../lib/index.js'
-import { loadNative } from '../lib/native.js'
+import { getFonts, pickName } from '../dist/index.js'
+import { loadNative } from '../dist/native.js'
 
 const skip = process.platform !== 'darwin' && 'macOS only'
 const fixture = (name) => fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url))

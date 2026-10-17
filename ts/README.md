@@ -1,6 +1,6 @@
 # ts
 
-The JS half of the package, compiled by `tsc` to `../lib` (CommonJS, with declarations). `types.ts` is the public type contract and is never edited as a side effect of other work.
+The JS half of the package, compiled by `tsc` to `../dist` (CommonJS, with declarations; `npm run build:ts` empties it first, so output of deleted sources never ships). `types.ts` is the public type contract and is never edited as a side effect of other work.
 
 ## Files
 

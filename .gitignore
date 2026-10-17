@@ -2,7 +2,7 @@ CLAUDE.local.md
 .worktrees/
 node_modules/
 build/
-lib/
+dist/
 prebuilds/
 *.tgz
 .DS_Store
