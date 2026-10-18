@@ -113,7 +113,7 @@ export const FIELD_CATALOGUE = [
   { name: 'faces.scope', level: 'face', preset: 'styles', sources: { darwin: A_AND_B, win32: B, linux: B } },
   // `file` is `file.path` and `file.index`; on macOS the index is C.
   { name: 'faces.file', level: 'face', preset: 'styles', identity: true, sources: { darwin: B_AND_C, win32: B, linux: B } },
-  { name: 'faces.variable', level: 'face', preset: 'details', sources: { darwin: B, win32: C, linux: B } },
+  { name: 'faces.variable', level: 'face', preset: 'details', sources: { darwin: B, win32: B, linux: B } },
   { name: 'faces.format', level: 'face', preset: 'details', sources: { darwin: B_C_FOR_CFF2, win32: C, linux: B_C_FOR_CFF2 } },
   { name: 'faces.axes', level: 'face', preset: 'details', sources: everywhere(C) },
   {
@@ -121,7 +121,7 @@ export const FIELD_CATALOGUE = [
     level: 'face',
     preset: 'styles',
     identity: true,
-    sources: { darwin: C, win32: C, linux: C_FOR_VARIABLE_FACES }
+    sources: { darwin: C, win32: C_FOR_VARIABLE_FACES, linux: C_FOR_VARIABLE_FACES }
   },
   { name: 'faces.namedInstanceIndex', level: 'face', preset: 'details', sources: { darwin: C, win32: C, linux: C_FOR_VARIABLE_FACES } },
   { name: 'faces.coverage', level: 'face', preset: null, sources: everywhere(E) },
@@ -145,7 +145,7 @@ export const FIELD_CATALOGUE = [
   platformField('faces.platform.width', everywhere(B)),
   platformField('faces.platform.slant', everywhere(B)),
   platformField('faces.platform.symbolicTraits', onlyDarwin(B)),
-  platformField('faces.platform.format', { darwin: B, win32: 'undocumented', linux: B }),
+  platformField('faces.platform.format', { darwin: B, win32: C, linux: B }),
   platformField('faces.platform.priority', onlyDarwin(B)),
   platformField('faces.platform.registrationScope', onlyDarwin(B)),
   platformField('faces.platform.downloadable', onlyDarwin(B)),
@@ -162,7 +162,7 @@ export const FIELD_CATALOGUE = [
   platformField('faces.platform.typographicStyleNames', onlyWin32(B)),
   platformField('faces.platform.designLanguages', onlyWin32(B)),
   platformField('faces.platform.supportedLanguages', onlyWin32(B)),
-  platformField('faces.platform.inactiveFamilyPreference', onlyWin32('undocumented')),
+  platformField('faces.platform.inactiveFamilyPreference', onlyWin32(A)),
   platformField('faces.platform.sourceType', onlyWin32(B)),
   platformField('faces.platform.sourceName', onlyWin32(B)),
   platformField('faces.platform.axisValues', onlyWin32(B)),

@@ -19,11 +19,11 @@ For Windows and Linux the sources below are the ones the backends are built on, 
 
 ## Source groups
 
-Every field belongs, on each platform, to one group of OS work. A call does the union of the work of its fields' groups, and within a group most of the cost is paid once: the first C field opens every font resource, after which another C field adds little (on Windows, C covers two kinds of work whose costs have not been measured separately; see below).
+Every field belongs, on each platform, to one group of OS work. A call does the union of the work of its fields' groups, and within a group most of the cost is paid once: the first C field opens every font resource, after which another C field adds little. On Windows, creating a resource and reading its tables are distinct kinds of C work; their separately measured costs are below.
 
 | Group | Work |
 | --- | --- |
-| A | The family list: the OS's list of families and their names, no work per face. |
+| A | The family list: the OS's list of families and their names, and family preferences fetched once per call; no OS work per face. |
 | B | Per-face OS attributes: one OS query per face (on Linux, more objects in the same `FcFontList` call). |
 | C | Opening each font resource: reading its `name`, `fvar` and `cmap` tables and its table directory (on macOS, creating a `CTFont`). |
 | D | Reading and parsing the OpenType tables; each `faces.opentype` entry is its own table. |
@@ -66,10 +66,10 @@ The group of OS work each field needs on each platform. A cell is read as follow
 | `faces.supportedLanguages` | B | B | B |
 | `faces.scope` | A, B | B | B |
 | `faces.file` | B, C | B | B |
-| `faces.variable` | B | C | B |
+| `faces.variable` | B | B | B |
 | `faces.format` | B; C for `cff2` | C | B; C for `cff2` |
 | `faces.axes` | C | C | C |
-| `faces.coordinates` | C | C | C, for variable faces only |
+| `faces.coordinates` | C | C, for variable faces only | C, for variable faces only |
 | `faces.namedInstanceIndex` | C | C | C, for variable faces only |
 | `faces.coverage` | E | E | E |
 | `faces.opentype.tables` | D | D | D |
@@ -88,7 +88,7 @@ The group of OS work each field needs on each platform. A cell is read as follow
 | `faces.platform.width` | B | B | B |
 | `faces.platform.slant` | B | B | B |
 | `faces.platform.symbolicTraits` | B | — | — |
-| `faces.platform.format` | B | not yet documented | B |
+| `faces.platform.format` | B | C | B |
 | `faces.platform.priority` | B | — | — |
 | `faces.platform.registrationScope` | B | — | — |
 | `faces.platform.downloadable` | B | — | — |
@@ -105,7 +105,7 @@ The group of OS work each field needs on each platform. A cell is read as follow
 | `faces.platform.typographicStyleNames` | — | B | — |
 | `faces.platform.designLanguages` | — | B | — |
 | `faces.platform.supportedLanguages` | — | B | — |
-| `faces.platform.inactiveFamilyPreference` | — | not yet documented | — |
+| `faces.platform.inactiveFamilyPreference` | — | A | — |
 | `faces.platform.sourceType` | — | B | — |
 | `faces.platform.sourceName` | — | B | — |
 | `faces.platform.axisValues` | — | B | — |
@@ -131,16 +131,16 @@ The groups each preset reaches. A selection costs the groups of the fields it se
 | --- | --- | --- | --- |
 | `fields: []` (`family` only) | A | A | A |
 | `names` | A, C | A | A |
-| `styles` | A, B, C | A, B, C | A, B; C for named instances; C for variable faces only |
+| `styles` | A, B, C | A, B; C for variable faces only | A, B; C for named instances; C for variable faces only |
 | `details` | A, B, C | A, B, C | A, B, C |
 | `full` | A, B, C, D | A, B, C, D | A, B, C, D |
 <!-- END GENERATED: preset-groups -->
 
-A selection that includes a `faces.*` field gives every face its identity ([api.md](api.md#always-included)), so it reaches C on macOS (`file.index`, `coordinates`) and on Windows (`coordinates`: telling whether a face is variable), and on Linux only for variable faces (`coordinates`). `names` selects no face field and so carries no identity: on Windows `familyNames` is group A, and on macOS and Linux the package computes it from the faces' `familyNames`, which cost C on macOS and A on Linux.
+A selection that includes a `faces.*` field gives every face its identity ([api.md](api.md#always-included)), so it reaches C on macOS (`file.index`, `coordinates`) and only for variable faces on Windows and Linux (`coordinates`). `names` selects no face field and so carries no identity: on Windows `familyNames` is group A, and on macOS and Linux the package computes it from the faces' `familyNames`, which cost C on macOS and A on Linux.
 
-On macOS `names` is C because CoreText has no API for a family's names in every language, and `styles` reaches C because the face names, `symbol` and `file.index` are C there. The face identity includes `coordinates`, which a variable font's named instances take from its `fvar` table; a static face has no coordinates. On Linux a face is known to be variable without reading its file (see `variable` in the Linux field sources), so `styles` reaches A and B, and C only for the faces of variable fonts (their `coordinates`, and the names of the named instances). On Windows telling whether a face is variable is itself C (`IDWriteFontResource::HasVariations`), so `styles` reaches C for every font resource.
+On macOS `names` is C because CoreText has no API for a family's names in every language, and `styles` reaches C because the face names, `symbol` and `file.index` are C there. The face identity includes `coordinates`, which a variable font's named instances take from its `fvar` table; a static face has no coordinates. On Linux a face is known to be variable without reading its file (see `variable` in the Linux field sources), so `styles` reaches A and B, and C only for the faces of variable fonts (their `coordinates`, and the names of the named instances). On Windows `IDWriteFontSet1::GetFontAxisRanges` identifies variable resources without creating a font resource or reading tables (B), so `styles` reaches C only for variable faces, whose coordinates must be limited to actual `fvar` axes.
 
-`faces.format` is in `details`, not `styles`, because on Windows telling a face's format needs each font resource's table directory (C): `CFF2`, `CFF` and `glyf` are told apart there. On Windows C covers two kinds of work: creating each font resource object (enough for `HasVariations`) and reading its table directory or tables (needed for `format`). Their costs have not been measured separately. `format` is kept out of `styles` so that `styles` needs only the first kind; how much the second adds is not measured. On Linux and macOS `format` is B, except that telling CFF2 from CFF needs the table directory (C).
+`faces.format` is in `details`, not `styles`, because on Windows telling a face's format needs each font resource's table directory (C): `CFF2`, `CFF` and `glyf` are told apart there. On Windows C covers creating font resource or face objects and reading a resource's table directory or tables. The component measurements below separate resource creation for `HasVariations`, table-directory reads, and directory plus `name` parsing. The measured range-based variable classification avoids opening static resources for `styles`; `format` remains outside `styles` because it needs the table directory. On Linux and macOS `format` is B, except that telling CFF2 from CFF needs the table directory (C).
 
 ## Family grouping
 
@@ -239,7 +239,7 @@ CoreText also keeps a cache in the process that answers PostScript name matching
 
 - The backend reads the system font collection, `IDWriteFactory3::GetSystemFontCollection` with downloadable fonts excluded and without an update check (`checkForUpdates` FALSE). With the update check the first call in a process spends about 300 ms and later calls about 190 ms (measured) asking the font cache service to rescan; without it the call reads the service's registered state, which trails a change by about a second ([Freshness](#freshness-1)).
 - **Every member of every family is a face**, including the members DirectWrite synthesizes (`simulations`; 1,333 of 2,568 members on the machine measured). Simulated faces share the tables of their base font.
-- **Exact duplicates**: 6 members had the same identity as another member on the machine measured; whether their other fields were identical has not been established. A member listed twice with identical content is one face.
+- **Exact duplicates**: on 2026-10-18, 6 members had the same identity as another member. Every public field's source inputs, coverage ranges, and every sfnt table's exact bytes were identical for all 6 (two in `Gen`, four in `LXGW WenKai GB`). These exact duplicates are one face, leaving 2,562 faces on that host. Compared field by field, the six pairs showed no difference.
 - **Member order** is the collection's member order.
 - **Not listed**: fonts whose data is not on the machine; fonts a process registered privately with `AddFontResourceEx(FR_PRIVATE)`, which are not in the system collection.
 - **Fonts marked as hidden** are listed, with `enabled: true` and `platform.inactiveFamilyPreference: true`.
@@ -272,7 +272,7 @@ The group of each field is in [the matrix of Source groups](#the-group-of-every-
 | `format` | The table directory: `CFF2` is `cff2`, `CFF` is `cff`, `glyf` is `truetype`; without those, `DWRITE_FONT_FACE_TYPE` Type 1 is `type1` and bitmap is `bitmap`; anything else `unknown`. A collection is a container, not a format. |
 | `file.path` | `IDWriteFont3::GetFontFaceReference`, `IDWriteFontFaceReference::GetFontFile`, and the path from `IDWriteLocalFontFileLoader::GetFilePathFromKey`. |
 | `file.index` | `IDWriteFontFaceReference::GetFontFaceIndex`. |
-| `variable` | `IDWriteFontResource::HasVariations`. |
+| `variable` | `IDWriteFontSet1::GetFontAxisRanges`: some axis has a non-empty range. On 2026-10-18 this agreed with independent `IDWriteFontResource::HasVariations` for all 1,235 system font-set entries (20 variable resources); all 2,568 WSS members mapped to those resources, including simulated members through their bases. |
 | `axes` | The `fvar` axes only. The standard axes DirectWrite adds for a font that does not define them (a fixed `wdth` of 100, for example) are in `platform.resourceAxes`. |
 | `coordinates` | `IDWriteFontFaceReference1::GetFontAxisValues`, limited to the `fvar` axes. |
 | `namedInstanceIndex` | The first `fvar` instance whose coordinates equal `coordinates`, within 1/65536. |
@@ -297,10 +297,10 @@ The definitions are in [api.md](api.md#windows-win32native).
 | `typographicFamilyNames`, `typographicStyleNames`, `designLanguages`, `supportedLanguages` | Informational strings. |
 | `sourceType`, `sourceName` | `IDWriteFontSet3::GetFontSourceType` and `GetFontSourceName` of the face's entry in the whole system font set. |
 | `axisValues` | `IDWriteFontFaceReference1::GetFontAxisValues`. |
-| `inactiveFamilyPreference` | One registry read per call; its group is not yet documented. |
+| `inactiveFamilyPreference` | One registry read per call of `HKCU\Software\Microsoft\Windows NT\CurrentVersion\Font Management\Inactive Fonts`, then family-name membership lookup (A). The key was absent in the normal-user measurement on 2026-10-18; a hidden-family match was not exercised. |
 | `resourceAxes` | The axes of the font resource (`IDWriteFontResource`). |
 | `additionalInformationalStrings` | Every informational string, compared with the `name` table. |
-| `format` | Not yet documented. |
+| `format` | Create a font face, then `IDWriteFontFace::GetType` (`DWRITE_FONT_FACE_TYPE`, C). |
 
 ### Freshness
 
@@ -398,9 +398,23 @@ Apple M4, 10 cores, 16 GB, macOS 27.0.1 (26A434), Node 24.20.0. 252 families, 65
 
 ### Windows
 
-Intel Core i7-8700K, 12 logical CPUs, 31.93 GiB, Windows 11 Pro 10.0.26200, dwrite.dll 10.0.26100.8875, Node 24.20.0. 462 families, 2,568 members (1,333 simulated), 906 font resources, 882 files.
+The backend's `fields: []`, `names`, `styles`, `details`, and `full` paths have not yet been measured. The figures below are standalone component observations and an earlier standalone selection capture, not measurements of those backend presets.
 
-The backend calls `GetSystemFontCollection` without the update check (`checkForUpdates` FALSE). Most figures were measured with the update check (TRUE), which costs about 300 ms per call in a fresh process. The FALSE column says which figures were measured that way; the others are derived as the TRUE figure minus that run's collection step under TRUE, plus the 1.556 ms the collection step takes under FALSE. The update check's cost depends on DirectWrite's internal state (later calls in one process spend about 190 ms on it), so a derived figure is an order of magnitude only.
+Component capture on 2026-10-18: Intel Core i7-8700K, 6 cores / 12 logical CPUs, 31.93 GiB, Windows 11 Pro 10.0.26200 x64, dwrite.dll 6.2.26100.9711, MSVC 19.29. WSS with `checkForUpdates` FALSE: 462 families, 2,568 members (1,333 simulated), 906 resources; 20 resources are variable. Each mode ran in 5 new processes with 6 sequential trials each. First is the median of the 5 initial trials; later is the median of the 25 subsequent trials. Brackets give minimum and maximum, in milliseconds. Resource discovery and file/index deduplication are excluded setup; OS file caches were warm.
+
+| Component | First in process (ms) | Later in process (ms) |
+| --- | --- | --- |
+| Create every resource and call `HasVariations` | 46.3665 [37.7638-157.2097] | 0.6007 [0.5900-0.7581] |
+| Read every table directory | 168.4574 [163.4622-172.7069] | 163.5174 [159.4687-168.7727] |
+| Directory, face creation, and read/parse `name` | 1202.3394 [1180.7245-1694.3533] | 1147.2463 [1134.5897-1169.0648] |
+| Create every face and call `GetType` | 531.2045 [526.6966-547.5997] | 502.8099 [490.1194-526.9040] |
+| One `Inactive Fonts` registry lookup, missing-key branch | 0.0574 [0.0558-0.0740] | 0.0129 [0.0120-0.0153] |
+
+Every resource mode visits 906 resources. The directory/name experiment uses the earlier standalone parser and intermediate JSON objects, not the product's sfnt parser or JS conversion. Resource objects are released during each trial, but DirectWrite's own in-process state may remain warm. Component medians must not be added.
+
+Earlier standalone selection capture: Intel Core i7-8700K, 12 logical CPUs, 31.93 GiB, Windows 11 Pro 10.0.26200, dwrite.dll 10.0.26100.8875, Node 24.20.0. 462 families, 2,568 members (1,333 simulated), 906 font resources, 882 files.
+
+The Windows source uses `GetSystemFontCollection` without the update check (`checkForUpdates` FALSE). Most figures in the earlier selection capture were measured with the update check (TRUE), which costs about 300 ms per call in a fresh process. The FALSE column says which figures were measured that way; the others are derived as the TRUE figure minus that run's collection step under TRUE, plus the 1.556 ms the collection step takes under FALSE. The update check's cost depends on DirectWrite's internal state (later calls in one process spend about 190 ms on it), so a derived figure is an order of magnitude only.
 
 | Selection | Groups | TRUE (measured) | FALSE |
 | --- | --- | --- | --- |
