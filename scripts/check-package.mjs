@@ -6,7 +6,8 @@
 // one that carries the sources must never be produced by accident. It checks, and reports every failure at once:
 //   - the compiled JavaScript exists (`main` and `types` of package.json) and is newer than every source in ts/;
 //   - every target of the table (ts/targets.ts) has its `prebuilds/<id>/system-font-info.node`;
-//   - nothing else is packed: no sources, no `binding.gyp`, no tests, no fontconfig orthography sources.
+//   - nothing else is packed: no sources, no `binding.gyp`, no tests, no fontconfig orthography sources;
+//   - the manifest has no `install`, `preinstall` or `postinstall` script: the package never builds at install time.
 //
 // There is no switch to skip it. To look at what a package would hold, run `npm pack --dry-run --ignore-scripts`.
 //
@@ -18,6 +19,9 @@ import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 export const ADDON_FILE = 'system-font-info.node'
+
+/** The lifecycle scripts npm runs on the installing machine. */
+const INSTALL_SCRIPTS = ['preinstall', 'install', 'postinstall']
 
 /** The files at the package root that must ship. */
 const ROOT_FILES = ['package.json', 'README.md', 'LICENSE', 'CHANGELOG.md']
@@ -52,6 +56,11 @@ export function checkPackage({ root, targetIds, packedFiles }) {
   const packed = new Set(packedFiles)
 
   const manifest = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'))
+  for (const script of INSTALL_SCRIPTS) {
+    if (manifest.scripts?.[script] !== undefined) {
+      problems.push(`package.json has a \`${script}\` script; the package must never build or run anything at install time`)
+    }
+  }
   const compiled = [manifest.main, manifest.types]
   const missingCompiled = compiled.filter((file) => !existsSync(path.join(root, file)))
   for (const file of missingCompiled) problems.push(`${file} does not exist; run \`npm run build:ts\``)
@@ -102,6 +111,7 @@ async function main() {
   const problems = checkPackage({ root, targetIds: TARGETS.map((target) => target.id), packedFiles: listPackedFiles(root) })
   if (problems.length > 0) {
     console.error(`check-package: refusing to pack:\n${problems.map((problem) => `  - ${problem}`).join('\n')}`)
+    console.error('To only list what would be packed, run `npm pack --dry-run --ignore-scripts`.')
     process.exit(1)
   }
   console.log(`check-package: ${TARGETS.length} prebuilds, dist/ up to date, nothing else in the package`)

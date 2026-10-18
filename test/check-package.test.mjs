@@ -24,13 +24,13 @@ const completePackage = () => [
 ]
 
 /** Writes `files` under a new directory, with a ts/ source older than the compiled JavaScript, and returns the root. */
-function makeTree(files) {
+function makeTree(files, scripts) {
   const root = mkdtempSync(path.join(tmpdir(), 'check-package-'))
   const write = (file, content = '') => {
     mkdirSync(path.dirname(path.join(root, file)), { recursive: true })
     writeFileSync(
       path.join(root, file),
-      file === 'package.json' ? JSON.stringify({ main: 'dist/index.js', types: 'dist/index.d.ts' }) : content
+      file === 'package.json' ? JSON.stringify({ main: 'dist/index.js', types: 'dist/index.d.ts', scripts }) : content
     )
   }
   write('ts/index.ts')
@@ -40,8 +40,8 @@ function makeTree(files) {
 }
 
 /** Runs the check on a tree made of `files`; the packed files are all of them but the sources. */
-function check(files, { packed = files } = {}) {
-  const root = makeTree(files)
+function check(files, { packed = files, scripts } = {}) {
+  const root = makeTree(files, scripts)
   try {
     return checkPackage({ root, targetIds: TARGET_IDS, packedFiles: packed })
   } finally {
@@ -115,4 +115,13 @@ test('compiled JavaScript that is missing or older than a source is refused', ()
   } finally {
     rmSync(root, { recursive: true })
   }
+})
+
+test('a manifest with an install-time script is refused, whatever else it holds', () => {
+  const scripts = { build: 'node-gyp rebuild', test: 'node --test', preinstall: 'a', install: 'node-gyp rebuild', postinstall: 'c' }
+  assert.deepEqual(
+    check(completePackage(), { scripts }).map((problem) => problem.split('`')[1]),
+    ['preinstall', 'install', 'postinstall']
+  )
+  assert.deepEqual(check(completePackage(), { scripts: { prepack: 'x', build: 'y' } }), [])
 })
