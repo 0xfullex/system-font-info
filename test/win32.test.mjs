@@ -85,6 +85,14 @@ describe('DirectWrite system families', { skip }, () => {
     }
   })
 
+  test('which repeated members are merged does not depend on the selected fields', async () => {
+    const counts = (families) => families.map((family) => [family.family, family.faces.length])
+    const expected = counts(full)
+    for (const fields of [['faces.weight'], ['faces.coordinates'], ['faces.file'], ['faces.format'], ['faces.platform.axisValues']]) {
+      assert.deepEqual(counts(await getFamilies({ fields })), expected, fields.join())
+    }
+  })
+
   test('asking for every canonical family name gives the full run and the same member order', async () => {
     assert.deepEqual(await getFamilies({ preset: 'full', families: full.map((entry) => entry.family) }), full)
   })

@@ -56,14 +56,13 @@ base resource's source without trying to match simulation flags in the set.
 Conflicting source metadata or variable classifications for one resource
 fail explicitly.
 
-Within a family, a repeated identity (resource, coordinates, simulations)
-is listed once, at the position of its first member; later members with that
-identity are dropped. On the machine measured the six repeats agreed in every
-public field's inputs, but the rule does not depend on that: if their other
-fields ever differ, the first member wins and no error is raised.
-A family-only aggregate can use hidden intermediate faces without the
-public identity; their raw reference axis values distinguish instances
-without opening `fvar` merely to compute that aggregate.
+Within a family, a repeated identity is listed once, at the position of its
+first member; later members with that identity are dropped. The identity is
+the resource, the member's raw axis values and its simulations, written the
+same way for every field selection, so which faces are merged never depends on
+the request. On the machine measured the six repeats agreed in every public
+field's inputs, but the rule does not depend on that: if their other fields
+ever differ, the first member wins and no error is raised.
 
 ## What the request changes
 

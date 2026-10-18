@@ -231,8 +231,9 @@ ReadFace FaceReader::read(IDWriteFont* font, const LocalizedStrings& familyNames
                               wanted(Field::FacesCoordinates) || wanted(Field::FacesNamedInstanceIndex);
   const bool variable = needsVariation && collection_.variable(reference.key);
   face.variable = variable;
-  std::vector<DWRITE_FONT_AXIS_VALUE> values;
-  if (variable || wanted(Field::FacesPlatformAxisValues)) values = axisValues(reference.reference.Get());
+  // Every axis value of the member, including the standard axes DirectWrite injects. It needs no opened face, and it
+  // is both the source of the coordinates and part of the identity.
+  const auto values = axisValues(reference.reference.Get());
   if (variable &&
       (wanted(Field::FacesAxes) || wanted(Field::FacesCoordinates) || wanted(Field::FacesNamedInstanceIndex))) {
     face.axes = axes(shared, reference);
@@ -292,12 +293,8 @@ ReadFace FaceReader::read(IDWriteFont* font, const LocalizedStrings& familyNames
   std::ostringstream identity;
   appendString(identity, reference.key.first);
   identity << ':' << reference.key.second << ':' << static_cast<uint32_t>(simulations);
-  for (const auto& [tag, value] : face.coordinates) identity << ':' << tag << '=' << std::hexfloat << value;
-  // A derived family field can need members without requesting identity. Its hidden intermediate faces still keep
-  // distinct instances without opening fvar just to identify them.
-  if (!wanted(Field::FacesCoordinates))
-    for (const auto& value : axisValues(reference.reference.Get()))
-      identity << ':' << axisTag(value.axisTag) << '=' << std::hexfloat << value.value;
+  // The same text for every field selection, so the merge of repeated members never depends on the request.
+  for (const auto& value : values) identity << ':' << axisTag(value.axisTag) << '=' << std::hexfloat << value.value;
   read.identity = identity.str();
   return read;
 }
