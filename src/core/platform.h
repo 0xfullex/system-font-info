@@ -42,7 +42,8 @@ void unregisterFontForTesting(const std::string& path);
 
 // Test hook: turns the fonts of a file registered for the current process off or
 // on again, as the user does in a font manager, for the current process only.
-// Throws on a platform without a disabled state.
+// Throws on a platform without a disabled state, and when asked to turn off a file
+// that is not registered for the current process (the user's fonts stay untouched).
 void setFontEnabledForTesting(const std::string& path, bool enabled);
 
 }  // namespace sfi::platform

@@ -46,6 +46,14 @@ void unregisterFontForTesting(const std::string& path) {
 
 void setFontEnabledForTesting(const std::string& path, bool enabled) {
   const auto url = fileUrl(path);
+  // Disabling a font that is registered beyond this process is a change to the user's fonts that outlives the test, so
+  // only a font registered for the process is disabled. Enabling cannot be guarded the same way: the file of a disabled
+  // font reports scope 0, the same as an unregistered file or one disabled for the user, so no check separates the
+  // fonts this hook disabled from the others. Enabling only undoes a disable, and a disable cannot reach other fonts.
+  if (!enabled && CTFontManagerGetScopeForURL(url.get()) != kCTFontManagerScopeProcess) {
+    throw std::runtime_error("system-font-info: " + path +
+                             " is not registered for this process, so it is not disabled");
+  }
   const Ref<CFArrayRef> descriptors(CTFontManagerCreateFontDescriptorsFromURL(url.get()));
   if (!descriptors || CFArrayGetCount(descriptors.get()) == 0) {
     throw std::runtime_error("system-font-info: " + path + " holds no fonts to " + (enabled ? "enable" : "disable"));

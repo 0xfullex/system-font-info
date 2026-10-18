@@ -52,7 +52,8 @@ the interface in `../core/platform.h` and fills the structs of
   from, and throw `std::runtime_error` with the OS error text on failure.
 - `setFontEnabledForTesting(path, enabled)` turns the fonts of a file registered
   that way off or on again, for the current process only, so a test can have a
-  disabled font without touching the machine's fonts. A platform with no
+  disabled font without touching the machine's fonts; turning off a file that
+  was not registered that way throws. A platform with no
   disabled state (DirectWrite, fontconfig) throws "not supported".
 
 ## What a backend must do

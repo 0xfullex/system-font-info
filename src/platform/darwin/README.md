@@ -283,4 +283,6 @@ runs between calls.
 `CTFontManagerRegisterFontsForURL` / `UnregisterFontsForURL` with process scope;
 `setFontEnabledForTesting` is `CTFontManagerEnableFontDescriptors` over
 `CTFontManagerCreateFontDescriptorsFromURL` of the file. For a font registered for
-the process the disabling holds in this process only. A failure throws `std::runtime_error` with the `CFError` description.
+the process the disabling holds in this process only; disabling any other file throws, so a test
+cannot change the user's fonts, and enabling is not guarded because the file of a
+disabled font reports scope 0, like an unregistered one. A failure throws `std::runtime_error` with the `CFError` description.

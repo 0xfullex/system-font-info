@@ -258,6 +258,15 @@ describe('disabled fonts', { skip }, () => {
     assert.ok(family.faces.every((face) => face.platform.priority === 60000 && face.platform.registrationScope === 1))
   })
 
+  test('are not disabled for a file that is not registered for the process', () => {
+    unregisterFont(disabledFile)
+    try {
+      assert.throws(() => setFontEnabled(disabledFile, false), /not registered for this process/)
+    } finally {
+      registerFont(disabledFile)
+    }
+  })
+
   test('are enabled again once they are enabled', async () => {
     setFontEnabled(disabledFile, false)
     setFontEnabled(disabledFile, true)
