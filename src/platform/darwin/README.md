@@ -128,7 +128,9 @@ not depend on whether `families` was given). A face the lookup does not name
 - `scope`, first rule that applies: `kCTFontRegistrationScopeAttribute` is the
   process scope: process. `kCTFontPriorityAttribute` 40000 or 50000 (dynamic: a
   font an application registered for the user, with session or persistent
-  scope; macOS 27 reports a session registration this way): user; 10000 / 20000 / 30000: system; 60000 with the persistent
+  scope; macOS 27 reports a session registration this way, checked by hand: no
+  test registers at session scope, since that registration is visible to every
+  process, the concurrently running test files included): user; 10000 / 20000 / 30000: system; 60000 with the persistent
   registration scope: system; anything else: unknown. Priority 60000 alone is
   ambiguous. Measured on
   macOS 27: a font registered for the process has priority 60000 and

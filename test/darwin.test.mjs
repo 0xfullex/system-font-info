@@ -375,10 +375,3 @@ describe('languageCoverage', { skip }, () => {
     assert.ok(entry.covered > 0 && entry.covered <= entry.required, `covered ${entry.covered}`)
   })
 })
-
-describe('scope of registered fonts', { skip }, () => {
-  // CTFontManagerRegisterFontsForURL with kCTFontManagerScopeSession lists as `user` (docs/platforms.md, `scope`), but
-  // the only registration hook of the addon registers for the process, and a test hook for session scope is native code
-  // this change does not add. The rule is covered by code review until such a hook exists.
-  test('a session-registered font is user scope', { skip: 'no test hook registers a font with session scope' }, () => {})
-})
