@@ -230,8 +230,8 @@ std::vector<FamilySeeds> groupByFamily(const std::vector<Group>& groups, const R
 }
 
 // The descriptors CoreText's family lookup returns for `family`, in the order its matcher lists them, which is the
-// family's member order. Disabled fonts are included when `includeDisabled`. Null when CoreText cannot make the lookup
-// or no font matches.
+// family's member order. Disabled fonts are included when `includeDisabled`. Null when no font matches; throws when
+// CoreText cannot make the lookup, which must not read as "no font matches" (a family would count as all disabled).
 Ref<CFArrayRef> lookUpFamily(const std::string& family, bool includeDisabled) {
   const auto familyName = makeString(family);
   const void* attributeKeys[] = {kCTFontFamilyNameAttribute};
@@ -245,7 +245,7 @@ Ref<CFArrayRef> lookUpFamily(const std::string& family, bool includeDisabled) {
   const Ref<CFDictionaryRef> options = includeDisabled ? includingDisabledFonts() : Ref<CFDictionaryRef>();
   const Ref<CTFontCollectionRef> collection(
       CTFontCollectionCreateWithFontDescriptors(descriptors.get(), options.get()));
-  if (!collection) return {};
+  if (!collection) throw std::runtime_error("system-font-info: CoreText cannot create the family lookup");
   return Ref<CFArrayRef>(CTFontCollectionCreateMatchingFontDescriptors(collection.get()));
 }
 
