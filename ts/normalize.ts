@@ -1,9 +1,9 @@
 import type { RawAxis, RawFace, RawFamily } from './native'
-import type { FontFace, FontFamily, LocalizedString, OpenTypeInfo, VariationAxis } from './types'
+import type { Field, FontFace, FontFamily, LocalizedString, OpenTypeInfo, VariationAxis } from './types'
 
 // Turns the native result into the public shape: canonical language tags,
 // merged duplicates, default strings, family aggregates, sorted families.
-// Objects are changed in place, so an object that several faces share (their
+// The result holds only the fetched keys. Objects are changed in place, so an object that several faces share (their
 // `opentype`, their `axes`) is processed once and stays shared.
 
 const canonicalTags = new Map<string, string>()
@@ -99,11 +99,17 @@ function normalizeAxes(axes: RawAxis[]): void {
   }
 }
 
-function normalizeFace(face: RawFace, done: WeakSet<object>): FontFace {
-  tidyLocalized(face.fullNames)
-  tidyLocalized(face.styleNames)
-  tidyLocalized(face.familyNames)
-  tidyTags(face.languages)
+/** A key the field closure promised the native result; its absence is a defect of the native side, so it fails loudly. */
+function required<T>(value: T | undefined, what: string): T {
+  if (value === undefined) throw new Error(`system-font-info: the native result lacks ${what}`)
+  return value
+}
+
+function normalizeFace(face: RawFace, derived: ReadonlySet<Field>, done: WeakSet<object>): FontFace {
+  if (face.fullNames) tidyLocalized(face.fullNames)
+  if (face.styleNames) tidyLocalized(face.styleNames)
+  if (face.familyNames) tidyLocalized(face.familyNames)
+  if (face.supportedLanguages) tidyTags(face.supportedLanguages)
 
   if (face.axes && !done.has(face.axes)) {
     done.add(face.axes)
@@ -115,31 +121,39 @@ function normalizeFace(face: RawFace, done: WeakSet<object>): FontFace {
   }
 
   const normalized = face as unknown as FontFace
-  normalized.fullName = defaultString(face.fullNames)
-  normalized.styleName = defaultString(face.styleNames)
+  if (derived.has('faces.fullName')) normalized.fullName = defaultString(required(face.fullNames, 'faces.fullNames'))
+  if (derived.has('faces.styleName')) normalized.styleName = defaultString(required(face.styleNames, 'faces.styleNames'))
   return normalized
 }
 
-function normalizeFamily(raw: RawFamily, done: WeakSet<object>): FontFamily {
-  const faces = raw.faces.map((face) => normalizeFace(face, done))
-
-  const familyNames: LocalizedString[] = []
-  const languages: string[] = []
-  for (const face of faces) {
-    for (const name of face.familyNames) familyNames.push({ language: name.language, value: name.value })
-    languages.push(...face.languages)
+/** Sets the family fields `derived` names from the (already normalized) faces; fields not in `derived` are left as they are. */
+function deriveFamilyFields(family: FontFamily, derived: ReadonlySet<Field>): void {
+  if (!(['familyNames', 'supportedLanguages', 'variable', 'enabled'] as const).some((field) => derived.has(field))) return
+  const faces = required<FontFace[]>(family.faces, 'faces')
+  if (derived.has('familyNames')) {
+    const familyNames: LocalizedString[] = []
+    for (const face of faces) {
+      for (const name of required(face.familyNames, 'faces.familyNames')) familyNames.push({ language: name.language, value: name.value })
+    }
+    tidyLocalized(familyNames)
+    family.familyNames = familyNames
   }
-  tidyLocalized(familyNames)
-  dedupeStrings(languages)
-
-  return {
-    family: raw.family,
-    familyNames,
-    languages,
-    variable: faces.some((face) => face.variable),
-    enabled: faces.some((face) => face.enabled),
-    faces
+  if (derived.has('supportedLanguages')) {
+    const supportedLanguages: string[] = []
+    for (const face of faces) supportedLanguages.push(...required(face.supportedLanguages, 'faces.supportedLanguages'))
+    dedupeStrings(supportedLanguages)
+    family.supportedLanguages = supportedLanguages
   }
+  if (derived.has('variable')) family.variable = faces.some((face) => required(face.variable, 'faces.variable'))
+  if (derived.has('enabled')) family.enabled = faces.some((face) => required(face.enabled, 'faces.enabled'))
+}
+
+function normalizeFamily(raw: RawFamily, derived: ReadonlySet<Field>, done: WeakSet<object>): FontFamily {
+  for (const face of raw.faces ?? []) normalizeFace(face, derived, done)
+  if (raw.familyNames) tidyLocalized(raw.familyNames)
+  const family = raw as unknown as FontFamily
+  deriveFamilyFields(family, derived)
+  return family
 }
 
 /** Lowercased, compared by UTF-16 code units; ties broken by the raw string. Locale-independent on purpose. */
@@ -151,8 +165,13 @@ function compareFamilies(a: FontFamily, b: FontFamily): number {
   return 0
 }
 
-export function normalizeFamilies(raw: RawFamily[]): FontFamily[] {
+/**
+ * Normalizes a native result in place and sorts the families. Only the keys the native side returned are handled;
+ * `derived` names the selected fields this platform computes (`BuiltRequest.derived`), which are computed from the
+ * normalized faces. The objects are typed as the complete shapes but hold only the fetched fields until `projectFamilies`.
+ */
+export function normalizeFamilies(raw: RawFamily[], derived: ReadonlySet<Field> = new Set()): FontFamily[] {
   const done = new WeakSet<object>()
-  const families = raw.map((family) => normalizeFamily(family, done))
+  const families = raw.map((family) => normalizeFamily(family, derived, done))
   return families.sort(compareFamilies)
 }

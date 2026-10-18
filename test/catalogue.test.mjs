@@ -1,5 +1,5 @@
 // The request closure and the groups it reaches, computed from the field catalogue. Reads dist/, which
-// `npm run build:catalogue` (and `pretest`) builds.
+// `npm run build:ts` (and `pretest`) builds.
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 

@@ -57,11 +57,13 @@ The other runtime errors, all rejections:
 
 | Condition | Error |
 | --- | --- |
+| `options` that is not an object | `TypeError` |
 | A string in `fields` that is not a field name of any platform | `TypeError` naming it |
 | `preset` that is not one of the four names | `TypeError` |
 | `fields` that is not an array of strings | `TypeError` |
 | `families` or `languageCoverage` that is not an array of strings | `TypeError` |
 | `getFamily` given a `families` option (possible only from JavaScript; the types reject it) | `TypeError` |
+| `getFamily` given a `family` that is not a string (possible only from JavaScript) | `TypeError` |
 | A `languageCoverage` tag that [resolves to no orthography](#languagecoverage) | `RangeError` naming it |
 | The operating system's font service fails | `Error` carrying the OS message |
 
@@ -208,16 +210,19 @@ Each platform groups faces into families its own way (macOS by typographic famil
 
 - **Default face**: the face the platform's matcher picks from this family for weight 400, normal width and normal style. It is one face, not the union of the family's faces.
 - **Orthography**: fontconfig's orthography files (`fc-lang/*.orth`, fontconfig commit `a4e25ec391d417e4bca052fbfa5cd7ce5f7fd39e`), built into the package so every platform counts against the same sets. Every orthography in fontconfig's fc-lang set is available, identified by its fc-lang name. A set is exactly what its file lists, with the files it includes: the characters fontconfig considers needed to write the language, which are mostly letters. For example `zh-cn` has 6,765 code points (the 6,763 GB2312 hanzi and the tone marks U+02C7 and U+02C9), `zh-tw` 13,063, `ja` 2,314. It is not the CLDR exemplar set or Hyperglot's base set, which list different characters.
-- **Matching a tag to an orthography**: a requested tag is resolved by trying, in order, (a) the tag's own language and region, lowercased as fontconfig names its orthographies (`zh-HK` → `zh-hk`; any script is ignored); (b) the language and region of the tag after adding likely subtags with `Intl.Locale.prototype.maximize()`; (c) the language alone (`en-US` → `en`). The first that names an orthography is used, and a tag none of them resolves is a `RangeError`. `orthography` in the result says which set the tag was counted against. The script does not choose the set, so a tag whose script differs from the language's default orthography is counted against the default: `sr-Latn` resolves to `sr`, fontconfig's Cyrillic set (fontconfig's Latin Serbo-Croatian set is `sh`); `orthography` shows which set was used.
+- **Matching a tag to an orthography**: a requested tag is resolved by trying, in order, (0) the tag itself, lowercased with `_` read as `-`, when that is exactly an fc-lang name (`sh`, `tl`, `zh_TW` → `zh-tw`); (a) the tag's own language and region, lowercased as fontconfig names its orthographies (`zh-HK` → `zh-hk`; any script is ignored); (b) the language and region of the tag after adding likely subtags with `Intl.Locale.prototype.maximize()`; (c) the language alone (`en-US` → `en`). The first that names an orthography is used. A tag that is not a well-formed BCP 47 tag (after `_` is read as `-`), and a tag none of the steps resolves, is a `RangeError` naming it. Step (0) makes every fc-lang name reachable by its own name, including those that `Intl` would rewrite into another tag (`sh`, `tl`, `mo`, `pap-AN`); `language` in the result is still the canonicalized tag, and `orthography` says which set the tag was counted against. The script does not choose the set, so a tag whose script differs from the language's default orthography is counted against the default: `sr-Latn` resolves to `sr`, fontconfig's Cyrillic set; to count against fontconfig's Latin Serbo-Croatian set, request `sh`.
 
   | Requested tag | Resolution | `orthography` |
   | --- | --- | --- |
+  | `sh` | (0) `sh` | `sh` |
+  | `zh_TW` | (0) `zh-tw` | `zh-tw` |
   | `zh-HK` | (a) `zh-hk` | `zh-hk` |
   | `zh-Hans` | no region; (b) `zh-Hans-CN` → `zh-cn` | `zh-cn` |
   | `zh-Hant` | no region; (b) `zh-Hant-TW` → `zh-tw` | `zh-tw` |
   | `zh` | no region; (b) `zh-Hans-CN` → `zh-cn` | `zh-cn` |
   | `pa-Arab` | no region; (b) `pa-Arab-PK` → `pa-pk` | `pa-pk` |
   | `en-US` | (a) and (b) give `en-us`, which is not an orthography; (c) `en` | `en` |
+  | `sr-Latn` | no region; (b) `sr-Latn-RS` → `sr-rs`, which is not an orthography; (c) `sr` | `sr` |
 - The counts say which code points the face maps, nothing about shaping or typographic quality, and whether a count is good enough is the caller's decision. That is why the field says coverage, not support.
 
 ## Face fields

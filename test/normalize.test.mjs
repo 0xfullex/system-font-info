@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { normalizeFamilies } from '../dist/normalize.js'
+import { normalizeFamilies as normalize } from '../dist/normalize.js'
+
+// The fields a platform that derives everything it can computes (macOS, Linux); the tests below pass them unless stated.
+const ALL_DERIVED = new Set(['familyNames', 'supportedLanguages', 'variable', 'enabled', 'faces.fullName', 'faces.styleName'])
+const normalizeFamilies = (raw, derived = ALL_DERIVED) => normalize(raw, derived)
 
 const names = (...pairs) => pairs.map(([language, value]) => ({ language, value }))
 
@@ -19,7 +23,7 @@ function rawFace(overrides = {}) {
     symbol: false,
     enabled: true,
     simulations: { bold: false, oblique: false },
-    languages: [],
+    supportedLanguages: [],
     scope: 'system',
     format: 'truetype',
     variable: false,
@@ -52,7 +56,7 @@ test('language tags are canonicalized in every place that carries one', () => {
         fullNames: names(['zh-cn', 'a']),
         styleNames: names(['en-us', 'b']),
         familyNames: names(['en-gb', 'c']),
-        languages: ['zh-cn', 'und-zsye'],
+        supportedLanguages: ['zh-cn', 'und-zsye'],
         variable: true,
         axes,
         opentype
@@ -63,7 +67,7 @@ test('language tags are canonicalized in every place that carries one', () => {
   assert.equal(face.fullNames[0].language, 'zh-CN')
   assert.equal(face.styleNames[0].language, 'en-US')
   assert.equal(face.familyNames[0].language, 'en-GB')
-  assert.deepEqual(face.languages, ['zh-CN', 'und-Zsye'])
+  assert.deepEqual(face.supportedLanguages, ['zh-CN', 'und-Zsye'])
   assert.equal(face.axes[0].names[0].language, 'zh-CN')
   assert.equal(opentype.names[0].language, 'zh-CN')
   assert.equal(opentype.fvar.axes[0].names[0].language, 'zh-CN')
@@ -86,12 +90,12 @@ test('exact duplicates are merged after canonicalization, first occurrence kept'
       'F',
       rawFace({
         fullNames: names(['en-us', 'A'], ['de', 'B'], ['en-US', 'A'], ['en-US', 'C']),
-        languages: ['en', 'de', 'en-us', 'en-US', 'de']
+        supportedLanguages: ['en', 'de', 'en-us', 'en-US', 'de']
       })
     )
   ])
   assert.deepEqual(family.faces[0].fullNames, names(['en-US', 'A'], ['de', 'B'], ['en-US', 'C']))
-  assert.deepEqual(family.faces[0].languages, ['en', 'de', 'en-US'])
+  assert.deepEqual(family.faces[0].supportedLanguages, ['en', 'de', 'en-US'])
 })
 
 test('opentype.names is a raw view and is never merged', () => {
@@ -130,19 +134,19 @@ test('family aggregates', () => {
       'F',
       rawFace({
         familyNames: names(['en-us', 'F'], ['de', 'Fd']),
-        languages: ['en', 'de'],
+        supportedLanguages: ['en', 'de'],
         enabled: false
       }),
       rawFace({
         familyNames: names(['en-US', 'F'], ['fr', 'Ff']),
-        languages: ['fr', 'en'],
+        supportedLanguages: ['fr', 'en'],
         enabled: true,
         variable: true
       })
     )
   ])
   assert.deepEqual(family.familyNames, names(['en-US', 'F'], ['de', 'Fd'], ['fr', 'Ff']))
-  assert.deepEqual(family.languages, ['en', 'de', 'fr'])
+  assert.deepEqual(family.supportedLanguages, ['en', 'de', 'fr'])
   assert.equal(family.variable, true)
   assert.equal(family.enabled, true)
 })
@@ -188,4 +192,71 @@ test('objects shared between faces stay one object', () => {
   assert.equal(family.faces[0].axes[0].names.length, 1)
   assert.equal(family.faces[0].axes[0].name, 'Weight')
   assert.equal(opentype.fvar.axes[0].names[0].language, 'en-US')
+})
+
+test('only the keys that are present are handled', () => {
+  const [family] = normalizeFamilies(
+    [{ family: 'F', faces: [{ weight: 400, fullNames: names(['en-us', 'F Regular']) }] }],
+    new Set(['faces.fullName'])
+  )
+  assert.deepEqual(family, { family: 'F', faces: [{ weight: 400, fullNames: names(['en-US', 'F Regular']), fullName: 'F Regular' }] })
+  // No faces at all: nothing to do and nothing to derive.
+  assert.deepEqual(normalizeFamilies([{ family: 'F' }], new Set()), [{ family: 'F' }])
+})
+
+test('a field is derived only when the platform derives it', () => {
+  const raw = () => [
+    {
+      family: 'F',
+      faces: [
+        rawFace({
+          fullNames: names(['en', 'a']),
+          styleNames: names(['en', 'b']),
+          familyNames: names(['en', 'F']),
+          variable: true,
+          enabled: false
+        })
+      ]
+    }
+  ]
+  const [none] = normalizeFamilies(raw(), new Set())
+  for (const key of ['familyNames', 'supportedLanguages', 'variable', 'enabled']) assert.equal(key in none, false, key)
+  for (const key of ['fullName', 'styleName']) assert.equal(key in none.faces[0], false, key)
+
+  const [some] = normalizeFamilies(raw(), new Set(['variable', 'faces.styleName']))
+  assert.deepEqual(Object.keys(some).sort(), ['faces', 'family', 'variable'])
+  assert.equal(some.variable, true)
+  assert.equal(some.faces[0].styleName, 'b')
+  assert.equal('fullName' in some.faces[0], false)
+})
+
+test('a family field the platform provides is normalized from the raw value, not derived', () => {
+  const [family] = normalizeFamilies(
+    [
+      {
+        family: 'F',
+        familyNames: names(['en-us', 'F'], ['en-US', 'F'], ['de', 'Fd']),
+        faces: [rawFace({ familyNames: names(['fr', 'Ff']) })]
+      }
+    ],
+    new Set(['variable'])
+  )
+  assert.deepEqual(family.familyNames, names(['en-US', 'F'], ['de', 'Fd']))
+})
+
+test('a key the closure promised but the native result lacks fails loudly', () => {
+  assert.throws(() => normalize([{ family: 'F', faces: [{}] }], new Set(['faces.fullName'])), Error)
+  assert.throws(() => normalize([{ family: 'F', faces: [{}] }], new Set(['variable'])), Error)
+  assert.throws(() => normalize([{ family: 'F' }], new Set(['enabled'])), Error)
+})
+
+test('axis names are derived whenever axes are present', () => {
+  const axes = [{ tag: 'wght', names: names(['en-us', 'Weight']), min: 1, max: 9, default: 4, hidden: false }]
+  const [family] = normalize([{ family: 'F', faces: [{ axes }] }], new Set())
+  assert.equal(family.faces[0].axes[0].name, 'Weight')
+})
+
+test('supportedLanguages of a face are canonicalized and merged', () => {
+  const [family] = normalize([{ family: 'F', faces: [{ supportedLanguages: ['zh-cn', 'zh-CN', 'und-zsye'] }] }], new Set())
+  assert.deepEqual(family.faces[0].supportedLanguages, ['zh-CN', 'und-Zsye'])
 })

@@ -1,6 +1,6 @@
 // The generated files must match what their generators produce from the current sources. A generator run with
 // --check lists the files that differ and exits 1; the fix is `npm run generate`. The field generator reads dist/,
-// which `npm run build:catalogue` (and `pretest`) builds.
+// which `npm run build:ts` (and `pretest`) builds.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { test } from 'node:test'
