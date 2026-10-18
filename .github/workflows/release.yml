@@ -1,0 +1,326 @@
+name: Release
+
+# A `v*` tag builds, verifies and publishes the package. Run by hand (`gh workflow run release.yml --ref <branch>`) it is
+# a dry run by default: everything except the publish, so the same pipeline can be checked on any branch and its package
+# artifact taken for a publish done by hand.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Do everything except publishing (a tag run publishes only when this is off)
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # The Node.js major version every target is built and tested with.
+  NODE_MAJOR: 24
+  # The packages the Linux container installs before building: the headers the addon is built against. The tests run
+  # later, on the runner's own system, against the assembled prebuilds.
+  LINUX_PACKAGES: fontconfig-devel freetype-devel
+  # The system packages a Linux runner needs to list fonts: fontconfig and fonts, since the tests assert that fonts exist.
+  LINUX_FONT_PACKAGES: fontconfig fonts-dejavu-core fonts-noto-cjk
+  # The Electron the smoke test runs, the latest stable 44.x; raise it by hand before a release.
+  ELECTRON_VERSION: 44.9.0
+  PNPM_VERSION: 12.14.0
+
+jobs:
+  # A release is the tagged commit of `main` whose version is the tag. Anything else stops here. Without a tag (a dry run
+  # on a branch) there is nothing to verify and nothing to publish.
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      publish: ${{ steps.verify.outputs.publish }}
+    steps:
+      # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - id: verify
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          EVENT: ${{ github.event_name }}
+          DRY_RUN: ${{ inputs.dry-run }}
+        run: |
+          set -euo pipefail
+          if [ "$REF_TYPE" != tag ]; then
+            echo "::notice::$REF_NAME is not a tag: a dry run, the tag is not verified and nothing is published."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          version=$(node -p "require('./package.json').version")
+          if [ "$REF_NAME" != "v$version" ]; then
+            echo "::error::The tag $REF_NAME is not v$version, the version in package.json."
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::The tagged commit $(git rev-parse --short HEAD) is not on main."
+            exit 1
+          fi
+          if [ "$EVENT" = workflow_dispatch ] && [ "$DRY_RUN" = true ]; then
+            echo "::notice::Dry run: v$version is verified and nothing is published."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  targets:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - id: matrix
+        uses: ./.github/actions/target-matrix
+        with:
+          node-major: ${{ env.NODE_MAJOR }}
+
+  # Each target is built natively on its own runner, never cross-compiled; Linux in the manylinux container, so the
+  # addon needs nothing newer than glibc 2.28. The stripped addon is the artifact.
+  build:
+    needs: [verify, targets]
+    name: build (${{ matrix.id }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.targets.outputs.matrix) }}
+    steps:
+      # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: ./.github/actions/build-addon
+        with:
+          id: ${{ matrix.id }}
+          platform: ${{ matrix.platform }}
+          arch: ${{ matrix.arch }}
+          node-major: ${{ env.NODE_MAJOR }}
+          linux-packages: ${{ env.LINUX_PACKAGES }}
+          # The container writes the prebuild to prebuilds/<id>/, where the other platforms' copy-prebuild puts it.
+          linux-options: --prebuild-out ${{ github.workspace }}/prebuilds
+      - name: Strip and copy the addon to prebuilds/
+        if: matrix.platform != 'linux'
+        shell: bash
+        run: npm run copy-prebuild -- --strip
+      - name: Show the prebuild
+        shell: bash
+        run: ls -l prebuilds/*/
+      # actions/upload-artifact v7.0.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: prebuild-${{ matrix.id }}
+          path: prebuilds
+          if-no-files-found: error
+          retention-days: 14
+
+  # The test suite against the prebuilds only: nothing is built here, so the loader can find only the assembled
+  # prebuilds, on a system that is not the one the addon was built on (a Linux addon built in the manylinux container is
+  # loaded on the runner's newer glibc, fontconfig and FreeType).
+  test-prebuilds:
+    needs: [targets, build]
+    name: test prebuilds (${{ matrix.id }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.targets.outputs.matrix) }}
+    steps:
+      # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      # actions/setup-node v7.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: ${{ env.NODE_MAJOR }}
+          cache: npm
+      - name: Install fontconfig and fonts
+        if: matrix.platform == 'linux'
+        run: sudo apt-get install -y --no-install-recommends $LINUX_FONT_PACKAGES
+      # actions/download-artifact v8.0.2
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: prebuild-*
+          merge-multiple: true
+          path: prebuilds
+      - name: Check that no local build is present
+        shell: bash
+        run: |
+          test ! -e build
+          ls -l prebuilds/*/
+      - run: npm ci
+      - run: npm test
+
+  # The package of the verified prebuilds. `prepack` refuses to pack unless every target is there.
+  pack:
+    needs: test-prebuilds
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      # actions/setup-node v7.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: ${{ env.NODE_MAJOR }}
+          cache: npm
+      # actions/download-artifact v8.0.2
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: prebuild-*
+          merge-multiple: true
+          path: prebuilds
+      - run: npm ci
+      - run: npm run build:ts
+      - run: npm pack --pack-destination package
+      - name: Show the package
+        run: |
+          ls -l package
+          tar -tvzf package/*.tgz
+      # actions/upload-artifact v7.0.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: package
+          path: package
+          if-no-files-found: error
+          retention-days: 30
+
+  # A clean install of the tarball, with npm and with pnpm, runs no build and loads the addon of the machine.
+  install-check:
+    needs: [targets, pack]
+    name: install (${{ matrix.id }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.targets.outputs.matrix) }}
+    steps:
+      # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      # actions/setup-node v7.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: ${{ env.NODE_MAJOR }}
+      - name: Install fontconfig and fonts
+        if: matrix.platform == 'linux'
+        run: sudo apt-get install -y --no-install-recommends $LINUX_FONT_PACKAGES
+      - run: npm install --global pnpm@${{ env.PNPM_VERSION }}
+      # actions/download-artifact v8.0.2
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: package
+          path: package
+      # Each project is outside the checkout, so the package can resolve nothing from it.
+      - name: Install with npm
+        shell: bash
+        run: |
+          mkdir "$RUNNER_TEMP/npm-project"
+          cp package/*.tgz "$RUNNER_TEMP/npm-project/"
+          cd "$RUNNER_TEMP/npm-project"
+          npm init -y
+          npm install --ignore-scripts ./*.tgz
+          node "$GITHUB_WORKSPACE/scripts/ci/check-install.mjs" .
+      - name: Install with pnpm
+        shell: bash
+        run: |
+          mkdir "$RUNNER_TEMP/pnpm-project"
+          cp package/*.tgz "$RUNNER_TEMP/pnpm-project/"
+          cd "$RUNNER_TEMP/pnpm-project"
+          pnpm init
+          pnpm add --ignore-scripts ./*.tgz
+          node "$GITHUB_WORKSPACE/scripts/ci/check-install.mjs" .
+
+  # The installed package in the main process of a real Electron.
+  electron-smoke:
+    needs: [targets, pack]
+    name: electron (${{ matrix.id }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.targets.outputs.matrix) }}
+    steps:
+      # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      # actions/setup-node v7.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: ${{ env.NODE_MAJOR }}
+      # Electron needs a display (xvfb) and the libraries Chromium links; the GTK ones are what bring the system
+      # fontconfig into the process.
+      - name: Install xvfb, the Electron libraries, fontconfig and fonts
+        if: matrix.platform == 'linux'
+        run: >
+          sudo apt-get install -y --no-install-recommends
+          xvfb libgtk-3-0t64 libnss3 libgbm1 libasound2t64 $LINUX_FONT_PACKAGES
+      # actions/download-artifact v8.0.2
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: package
+          path: package
+      # Electron's own install script downloads its binary, so scripts run for it and not for the package.
+      - name: Install Electron and the package
+        shell: bash
+        run: |
+          mkdir "$RUNNER_TEMP/electron-project"
+          cp package/*.tgz "$RUNNER_TEMP/electron-project/"
+          cd "$RUNNER_TEMP/electron-project"
+          npm init -y
+          npm install --save-exact "electron@$ELECTRON_VERSION"
+          npm install --ignore-scripts ./*.tgz
+      - name: Smoke test on Linux
+        if: matrix.platform == 'linux'
+        # The npm-installed chrome-sandbox is not setuid, so the sandbox is off; it is not what is under test.
+        run: xvfb-run -a npx electron "$GITHUB_WORKSPACE/scripts/ci/electron-smoke.mjs" . --no-sandbox
+        working-directory: ${{ runner.temp }}/electron-project
+      - name: Smoke test
+        if: matrix.platform != 'linux'
+        shell: bash
+        run: npx electron "$GITHUB_WORKSPACE/scripts/ci/electron-smoke.mjs" .
+        working-directory: ${{ runner.temp }}/electron-project
+
+  # Trusted publishing: npm trusts this workflow, in this environment, through the OIDC token, so no secret exists.
+  # `id-token: write` is granted to this job only.
+  publish:
+    needs: [verify, pack, install-check, electron-smoke]
+    if: needs.verify.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: npm-release
+    permissions:
+      id-token: write
+    steps:
+      # actions/setup-node v7.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: ${{ env.NODE_MAJOR }}
+          registry-url: https://registry.npmjs.org
+      # actions/download-artifact v8.0.2
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: package
+          path: package
+      - name: Publish
+        run: |
+          set -euo pipefail
+          # Trusted publishing needs npm 11.5.1 or newer.
+          node -e "if (process.argv[1].localeCompare('11.5.1', undefined, { numeric: true }) < 0) { console.error('npm ' + process.argv[1] + ' is older than 11.5.1'); process.exit(1) }" "$(npm --version)"
+          tarball=$(ls package/*.tgz)
+          version=$(tar -xOzf "$tarball" package/package.json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
+          # A re-run after a publish must not fail on the version that is already there.
+          if npm view "system-font-info@$version" version > /dev/null 2>&1; then
+            echo "::notice::system-font-info@$version is already published."
+            exit 0
+          fi
+          # A version with a pre-release part is not what `npm install` gets.
+          case "$version" in *-*) tag=next ;; *) tag=latest ;; esac
+          npm publish "$tarball" --provenance --tag "$tag"

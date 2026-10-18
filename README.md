@@ -120,6 +120,27 @@ The arguments are the image, the Node.js major version and the packages to insta
 
 The steps the CI and release workflows share live in two local actions, `.github/actions/target-matrix` (the matrix from the target table) and `.github/actions/build-addon` (build one target natively); `scripts/ci/README.md` lists the scripts.
 
+### Releasing
+
+`.github/workflows/release.yml` builds, verifies and publishes the package. It runs when a `v*` tag is pushed, and on demand as a dry run: everything except the publish. The jobs, in order:
+
+1. `verify`: the tag is `v` plus the version in `package.json`, and the tagged commit is on `main`.
+2. `build`: every target of the table is built natively (Linux in the manylinux container), stripped, and uploaded as an artifact.
+3. `test-prebuilds`: the prebuilds are assembled with no `build/` anywhere and `npm test` runs on every target's runner. A Linux addon built in the container is therefore tested on the runner's newer glibc, fontconfig and FreeType.
+4. `pack`: `npm pack`. `prepack` (`scripts/check-package.mjs`) refuses unless every target has its prebuild, `dist/` is newer than `ts/`, and nothing but the expected files is packed (no sources, no `binding.gyp`, no tests). There is no switch to skip it; `npm pack --dry-run --ignore-scripts` shows a package's contents without the check. The tarball is the `package` artifact.
+5. `install-check` and `electron-smoke`, on every target: the tarball is installed into a clean project with npm and with pnpm and loaded, and the installed package is loaded in the main process of Electron `ELECTRON_VERSION` (`scripts/ci/README.md` says what each proves).
+6. `publish`, in the `npm-release` environment: `npm publish --provenance` by [trusted publishing](https://docs.npmjs.com/trusted-publishers), so no npm token exists. A version with a pre-release part goes to the `next` tag. A version that is already published is skipped, so a re-run is safe.
+
+To cut a release:
+
+1. On a branch, run `npm version x.y.z --no-git-tag-version`, rename the `Unreleased` section of `CHANGELOG.md` to the version and date, raise `ELECTRON_VERSION` in `release.yml` to the latest stable Electron of the major it names, and commit as `chore(release): x.y.z`.
+2. Check the pipeline on the branch with `gh workflow run release.yml --ref <branch>` (a dry run by default), then land the branch on `main`.
+3. Tag the landed commit, `git tag -a vx.y.z -m vx.y.z`, and push the tag. When the jobs before `publish` are green, `publish` waits for a required reviewer of the `npm-release` environment to approve it.
+
+One-time setup on GitHub and npm: an `npm-release` environment with required reviewers, and a trusted publisher on the package (repository `0xfullex/system-font-info`, workflow `release.yml`, environment `npm-release`), after which the package can refuse token publishes.
+
+A trusted publisher can be configured only on a package that exists, so the first version is published by hand: run the dry run on the commit to release, download the `package` artifact of that green run (`gh run download <run id> --name package`), and publish that tarball with `npm stage publish` from a machine logged in with a passkey. That version has no provenance. Configure the trusted publisher right away (an unverified one expires after 48 hours) and push the tag only after the version is published; `publish` then finds it published and does nothing.
+
 ## License
 
 MIT. The language orthographies built into the addon are derived from [fontconfig](https://gitlab.freedesktop.org/fontconfig/fontconfig)'s `fc-lang` files; its notice ships with the package as `third_party/fontconfig/COPYING`.
