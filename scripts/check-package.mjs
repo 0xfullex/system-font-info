@@ -52,12 +52,12 @@ export function checkPackage({ root, targetIds, packedFiles }) {
   const packed = new Set(packedFiles)
 
   const manifest = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'))
-  const compiled = [manifest.main, manifest.types].map((file) => path.join(root, file))
-  const missingCompiled = compiled.filter((file) => !existsSync(file))
-  for (const file of missingCompiled) problems.push(`${path.relative(root, file)} does not exist; run \`npm run build:ts\``)
+  const compiled = [manifest.main, manifest.types]
+  const missingCompiled = compiled.filter((file) => !existsSync(path.join(root, file)))
+  for (const file of missingCompiled) problems.push(`${file} does not exist; run \`npm run build:ts\``)
   if (missingCompiled.length === 0) {
     const sources = newestModification(path.join(root, 'ts'))
-    if (compiled.some((file) => statSync(file).mtimeMs < sources)) {
+    if (compiled.some((file) => statSync(path.join(root, file)).mtimeMs < sources)) {
       problems.push('dist/ is older than a file in ts/; run `npm run build:ts`')
     }
   }
