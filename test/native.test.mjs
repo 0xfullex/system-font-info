@@ -15,7 +15,7 @@ const localBuild = path.join(ROOT, 'build', 'Release', 'system-font-info.node')
 function environment({ platform, arch, libc = 'glibc', available = [], failures = {} }) {
   const calls = { libc: 0, prebuilt: [], files: [] }
   const result = (key) => {
-    if (available.includes(key)) return { loaded: key }
+    if (available.includes(key)) return { loaded: key, getFamilies() {} }
     throw new Error(failures[key] ?? `Cannot find module '${key}'`)
   }
   return {
@@ -77,7 +77,7 @@ test('the literal requires of native.ts are exactly the table targets, each with
 for (const target of TARGETS) {
   test(`${target.id} loads prebuilds/${target.id}/system-font-info.node`, () => {
     const env = environment({ platform: target.platform, arch: target.arch, libc: target.libc, available: [target.id] })
-    assert.deepEqual(loadBinding(env), { loaded: target.id })
+    assert.equal(loadBinding(env).loaded, target.id)
     assert.deepEqual(env.calls.prebuilt, [target.id])
     assert.deepEqual(env.calls.files, [])
     // The libc is asked on Linux only.
@@ -87,18 +87,27 @@ for (const target of TARGETS) {
 
 test('a local build is used when the prebuilt addon does not load', () => {
   const env = environment({ platform: 'darwin', arch: 'arm64', available: [localBuild] })
-  assert.deepEqual(loadBinding(env), { loaded: localBuild })
+  assert.equal(loadBinding(env).loaded, localBuild)
   assert.deepEqual(env.calls.prebuilt, ['darwin-arm64'])
 })
 
 test('a platform without a target can only use a local build, and the error names the supported targets', () => {
   const env = environment({ platform: 'freebsd', arch: 'x64', available: [localBuild] })
-  assert.deepEqual(loadBinding(env), { loaded: localBuild })
+  assert.equal(loadBinding(env).loaded, localBuild)
   assert.deepEqual(env.calls.prebuilt, [])
 
   const error = thrown(() => loadBinding(environment({ platform: 'win32', arch: 'ia32' })))
   assert.match(error.message, /no prebuilt addon for win32-ia32 \(prebuilt targets: darwin-arm64, .*linux-arm64-glibc\)/)
   assert.ok(error.message.includes(localBuild), error.message)
+})
+
+test('a module that is not the addon is refused, naming the path and the bundler', () => {
+  for (const replacement of [{}, '/pkg/prebuilds/win32-x64/system-font-info.node', null]) {
+    const env = { ...environment({ platform: 'win32', arch: 'x64' }), requirePrebuilt: () => replacement }
+    const error = thrown(() => loadBinding(env))
+    assert.ok(error.message.includes(`${prebuilt('win32-x64')}: loaded, but it is not the addon`), error.message)
+    assert.match(error.message, /a bundler may have replaced the \.node file/)
+  }
 })
 
 test('musl is reported as not supported yet', () => {

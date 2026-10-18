@@ -107,6 +107,14 @@ function realEnvironment(): LoaderEnvironment {
   }
 }
 
+/**
+ * Whether a required module is the addon. A bundler can resolve a `.node` path to something else (an empty module, or
+ * the path as a string) without failing, and the first call would then die with an unrelated TypeError.
+ */
+function looksLikeBinding(value: unknown): value is NativeBinding {
+  return typeof value === 'object' && value !== null && typeof (value as Partial<NativeBinding>).getFamilies === 'function'
+}
+
 /** The system libraries the Linux addon links dynamically, with the package that provides each. */
 const SYSTEM_LIBRARIES = [
   { soname: 'libfontconfig.so.1', debian: 'libfontconfig1', rpm: 'fontconfig' },
@@ -144,7 +152,11 @@ export function loadBinding(environment: LoaderEnvironment): NativeBinding {
   const failures: string[] = []
   for (const { file, load } of attempts) {
     try {
-      return load() as NativeBinding
+      const loaded = load()
+      if (!looksLikeBinding(loaded)) {
+        throw new Error('loaded, but it is not the addon (it has no getFamilies function); a bundler may have replaced the .node file')
+      }
+      return loaded
     } catch (error) {
       failures.push(`  ${file}: ${error instanceof Error ? error.message : String(error)}`)
     }
