@@ -123,7 +123,8 @@ jobs:
       # A target whose tests are off is still built and loaded, so a broken build or loader shows.
       - name: Load the addon
         if: matrix.platform != 'linux' && !matrix.tests
-        run: node -e "require('./dist/index.js').getFamilies({ fields: [] }).then((families) => console.log(families.length, 'families'))"
+        run: |
+          node -e "require('./dist/index.js').getFamilies({ fields: [] }).then((families) => console.log(families.length, 'families'))"
 
   # The addon is a Node-API binary, so other Node.js versions differ only in the JavaScript layer: one platform is enough.
   node-versions:
