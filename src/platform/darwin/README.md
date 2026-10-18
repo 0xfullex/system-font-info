@@ -54,15 +54,19 @@ per face for `faces.coverage`, one per family for `languageCoverage`, E).
 
 ## Language coverage
 
-The default face of a family is what `CTFontDescriptorCreateMatchingFontDescriptor`
-returns for the family name (a mandatory attribute) with the weight and width
-traits 0. Its `kCTFontCharacterSetAttribute` is walked once per requested
+The default face of a family is the one `CTFontDescriptorCreateMatchingFontDescriptor`
+names for the family name (a mandatory attribute) with the weight and width
+traits 0. Only its PostScript name is taken: the matcher caches its answers (see
+"Freshness"), so the name can be one of a file that is no longer listed. The face
+is the one of the family's faces in this call with that name. Its
+`kCTFontCharacterSetAttribute` is walked once per requested
 orthography with `orthography::countCovered` and
 `CFCharacterSetIsLongCharacterMember`; the counts follow
-`Request::orthographies`. When the matcher returns nothing or a face of another
-family, the family's first face in member order stands in (it was never needed
-on the machine measured: all 252 families matched). A family costs one
-`characterSets`, whatever the number of orthographies.
+`Request::orthographies`. When the matcher returns nothing, a face of another
+family or a name the call does not list, the family's first face in member order
+stands in (it was never needed on the machine measured: all 252 families
+matched). A family costs one `characterSets`, whatever the number of
+orthographies.
 
 ## One face per PostScript name
 

@@ -327,12 +327,19 @@ std::vector<FamilySeeds> familiesOfLookups(const Request& request, CollectionGro
   return result;
 }
 
-// How many code points of each requested orthography the family's default face covers. When the matcher returns no
-// face of the family, the first face of its member order stands in.
+// How many code points of each requested orthography the family's default face covers. The matcher only names the
+// default face, and it caches its answers, so the name can be one of a file that is no longer listed: the face is the
+// one of this family's faces with that PostScript name, which are the faces this call lists. When the matcher names no
+// face of the family, or one this call does not list, the first face of the family's member order stands in.
 std::vector<uint32_t> languageCoverageOf(FamilySeeds& family, const Request& request, WorkLog& work) {
-  const Ref<CTFontDescriptorRef> matched = matchDefaultFace(family.name);
-  CTFontDescriptorRef face = matched.get();
-  if (!face) {
+  const std::string defaultFaceName = matchDefaultFaceName(family.name);
+  const auto named = std::find_if(family.seeds.begin(), family.seeds.end(), [&](const Seed& seed) {
+    return !defaultFaceName.empty() && seed.postscriptName == defaultFaceName;
+  });
+  CTFontDescriptorRef face;
+  if (named != family.seeds.end()) {
+    face = named->descriptor;
+  } else {
     orderLikeCoreText(family);
     face = family.seeds.front().descriptor;
   }

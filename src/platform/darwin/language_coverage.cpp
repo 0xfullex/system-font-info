@@ -2,7 +2,7 @@
 
 namespace sfi::platform::darwin {
 
-Ref<CTFontDescriptorRef> matchDefaultFace(const std::string& family) {
+std::string matchDefaultFaceName(const std::string& family) {
   const auto name = makeString(family);
   const double zero = 0;
   const Ref<CFNumberRef> weight(CFNumberCreate(kCFAllocatorDefault, kCFNumberDoubleType, &zero));
@@ -21,9 +21,9 @@ Ref<CTFontDescriptorRef> matchDefaultFace(const std::string& family) {
   // Without the mandatory family the matcher falls back to other families when it finds none.
   const void* mandatoryKeys[] = {kCTFontFamilyNameAttribute};
   const Ref<CFSetRef> mandatory(CFSetCreate(kCFAllocatorDefault, mandatoryKeys, 1, &kCFTypeSetCallBacks));
-  Ref<CTFontDescriptorRef> match(CTFontDescriptorCreateMatchingFontDescriptor(request.get(), mandatory.get()));
+  const Ref<CTFontDescriptorRef> match(CTFontDescriptorCreateMatchingFontDescriptor(request.get(), mandatory.get()));
   if (!match || toUtf8(asString(copyAttribute(match.get(), kCTFontFamilyNameAttribute).get())) != family) return {};
-  return match;
+  return toUtf8(asString(copyAttribute(match.get(), kCTFontNameAttribute).get()));
 }
 
 std::vector<uint32_t> countLanguageCoverage(CTFontDescriptorRef face,
