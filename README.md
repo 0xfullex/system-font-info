@@ -18,7 +18,7 @@ Every platform returns one shape, and the caller declares which fields it wants:
 npm install system-font-info
 ```
 
-Node.js 18 or newer. The package ships a prebuilt binary for each of these targets, and nothing else is supported yet:
+Node.js 22 or newer. The package ships a prebuilt binary for each of these targets, and nothing else is supported yet:
 
 | Target | Minimum |
 | --- | --- |
