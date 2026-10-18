@@ -155,7 +155,7 @@ const sfnt::FontTables& FaceReader::tables(Resource& resource, const Reference& 
   }
   const sfnt::TableFetcher fetch = [face](uint32_t tag) { return copyTable(face, tag); };
   resource.tables = sfnt::readFontTables(tags, fetch, decodeLegacyText);
-  if (request_.wantsAnyOpenType() && !tags.empty()) {
+  if (request_.wantsAnyOpenType()) {
     resource.opentype = sfnt::openTypeValue(*resource.tables, request_.openTypeSelection, fetch);
     work_.tableEntries += static_cast<uint32_t>(request_.openTypeSelection.entries.count());
   }

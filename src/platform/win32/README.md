@@ -91,6 +91,10 @@ counts each costly operation where it occurs.
   table fetch returns no bytes to the shared reader, which records the
   failure only for selected entries. Instances and simulations share one
   `opentype` object and one `axes` array per resource.
+  The value is built even when no table directory could be read (a reference
+  that is not a local file, or a file the shared reader cannot parse): it is
+  then made from an empty table list, so a requested `opentype` key is never
+  missing.
 - **E** reads `IDWriteFont1::GetUnicodeRanges`, with no explicit face creation.
   `faces.coverage` costs one character-set read per visited member;
   `languageCoverage` costs one per family, regardless of language count.
