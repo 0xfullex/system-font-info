@@ -7,6 +7,8 @@
 #include "autorelease_pool.h"
 #include "cf.h"
 #include "face_reader.h"
+#include "language_coverage.h"
+#include "variations.h"
 
 // enumerateFonts: the installed fonts as CoreText's font collection lists them.
 //
@@ -17,6 +19,13 @@
 // the result holds one face per PostScript name: the one the name resolves to.
 // The others are not dropped silently: they are reported under
 // `platform.shadowed` of that face.
+//
+// Two ways to get the descriptors to group. Without `request.families` it is the
+// whole collection. With it, it is what CoreText's family lookup returns for
+// each requested name, which is far less work for a few families: the lookup
+// matches case-insensitively and by localized and legacy names, and can return
+// another family (`Kefa` returns `Kefa III`), so the families it yields are
+// then kept only when their `family` is exactly the requested name.
 
 namespace sfi::platform {
 namespace {
@@ -52,11 +61,6 @@ std::string fileOf(CTFontDescriptorRef descriptor) {
 
 std::string postscriptNameOf(CTFontDescriptorRef descriptor) {
   return toUtf8(asString(copyAttribute(descriptor, kCTFontNameAttribute).get()));
-}
-
-bool isVariable(CTFontDescriptorRef descriptor) {
-  CFArrayRef axes = asArray(copyAttribute(descriptor, kCTFontVariationAxesAttribute).get());
-  return axes && CFArrayGetCount(axes) > 0;
 }
 
 // Groups the descriptors by PostScript name, in the order the names first
@@ -104,7 +108,8 @@ struct Seed {
 
 struct FamilySeeds {
   std::string name;
-  std::vector<Seed> seeds;  // in collection order
+  std::vector<Seed> seeds;  // in collection order, or in CoreText's member order when `ordered`
+  bool ordered = false;
 };
 
 std::vector<ShadowedFile> shadowedFiles(const Group& group, CTFontDescriptorRef chosen) {
@@ -116,19 +121,21 @@ std::vector<ShadowedFile> shadowedFiles(const Group& group, CTFontDescriptorRef 
     // The same file listed twice is one font, not a shadowed one.
     if (file == chosenFile || file.empty()) continue;
     if (std::any_of(shadowed.begin(), shadowed.end(), [&](const ShadowedFile& s) { return s.path == file; })) continue;
-    shadowed.push_back({std::move(file), isVariable(other)});
+    shadowed.push_back({std::move(file), hasVariationAxes(other)});
   }
   return shadowed;
 }
 
-std::vector<FamilySeeds> groupByFamily(const std::vector<Group>& groups) {
+// Groups the resolved faces by family, in the order the families first appear. The shadowed files, which cost a
+// look at every other descriptor of a group, are found only when the request wants them.
+std::vector<FamilySeeds> groupByFamily(const std::vector<Group>& groups, const Request& request) {
   std::vector<FamilySeeds> families;
   std::unordered_map<std::string, size_t> familyOfName;
   for (const Group& group : groups) {
     Seed seed;
     seed.descriptor = resolve(group, seed.resolved);
     seed.postscriptName = group.postscriptName;
-    seed.shadowed = shadowedFiles(group, seed.descriptor);
+    if (request.wants(Field::FacesPlatformShadowed)) seed.shadowed = shadowedFiles(group, seed.descriptor);
 
     std::string family = toUtf8(asString(copyAttribute(seed.descriptor, kCTFontFamilyNameAttribute).get()));
     const auto [entry, inserted] = familyOfName.try_emplace(family, families.size());
@@ -138,11 +145,9 @@ std::vector<FamilySeeds> groupByFamily(const std::vector<Group>& groups) {
   return families;
 }
 
-// The PostScript names of a family's members in the order CoreText's matcher
-// lists them, which is the order a browser walks them. A name appears once
-// even when several files provide it.
-std::vector<std::string> memberOrder(const std::string& family) {
-  std::vector<std::string> names;
+// The descriptors CoreText's family lookup returns for `family`, in the order its matcher lists them, which is the
+// order a browser walks them. Disabled fonts are included. Null when CoreText cannot make the lookup.
+Ref<CFArrayRef> lookUpFamily(const std::string& family) {
   const auto familyName = makeString(family);
   const void* attributeKeys[] = {kCTFontFamilyNameAttribute};
   const void* attributeValues[] = {familyName.get()};
@@ -155,22 +160,28 @@ std::vector<std::string> memberOrder(const std::string& family) {
   const Ref<CFDictionaryRef> options = collectionOptions();
   const Ref<CTFontCollectionRef> collection(
       CTFontCollectionCreateWithFontDescriptors(descriptors.get(), options.get()));
-  if (!collection) return names;
-  const Ref<CFArrayRef> members(CTFontCollectionCreateMatchingFontDescriptors(collection.get()));
-  if (!members) return names;
-  for (CFIndex i = 0; i < CFArrayGetCount(members.get()); ++i) {
-    std::string name = postscriptNameOf(static_cast<CTFontDescriptorRef>(CFArrayGetValueAtIndex(members.get(), i)));
-    if (!name.empty() && std::find(names.begin(), names.end(), name) == names.end()) names.push_back(std::move(name));
-  }
-  return names;
+  if (!collection) return {};
+  return Ref<CFArrayRef>(CTFontCollectionCreateMatchingFontDescriptors(collection.get()));
 }
 
 // The family's members in CoreText's member order first, then the faces that
-// list does not name, in collection order.
+// lookup does not name, in collection order.
 void orderLikeCoreText(FamilySeeds& family) {
+  if (family.ordered) return;
+  family.ordered = true;
+
+  // A PostScript name counts once, at its first position.
+  std::vector<std::string> names;
+  if (const Ref<CFArrayRef> members = lookUpFamily(family.name)) {
+    for (CFIndex i = 0; i < CFArrayGetCount(members.get()); ++i) {
+      std::string name = postscriptNameOf(static_cast<CTFontDescriptorRef>(CFArrayGetValueAtIndex(members.get(), i)));
+      if (!name.empty() && std::find(names.begin(), names.end(), name) == names.end()) names.push_back(std::move(name));
+    }
+  }
+
   std::vector<Seed> ordered;
   std::vector<bool> placed(family.seeds.size(), false);
-  for (const std::string& name : memberOrder(family.name)) {
+  for (const std::string& name : names) {
     for (size_t i = 0; i < family.seeds.size(); ++i) {
       if (placed[i] || family.seeds[i].postscriptName != name) continue;
       placed[i] = true;
@@ -184,23 +195,87 @@ void orderLikeCoreText(FamilySeeds& family) {
   family.seeds = std::move(ordered);
 }
 
+// The faces of every family of the collection.
+std::vector<FamilySeeds> familiesOfCollection(const Request& request, Ref<CFArrayRef>& collection) {
+  collection = copyCollectionDescriptors();
+  return groupByFamily(groupByPostscriptName(collection.get()), request);
+}
+
+// The faces of each requested family, from the family lookup. The groups come out in the lookup's order, so the
+// family's faces are in member order already; the faces the full collection would add after them (those the lookup
+// does not name) are not looked for. The lookup lists one file for a PostScript name, and the other files
+// (`platform.shadowed`) only the collection knows, so a request for them also lists the collection and takes the
+// group of each name from it. `collection` and `lookups` keep the descriptors alive.
+std::vector<FamilySeeds> familiesOfLookups(const Request& request, Ref<CFArrayRef>& collection,
+                                           std::vector<Ref<CFArrayRef>>& lookups) {
+  std::vector<Group> collectionGroups;
+  std::unordered_map<std::string, size_t> collectionGroupOfName;
+  if (request.wants(Field::FacesPlatformShadowed)) {
+    collection = copyCollectionDescriptors();
+    collectionGroups = groupByPostscriptName(collection.get());
+    for (size_t i = 0; i < collectionGroups.size(); ++i) {
+      if (!collectionGroups[i].postscriptName.empty())
+        collectionGroupOfName.emplace(collectionGroups[i].postscriptName, i);
+    }
+  }
+
+  std::vector<FamilySeeds> result;
+  std::vector<std::string> looked;
+  for (const std::string& name : *request.families) {
+    if (std::find(looked.begin(), looked.end(), name) != looked.end()) continue;
+    looked.push_back(name);
+
+    Ref<CFArrayRef> members = lookUpFamily(name);
+    if (!members) continue;
+    std::vector<Group> groups = groupByPostscriptName(members.get());
+    for (Group& group : groups) {
+      const auto inCollection = collectionGroupOfName.find(group.postscriptName);
+      if (inCollection != collectionGroupOfName.end()) group = collectionGroups[inCollection->second];
+    }
+    // The lookup may return other families, and the same family may come out of the lookup of another requested
+    // name: the family of this name is the one this lookup answers for.
+    for (FamilySeeds& family : groupByFamily(groups, request)) {
+      if (family.name != name) continue;
+      family.ordered = true;
+      result.push_back(std::move(family));
+    }
+    lookups.push_back(std::move(members));
+  }
+  return result;
+}
+
+// How many code points of each requested orthography the family's default face covers. When the matcher returns no
+// face of the family, the first face of its member order stands in.
+std::vector<uint32_t> languageCoverageOf(FamilySeeds& family, const Request& request, WorkLog& work) {
+  const Ref<CTFontDescriptorRef> matched = matchDefaultFace(family.name);
+  CTFontDescriptorRef face = matched.get();
+  if (!face) {
+    orderLikeCoreText(family);
+    face = family.seeds.front().descriptor;
+  }
+  ++work.characterSets;
+  return countLanguageCoverage(face, request.orthographies);
+}
+
 std::vector<Family> enumerate(const Request& request, WorkLog& work) {
-  const Ref<CFArrayRef> collection = copyCollectionDescriptors();
-  std::vector<FamilySeeds> families = groupByFamily(groupByPostscriptName(collection.get()));
+  // Keeps the descriptors the seeds point into alive.
+  Ref<CFArrayRef> collection;
+  std::vector<Ref<CFArrayRef>> lookups;
+  std::vector<FamilySeeds> families =
+      request.families ? familiesOfLookups(request, collection, lookups) : familiesOfCollection(request, collection);
 
   FaceReader reader(request, work);
   std::vector<Family> result;
   for (FamilySeeds& seeds : families) {
-    if (!request.wantsFamily(seeds.name)) continue;
-
     Family family;
     family.family = seeds.name;
     if (request.wantsAnyFace()) {
       orderLikeCoreText(seeds);
-      for (size_t i = 0; i < seeds.seeds.size(); ++i) {
-        family.faces.push_back(reader.read(seeds.seeds[i].descriptor, seeds.seeds[i].shadowed));
+      for (const Seed& seed : seeds.seeds) {
+        family.faces.push_back(reader.read(seed.descriptor, seed.postscriptName, seed.shadowed));
       }
     }
+    if (!request.orthographies.empty()) family.languageCoverage = languageCoverageOf(seeds, request, work);
     result.push_back(std::move(family));
   }
   return result;
@@ -209,6 +284,7 @@ std::vector<Family> enumerate(const Request& request, WorkLog& work) {
 }  // namespace
 
 std::vector<Family> enumerateFonts(const Request& request, WorkLog& work) {
+  if (request.families && request.families->empty()) return {};
   std::vector<Family> result;
   runInAutoreleasePool([&] { result = enumerate(request, work); });
   return result;

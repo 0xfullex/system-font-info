@@ -76,10 +76,10 @@ Scope scopeOf(std::optional<int64_t> priority, std::optional<int64_t> registrati
   }
 }
 
-Format formatOf(std::optional<int64_t> coreTextFormat, bool hasCff2) {
+Format formatOf(std::optional<int64_t> coreTextFormat, const std::function<bool()>& hasCff2) {
   switch (coreTextFormat.value_or(kCTFontFormatUnrecognized)) {
     case kCTFontFormatOpenTypePostScript:
-      return hasCff2 ? Format::Cff2 : Format::Cff;
+      return hasCff2() ? Format::Cff2 : Format::Cff;
     case kCTFontFormatOpenTypeTrueType:
     case kCTFontFormatTrueType:
       return Format::TrueType;

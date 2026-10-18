@@ -8,12 +8,13 @@ first for the contract.
 
 | File | Role |
 | --- | --- |
-| `enumerate.cpp` | `enumerateFonts`: collection, grouping by PostScript name and family, member order, the `families` filter |
-| `face_reader.*` | builds one `Face`; caches the parsed tables, the axes and the collection face lookups for one enumeration |
+| `enumerate.cpp` | `enumerateFonts`: the collection or the family lookups, grouping by PostScript name and family, member order, the per-family `languageCoverage` |
+| `face_reader.*` | builds one `Face`, doing only the work its requested fields need; caches the parsed tables, the `opentype` value, the axes and the collection face lookups for one enumeration |
 | `traits.*` | pure conversions: CSS weight and width, style, scope, format |
 | `variations.*` | axes, coordinates, named instance |
 | `platform_value.*` | the `platform` value (`DarwinNative`) |
 | `coverage.*` | character set to code point ranges |
+| `language_coverage.*` | a family's default face and the count of an orthography's code points it covers |
 | `legacy_text.cpp` | `decodeLegacyText` |
 | `testing.cpp` | the register / unregister test hooks |
 | `autorelease_pool.*` | the autorelease pool the worker thread runs in (the only Objective-C++) |
@@ -21,15 +22,46 @@ first for the contract.
 
 ## What the request changes
 
-The backend still reads every face of the requested families completely: the
-request selects the families (`Request::wantsFamily`, applied after the
-collection is grouped into families, before their faces are read) and whether
-faces are read at all (`wantsAnyFace()`), builds the `opentype` entries it
-names, and reads the character set only for `faces.coverage`. What reaches JS
-is cut to the request by `core/to_js.cpp`. `WorkLog` counts the `CTFont`s
-created (`fontResources`), the `opentype` entries built per font resource
-(`tableEntries`) and the character sets read for `faces.coverage`
-(`characterSets`). The per-family `languageCoverage` is not counted yet.
+The backend does the work of the groups the request reaches
+(`docs/platforms.md`, "Source groups") and no more; what reaches JS is cut to
+the request by `core/to_js.cpp`. `WorkLog` counts the work of groups C, D and E
+as it happens, and the tests hold it to the catalogue: `fontResources` (a
+`CTFont` created for a face, C), `tableEntries` (an `opentype` entry built per
+font resource, D), `characterSets` (a character set fetched and walked: one
+per face for `faces.coverage`, one per family for `languageCoverage`, E).
+
+- **A** is always done: the descriptors, grouped by PostScript name, resolved
+  and grouped by family (`family` needs the resolution).
+- **Faces** are built, and the members put in order, only when the request wants
+  a face-level field (`wantsAnyFace()`).
+- **B**: a face reads only the descriptor attributes of its requested fields.
+  The traits are read once for `weight`, `width`, `style`, `monospace`,
+  `color` and the raw platform values; `faces.variable` is a non-empty
+  `kCTFontVariationAxesAttribute`; the `shadowed` files are found only for
+  `platform.shadowed`.
+- **C**: the `CTFont` and the tables are opened for a face by the first field
+  that needs them and not before: `file.index`, `symbol`, the names, `axes`,
+  `coordinates`, `namedInstanceIndex`, `features`, `metrics` and the `opentype`
+  entries. `format` needs them only for an OpenType PostScript face, to tell
+  CFF2 from CFF (`formatOf` asks lazily). A request of descriptor attributes
+  alone creates no font. The names, `coordinates` and `namedInstanceIndex` go
+  together because a named instance has names of its own.
+- **D**: `sfnt::openTypeValue` builds the entries of the request, once per font
+  resource.
+- **E**: `faces.coverage` reads each face's character set; `languageCoverage`
+  matches one default face per family (below).
+
+## Language coverage
+
+The default face of a family is what `CTFontDescriptorCreateMatchingFontDescriptor`
+returns for the family name (a mandatory attribute) with the weight and width
+traits 0. Its `kCTFontCharacterSetAttribute` is walked once per requested
+orthography with `orthography::countCovered` and
+`CFCharacterSetIsLongCharacterMember`; the counts follow
+`Request::orthographies`. When the matcher returns nothing or a face of another
+family, the family's first face in member order stands in (it was never needed
+on the machine measured: all 252 families matched). A family costs one
+`characterSets`, whatever the number of orthographies.
 
 ## One face per PostScript name
 
@@ -60,6 +92,17 @@ was checked on (252 of 252), so AppKit is not needed. The enumeration runs in an
 autorelease pool because a worker thread has none and CoreText autoreleases
 objects internally.
 
+With `request.families` the descriptors are not the whole collection but, for
+each distinct requested name, the family lookup that gives the member order
+(disabled fonts included). The lookup is case-insensitive and can return another
+family, so the family of that name is picked out by exact comparison, and the
+groups come out in the lookup's order, which is the member order, so the lookup
+is made once. `families: []` returns before any CoreText call. The lookup lists
+one file for a PostScript name; when the request wants `platform.shadowed` the
+collection is listed too and each name's group is taken from it. A face the
+lookup does not name (the tail the full listing appends) is not found on this
+path.
+
 ## Source of each field
 
 - `postscriptName`: `kCTFontNameAttribute`.
@@ -87,7 +130,7 @@ objects internally.
   `/System/Library/AssetsV2`, `downloadable` and `downloaded` both true) have
   priority 60000 and registration scope 2 (persistent).
 - `format`: `kCTFontFormatAttribute`; an OpenType PostScript font is `cff2`
-  when it has a `CFF2` table.
+  when it has a `CFF2` table (the table directory is read for that format only).
 - `file.path`: `kCTFontURLAttribute`, when it is a file URL (any other URL gives
   no path). `file.index`: CoreText does not say which
   face of a collection a font is, so it is the face whose `name` table equals
@@ -106,9 +149,10 @@ objects internally.
   feed `weight`, `width`, `style`, `monospace` and `color` count as 0 then.
   `features` come from `CTFontCopyFeatures` because the attribute carries
   identifiers without names; the call is made once per font resource (the
-  named instances of a variable font report the same list). `metrics` are CoreText's lengths scaled from the
-  creation size to font units (the slant angle is in degrees and is not
-  scaled); they are read only when the request wants `faces.platform.metrics`.
+  named instances of a variable font report the same list). `metrics` are
+  CoreText's lengths scaled from the creation size to font units (the slant
+  angle is in degrees and is not scaled). Each key is read only when the
+  request wants it.
 
 ## Tables and sharing
 
@@ -123,15 +167,17 @@ font; `sfnt::FontFile::faceWithPostscriptName` finds it), the coordinates come f
 and `platform.features` and `platform.metrics` are left out because only a
 CTFont provides them. This was not observed on macOS 27; it is a guard.
 
-Every face is read through `sfnt::readFontTables` (tag list from
-`CTFontCopyAvailableTables` in CoreText's own order, which the reader sorts;
-bytes from `CTFontCopyTable`) whatever
-the request says: the names, `fvar` and `cmap` feed fields that exist
-anyway. The `opentype` value is built from it by `sfnt::openTypeValue` with
-the entries of the request (`Request::openTypeSelection`); `opentype` is
-attached when the request wants an entry. The result is cached per font resource (file path and face index) for the length of one enumeration, so
-the named instances of a variable font share one `opentype` value and one axes
-list.
+A face whose request needs a font (group C) is read through
+`sfnt::readFontTables` (tag list from `CTFontCopyAvailableTables` in CoreText's
+own order, which the reader sorts; bytes from `CTFontCopyTable`): the names,
+`fvar` and `cmap` feed the fields that need them. The `opentype` value is built
+from it by `sfnt::openTypeValue` with the entries of the request
+(`Request::openTypeSelection`); `opentype` is attached when the request wants an
+entry. The result is cached per font resource (file path and face index) for the
+length of one enumeration, so the named instances of a variable font share one
+`opentype` value and one axes list. The face index is found only for
+`faces.file`, so a request without it shares nothing between faces; the JS layer
+adds the file to the request of any face-level field.
 
 ## Names and variations
 

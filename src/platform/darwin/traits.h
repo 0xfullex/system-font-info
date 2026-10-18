@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 
 #include "../../core/model.h"
@@ -45,8 +46,9 @@ Style styleOf(const Traits& traits);
 // the priority decides. Either may be absent.
 Scope scopeOf(std::optional<int64_t> priority, std::optional<int64_t> registrationScope);
 
-// kCTFontFormatAttribute -> Format. `hasCff2` tells CFF from CFF2 in an
-// OpenType PostScript font, which CoreText reports as one format.
-Format formatOf(std::optional<int64_t> coreTextFormat, bool hasCff2);
+// kCTFontFormatAttribute -> Format. CoreText reports CFF and CFF2 as one
+// format, OpenType PostScript; only for that format `hasCff2` is called, to tell
+// them apart, so a caller that has to open the font for it does so only then.
+Format formatOf(std::optional<int64_t> coreTextFormat, const std::function<bool()>& hasCff2);
 
 }  // namespace sfi::platform::darwin

@@ -118,28 +118,40 @@ std::optional<Value> readFeatures(CTFontRef font) {
 }
 
 Value makePlatformValue(const PlatformValueInput& input) {
+  const Request& request = input.request;
   CTFontDescriptorRef descriptor = input.descriptor;
 
   Value out = Value::object();
   out.set("os", "darwin");
-  setIfPresent(out, "weight", input.traits.weight);
-  setIfPresent(out, "width", input.traits.width);
-  setIfPresent(out, "slant", input.traits.slant);
-  setIfPresent(out, "symbolicTraits", input.traits.symbolic);
-  setIfPresent(out, "format", numberValue(copyAttribute(descriptor, kCTFontFormatAttribute).get()));
-  setIfPresent(out, "priority", numberValue(copyAttribute(descriptor, kCTFontPriorityAttribute).get()));
-  setIfPresent(out, "registrationScope",
-               numberValue(copyAttribute(descriptor, kCTFontRegistrationScopeAttribute).get()));
-  setIfPresent(out, "downloadable", booleanValue(copyAttribute(descriptor, kCTFontDownloadableAttribute).get()));
-  setIfPresent(out, "downloaded", booleanValue(copyAttribute(descriptor, kCTFontDownloadedAttribute).get()));
-  setIfPresent(out, "styleName", stringAttribute(descriptor, kCTFontStyleNameAttribute));
-  setIfPresent(out, "displayName", stringAttribute(descriptor, kCTFontDisplayNameAttribute));
-  setIfPresent(out, "localizedFamilyName", localizedAttribute(descriptor, kCTFontFamilyNameAttribute));
-  setIfPresent(out, "localizedStyleName", localizedAttribute(descriptor, kCTFontStyleNameAttribute));
-  setIfPresent(out, "fixedAdvance", numberValue(copyAttribute(descriptor, kCTFontFixedAdvanceAttribute).get()));
-  if (input.features) out.set("features", *input.features);
-  if (input.withMetrics && input.font) out.set("metrics", metricsValue(input.font));
-  if (!input.shadowed.empty()) out.set("shadowed", shadowedValue(input.shadowed));
+  if (request.wants(Field::FacesPlatformWeight)) setIfPresent(out, "weight", input.traits.weight);
+  if (request.wants(Field::FacesPlatformWidth)) setIfPresent(out, "width", input.traits.width);
+  if (request.wants(Field::FacesPlatformSlant)) setIfPresent(out, "slant", input.traits.slant);
+  if (request.wants(Field::FacesPlatformSymbolicTraits)) setIfPresent(out, "symbolicTraits", input.traits.symbolic);
+  if (request.wants(Field::FacesPlatformFormat))
+    setIfPresent(out, "format", numberValue(copyAttribute(descriptor, kCTFontFormatAttribute).get()));
+  if (request.wants(Field::FacesPlatformPriority))
+    setIfPresent(out, "priority", numberValue(copyAttribute(descriptor, kCTFontPriorityAttribute).get()));
+  if (request.wants(Field::FacesPlatformRegistrationScope))
+    setIfPresent(out, "registrationScope",
+                 numberValue(copyAttribute(descriptor, kCTFontRegistrationScopeAttribute).get()));
+  if (request.wants(Field::FacesPlatformDownloadable))
+    setIfPresent(out, "downloadable", booleanValue(copyAttribute(descriptor, kCTFontDownloadableAttribute).get()));
+  if (request.wants(Field::FacesPlatformDownloaded))
+    setIfPresent(out, "downloaded", booleanValue(copyAttribute(descriptor, kCTFontDownloadedAttribute).get()));
+  if (request.wants(Field::FacesPlatformStyleName))
+    setIfPresent(out, "styleName", stringAttribute(descriptor, kCTFontStyleNameAttribute));
+  if (request.wants(Field::FacesPlatformDisplayName))
+    setIfPresent(out, "displayName", stringAttribute(descriptor, kCTFontDisplayNameAttribute));
+  if (request.wants(Field::FacesPlatformLocalizedFamilyName))
+    setIfPresent(out, "localizedFamilyName", localizedAttribute(descriptor, kCTFontFamilyNameAttribute));
+  if (request.wants(Field::FacesPlatformLocalizedStyleName))
+    setIfPresent(out, "localizedStyleName", localizedAttribute(descriptor, kCTFontStyleNameAttribute));
+  if (request.wants(Field::FacesPlatformFixedAdvance))
+    setIfPresent(out, "fixedAdvance", numberValue(copyAttribute(descriptor, kCTFontFixedAdvanceAttribute).get()));
+  if (request.wants(Field::FacesPlatformFeatures) && input.features) out.set("features", *input.features);
+  if (request.wants(Field::FacesPlatformMetrics) && input.font) out.set("metrics", metricsValue(input.font));
+  if (request.wants(Field::FacesPlatformShadowed) && !input.shadowed.empty())
+    out.set("shadowed", shadowedValue(input.shadowed));
   return out;
 }
 

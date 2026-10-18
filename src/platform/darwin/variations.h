@@ -13,6 +13,11 @@ namespace sfi::platform::darwin {
 
 using Coordinates = std::vector<std::pair<std::string, double>>;
 
+// Whether the descriptor has variation axes, that is a non-empty
+// kCTFontVariationAxesAttribute: whether the face is of a variable font. It
+// reads the descriptor only, no font.
+bool hasVariationAxes(CTFontDescriptorRef descriptor);
+
 // The font's variation axes (kCTFontVariationAxesAttribute) with the names the
 // `fvar` table gives each axis. Null when the font has no axes.
 SharedAxes makeAxes(CFArrayRef coreTextAxes, const sfnt::FontTables& tables);

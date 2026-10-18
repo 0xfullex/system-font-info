@@ -14,6 +14,11 @@ constexpr double kCoordinateTolerance = 5e-4;
 
 }  // namespace
 
+bool hasVariationAxes(CTFontDescriptorRef descriptor) {
+  CFArrayRef axes = asArray(copyAttribute(descriptor, kCTFontVariationAxesAttribute).get());
+  return axes && CFArrayGetCount(axes) > 0;
+}
+
 SharedAxes makeAxes(CFArrayRef coreTextAxes, const sfnt::FontTables& tables) {
   if (!coreTextAxes || CFArrayGetCount(coreTextAxes) == 0) return nullptr;
 

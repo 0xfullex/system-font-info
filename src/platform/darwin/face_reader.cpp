@@ -12,10 +12,6 @@
 namespace sfi::platform::darwin {
 namespace {
 
-std::string stringAttribute(CTFontDescriptorRef descriptor, CFStringRef attribute) {
-  return toUtf8(asString(copyAttribute(descriptor, attribute).get()));
-}
-
 std::optional<std::vector<uint8_t>> copyTable(CTFontRef font, uint32_t tag) {
   const Ref<CFDataRef> data(CTFontCopyTable(font, tag, kCTFontTableOptionNoOptions));
   if (!data) return std::nullopt;
@@ -78,7 +74,8 @@ FaceReader::TableSource FaceReader::tablesFromFont(CTFontRef font, const std::st
   TableSource source;
   source.tags = availableTags(font);
   source.fetch = [font](uint32_t tag) { return copyTable(font, tag); };
-  if (!path.empty()) source.index = faceIndexInFile(path, source.tags, font);
+  // Finding the index reads the file's collection; only `faces.file` reports it.
+  if (!path.empty() && request_.wants(Field::FacesFile)) source.index = faceIndexInFile(path, source.tags, font);
   return source;
 }
 
@@ -100,9 +97,10 @@ FaceReader::TableSource FaceReader::tablesFromFile(const std::string& path, cons
 
 std::shared_ptr<const FaceReader::Resource> FaceReader::loadResource(const TableSource& source,
                                                                      CTFontDescriptorRef descriptor,
-                                                                     const std::optional<FileLocation>& file) {
+                                                                     const std::string& path,
+                                                                     std::optional<uint32_t> index) {
   // Faces of a file are told apart by their index; without one nothing is shared.
-  const auto key = file && file->index ? std::make_optional(std::make_pair(file->path, *file->index)) : std::nullopt;
+  const auto key = !path.empty() && index ? std::make_optional(std::make_pair(path, *index)) : std::nullopt;
   if (key) {
     const auto cached = resources_.find(*key);
     if (cached != resources_.end()) return cached->second;
@@ -110,95 +108,161 @@ std::shared_ptr<const FaceReader::Resource> FaceReader::loadResource(const Table
 
   auto resource = std::make_shared<Resource>();
   resource->tables = sfnt::readFontTables(source.tags, source.fetch, decodeLegacyText);
-  resource->opentype = sfnt::openTypeValue(resource->tables, request_.openTypeSelection, source.fetch);
-  work_.tableEntries += static_cast<uint32_t>(request_.openTypeSelection.entries.count());
-  const auto axes = copyAttribute(descriptor, kCTFontVariationAxesAttribute);
-  resource->axes = makeAxes(asArray(axes.get()), resource->tables);
+  if (request_.wantsAnyOpenType()) {
+    resource->opentype = sfnt::openTypeValue(resource->tables, request_.openTypeSelection, source.fetch);
+    work_.tableEntries += static_cast<uint32_t>(request_.openTypeSelection.entries.count());
+  }
+  if (request_.wants(Field::FacesAxes) || wantsInstance_) {
+    const auto axes = copyAttribute(descriptor, kCTFontVariationAxesAttribute);
+    resource->axes = makeAxes(asArray(axes.get()), resource->tables);
+  }
   if (key) resources_.emplace(*key, resource);
   return resource;
 }
 
-std::optional<Value> FaceReader::featuresOf(CTFontRef font, const std::optional<FileLocation>& file) {
-  if (!file || !file->index) return readFeatures(font);
-  const auto key = std::make_pair(file->path, *file->index);
+std::optional<Value> FaceReader::featuresOf(const OpenedFont& opened) {
+  if (opened.path.empty() || !opened.index) return readFeatures(opened.font.get());
+  const auto key = std::make_pair(opened.path, *opened.index);
   const auto cached = features_.find(key);
   if (cached != features_.end()) return cached->second;
-  return features_.emplace(key, readFeatures(font)).first->second;
+  return features_.emplace(key, readFeatures(opened.font.get())).first->second;
 }
 
-Face FaceReader::read(CTFontDescriptorRef descriptor, const std::vector<ShadowedFile>& shadowed) {
-  Face face;
-  face.postscriptName = stringAttribute(descriptor, kCTFontNameAttribute);
+FaceReader::FaceReader(const Request& request, WorkLog& work) : request_(request), work_(work) {
+  for (const Field field : {Field::FacesWeight, Field::FacesWidth, Field::FacesStyle, Field::FacesMonospace,
+                            Field::FacesColor, Field::FacesPlatformWeight, Field::FacesPlatformWidth,
+                            Field::FacesPlatformSlant, Field::FacesPlatformSymbolicTraits}) {
+    wantsTraits_ = wantsTraits_ || request.wants(field);
+  }
+  for (const Field field :
+       {Field::FacesCoordinates, Field::FacesNamedInstanceIndex, Field::FacesFullNames, Field::FacesStyleNames}) {
+    wantsInstance_ = wantsInstance_ || request.wants(field);
+  }
+}
 
-  const Ref<CTFontRef> font(CTFontCreateWithFontDescriptor(descriptor, 0, nullptr));
-  if (!font) throw std::runtime_error("system-font-info: CoreText cannot create the font " + face.postscriptName);
+FaceReader::OpenedFont FaceReader::openFont(CTFontDescriptorRef descriptor, const std::string& postscriptName) {
+  OpenedFont opened;
+  opened.font = Ref<CTFontRef>(CTFontCreateWithFontDescriptor(descriptor, 0, nullptr));
+  if (!opened.font) throw std::runtime_error("system-font-info: CoreText cannot create the font " + postscriptName);
   ++work_.fontResources;
 
   // CoreText can create another font than the descriptor names (it substitutes
   // one when it cannot use the file). Whatever is read from that CTFont then
   // describes the wrong font, so the tables come from the descriptor's file and
   // the data only a CTFont provides is left out.
-  const Ref<CFStringRef> createdName(CTFontCopyPostScriptName(font.get()));
-  const bool substituted = !face.postscriptName.empty() && toUtf8(createdName.get()) != face.postscriptName;
+  const Ref<CFStringRef> createdName(CTFontCopyPostScriptName(opened.font.get()));
+  opened.substituted = !postscriptName.empty() && toUtf8(createdName.get()) != postscriptName;
 
-  // ---- file, tables
-  const std::string path = filePath(copyAttribute(descriptor, kCTFontURLAttribute).get());
-  const TableSource source = substituted ? tablesFromFile(path, face.postscriptName) : tablesFromFont(font.get(), path);
-  if (!path.empty()) face.file = FileLocation{path, source.index};
-  const auto resource = loadResource(source, descriptor, face.file);
-  const sfnt::FontTables& tables = resource->tables;
-  if (request_.wantsAnyOpenType() && !source.tags.empty()) face.opentype = resource->opentype;
+  opened.path = filePath(copyAttribute(descriptor, kCTFontURLAttribute).get());
+  const TableSource source =
+      opened.substituted ? tablesFromFile(opened.path, postscriptName) : tablesFromFont(opened.font.get(), opened.path);
+  opened.index = source.index;
+  opened.isSfnt = !source.tags.empty();
+  opened.resource = loadResource(source, descriptor, opened.path, opened.index);
+  return opened;
+}
 
-  // ---- classification
-  const Traits traits = readTraits(descriptor);
+Face FaceReader::read(CTFontDescriptorRef descriptor, const std::string& postscriptName,
+                      const std::vector<ShadowedFile>& shadowed) {
+  Face face;
+  face.postscriptName = postscriptName;
+
+  // Group C is done for a face at most once, by the first field that needs it. A face whose fields are all descriptor
+  // attributes never creates a font.
+  std::optional<OpenedFont> openedFont;
+  const auto font = [&]() -> const OpenedFont& {
+    if (!openedFont) openedFont = openFont(descriptor, postscriptName);
+    return *openedFont;
+  };
+
+  // ---- descriptor attributes (B)
+  Traits traits;
+  if (wantsTraits_) traits = readTraits(descriptor);  // without it the conversions below give defaults nobody reads
   face.weight = cssWeight(traits.weight);
   face.width = cssWidth(traits.width);
   face.style = styleOf(traits);
   face.monospace = traits.symbolic.value_or(0) & kCTFontTraitMonoSpace;
   face.color = traits.symbolic.value_or(0) & kCTFontTraitColorGlyphs;
-  face.symbol = tables.symbolCmap;
-  // CoreText stores the enabled state as a number or a boolean; a font without one is enabled.
-  face.enabled = booleanValue(copyAttribute(descriptor, kCTFontEnabledAttribute).get()).value_or(true);
-  if (const auto languages = copyAttribute(descriptor, kCTFontLanguagesAttribute); asArray(languages.get())) {
-    for (CFIndex i = 0; i < CFArrayGetCount(asArray(languages.get())); ++i) {
-      face.supportedLanguages.push_back(toUtf8(asString(CFArrayGetValueAtIndex(asArray(languages.get()), i))));
+  if (request_.wants(Field::FacesEnabled)) {
+    // CoreText stores the enabled state as a number or a boolean; a font without one is enabled.
+    face.enabled = booleanValue(copyAttribute(descriptor, kCTFontEnabledAttribute).get()).value_or(true);
+  }
+  if (request_.wants(Field::FacesSupportedLanguages)) {
+    if (const auto languages = copyAttribute(descriptor, kCTFontLanguagesAttribute); asArray(languages.get())) {
+      for (CFIndex i = 0; i < CFArrayGetCount(asArray(languages.get())); ++i) {
+        face.supportedLanguages.push_back(toUtf8(asString(CFArrayGetValueAtIndex(asArray(languages.get()), i))));
+      }
     }
   }
-  face.scope = scopeOf(integerValue(copyAttribute(descriptor, kCTFontPriorityAttribute).get()),
-                       integerValue(copyAttribute(descriptor, kCTFontRegistrationScopeAttribute).get()));
-  face.format = formatOf(integerValue(copyAttribute(descriptor, kCTFontFormatAttribute).get()), tables.hasCff2);
+  if (request_.wants(Field::FacesScope)) {
+    face.scope = scopeOf(integerValue(copyAttribute(descriptor, kCTFontPriorityAttribute).get()),
+                         integerValue(copyAttribute(descriptor, kCTFontRegistrationScopeAttribute).get()));
+  }
+  if (request_.wants(Field::FacesVariable)) face.variable = hasVariationAxes(descriptor);
 
-  // ---- variations
-  if (resource->axes) {
-    face.variable = true;
-    face.axes = resource->axes;
-    const Ref<CFTypeRef> variation = substituted ? copyAttribute(descriptor, kCTFontVariationAttribute)
-                                                 : Ref<CFTypeRef>(CTFontCopyVariation(font.get()));
-    face.coordinates = coordinatesOf(asDictionary(variation.get()), *resource->axes);
-    face.namedInstanceIndex = namedInstanceOf(face.coordinates, tables.fvar);
+  // ---- file, tables (C)
+  if (request_.wants(Field::FacesFile)) {
+    const OpenedFont& opened = font();
+    if (!opened.path.empty()) face.file = FileLocation{opened.path, opened.index};
+  }
+  if (request_.wants(Field::FacesSymbol)) face.symbol = font().resource->tables.symbolCmap;
+  if (request_.wants(Field::FacesFormat)) {
+    face.format = formatOf(integerValue(copyAttribute(descriptor, kCTFontFormatAttribute).get()),
+                           [&] { return font().resource->tables.hasCff2; });
+  }
+  if (request_.wantsAnyOpenType()) {
+    const OpenedFont& opened = font();
+    if (opened.isSfnt) face.opentype = opened.resource->opentype;
   }
 
-  // ---- names
-  face.familyNames = sfnt::localizedNameWithFallback(tables.names, 16, 1);
-  face.styleNames = sfnt::localizedNameWithFallback(tables.names, 17, 2);
-  face.fullNames = sfnt::localizedName(tables.names, 4);
-  if (face.namedInstanceIndex) {
-    face.styleNames =
-        sfnt::localizedName(tables.names, tables.fvar->instances[*face.namedInstanceIndex].subfamilyNameId);
-    // A named instance has no full-name record of its own; its names are composed from the family and its subfamily
-    // name.
-    face.fullNames = sfnt::instanceFullNames(tables.names, tables.fvar->instances[*face.namedInstanceIndex]);
+  // ---- variations (C)
+  if (request_.wants(Field::FacesAxes) || wantsInstance_) {
+    const OpenedFont& opened = font();
+    if (opened.resource->axes) {
+      face.axes = opened.resource->axes;
+      if (wantsInstance_) {
+        const Ref<CFTypeRef> variation = opened.substituted ? copyAttribute(descriptor, kCTFontVariationAttribute)
+                                                            : Ref<CFTypeRef>(CTFontCopyVariation(opened.font.get()));
+        face.coordinates = coordinatesOf(asDictionary(variation.get()), *opened.resource->axes);
+        face.namedInstanceIndex = namedInstanceOf(face.coordinates, opened.resource->tables.fvar);
+      }
+    }
   }
 
+  // ---- names (C)
+  if (request_.wants(Field::FacesFamilyNames)) {
+    face.familyNames = sfnt::localizedNameWithFallback(font().resource->tables.names, 16, 1);
+  }
+  if (request_.wants(Field::FacesStyleNames) || request_.wants(Field::FacesFullNames)) {
+    const sfnt::FontTables& tables = font().resource->tables;
+    if (face.namedInstanceIndex) {
+      const sfnt::FvarInstance& instance = tables.fvar->instances[*face.namedInstanceIndex];
+      face.styleNames = sfnt::localizedName(tables.names, instance.subfamilyNameId);
+      // A named instance has no full-name record of its own; its names are composed from the family and its subfamily
+      // name.
+      face.fullNames = sfnt::instanceFullNames(tables.names, instance);
+    } else {
+      face.styleNames = sfnt::localizedNameWithFallback(tables.names, 17, 2);
+      face.fullNames = sfnt::localizedName(tables.names, 4);
+    }
+  }
+
+  // ---- character set (E)
   if (request_.wants(Field::FacesCoverage)) {
     face.coverage = coverageRanges(descriptor);
     ++work_.characterSets;
   }
 
-  // Only a CTFont provides the features and the metrics.
-  const std::optional<Value> features = substituted ? std::nullopt : featuresOf(font.get(), face.file);
-  face.platform = makePlatformValue({descriptor, substituted ? nullptr : font.get(), features ? &*features : nullptr,
-                                     traits, request_.wants(Field::FacesPlatformMetrics), shadowed});
+  // ---- platform
+  if (request_.platformObject) {
+    // Only a CTFont provides the features and the metrics.
+    std::optional<Value> features;
+    CTFontRef metricsFont = nullptr;
+    if (request_.wants(Field::FacesPlatformFeatures) && !font().substituted) features = featuresOf(font());
+    if (request_.wants(Field::FacesPlatformMetrics) && !font().substituted) metricsFont = font().font.get();
+    face.platform =
+        makePlatformValue({request_, descriptor, metricsFont, features ? &*features : nullptr, traits, shadowed});
+  }
   return face;
 }
 
