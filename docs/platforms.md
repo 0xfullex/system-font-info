@@ -237,6 +237,7 @@ CoreText also keeps a cache in the process that answers PostScript name matching
 
 ### What is listed
 
+- **Minimum system: Windows 10 version 1809 (build 17763).** The backend needs `IDWriteFactory6` (version 1709) and `IDWriteFontSet3` (version 1809). There is no fallback for older builds; a call there fails with an error naming this requirement. It has been run on Windows 11 only.
 - The backend reads the system font collection, `IDWriteFactory3::GetSystemFontCollection` with downloadable fonts excluded and without an update check (`checkForUpdates` FALSE). With the update check the first call in a process spends about 300 ms and later calls about 190 ms (measured) asking the font cache service to rescan; without it the call reads the service's registered state, which trails a change by about a second ([Freshness](#freshness-1)).
 - **Every member of every family is a face**, including the members DirectWrite synthesizes (`simulations`; 1,333 of 2,568 members on the machine measured). Simulated faces share the tables of their base font.
 - **Exact duplicates**: on 2026-10-18, 6 members had the same identity as another member. Every public field's source inputs, coverage ranges, and every sfnt table's exact bytes were identical for all 6 (two in `Gen`, four in `LXGW WenKai GB`). These exact duplicates are one face, leaving 2,562 faces on that host. Compared field by field, the six pairs showed no difference.

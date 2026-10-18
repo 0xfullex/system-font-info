@@ -23,6 +23,13 @@ void check(HRESULT result, const char* operation) {
   throw std::runtime_error(error.str());
 }
 
+void checkRequiredInterface(HRESULT result, const char* operation) {
+  // Older DirectWrite builds answer E_NOINTERFACE for an interface they lack; saying only that would hide the cause.
+  if (result == E_NOINTERFACE)
+    throw std::runtime_error("system-font-info requires Windows 10 version 1809 (build 17763) or later");
+  check(result, operation);
+}
+
 std::string toUtf8(std::wstring_view text) {
   if (text.empty()) return {};
   const int size = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, text.data(), static_cast<int>(text.size()),
@@ -49,9 +56,9 @@ std::wstring toWide(std::string_view text) {
 
 ComPtr<IDWriteFactory6> createFactory() {
   ComPtr<IDWriteFactory6> factory;
-  check(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory6),
-                            reinterpret_cast<IUnknown**>(factory.GetAddressOf())),
-        "DWriteCreateFactory");
+  checkRequiredInterface(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory6),
+                                             reinterpret_cast<IUnknown**>(factory.GetAddressOf())),
+                         "DWriteCreateFactory");
   return factory;
 }
 

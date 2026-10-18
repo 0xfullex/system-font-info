@@ -18,7 +18,7 @@ Every platform returns one shape, and the caller declares which fields it wants:
 npm install system-font-info
 ```
 
-Node.js 18 or newer. The package ships a binary per platform and architecture under `prebuilds/<platform>-<arch>/`. If no binary matches (or you built from source, see below), it falls back to `build/Release/`.
+Node.js 18 or newer. On Windows, Windows 10 version 1809 (build 17763) or later: the backend uses DirectWrite interfaces that earlier builds lack, has no fallback for them, and reports that requirement as its error. The package ships a binary per platform and architecture under `prebuilds/<platform>-<arch>/`. If no binary matches (or you built from source, see below), it falls back to `build/Release/`.
 
 ## Usage
 

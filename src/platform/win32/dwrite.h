@@ -21,6 +21,9 @@ using Microsoft::WRL::ComPtr;
 using ResourceKey = std::pair<std::string, uint32_t>;
 
 void check(HRESULT result, const char* operation);
+// Like `check`, for a query of an interface that only recent Windows builds have: E_NOINTERFACE becomes the error
+// naming the minimum supported Windows version.
+void checkRequiredInterface(HRESULT result, const char* operation);
 std::string toUtf8(std::wstring_view text);
 std::wstring toWide(std::string_view text);
 ComPtr<IDWriteFactory6> createFactory();

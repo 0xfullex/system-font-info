@@ -2,10 +2,13 @@
 
 The Windows backend uses DirectWrite's weight/stretch/style (WSS) family
 model. Read `../README.md` first for the backend contract. It requires the
-DirectWrite interfaces through `IDWriteFactory6` and `IDWriteFontSet3`;
-test registration also uses `IDWriteFontSetBuilder2`. This backend has been
-executed on Windows 11 only. No minimum Windows 10 version or older-system
-fallback is established by that observation.
+DirectWrite interfaces through `IDWriteFactory6` (Windows 10 version 1709) and
+`IDWriteFontSet3` (version 1809); test registration also uses
+`IDWriteFontSetBuilder2`. The minimum system is therefore **Windows 10 version
+1809 (build 17763)**, and there is no fallback for earlier builds: creating
+the factory or querying `IDWriteFontSet3` gets `E_NOINTERFACE` there, which
+`checkRequiredInterface` turns into an error naming that requirement. The
+backend has been executed on Windows 11 only.
 
 ## Files
 

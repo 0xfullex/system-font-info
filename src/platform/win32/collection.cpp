@@ -78,7 +78,7 @@ void Collection::loadSources() {
   sourcesLoaded_ = true;
   if (!systemSet_) check(factory_->GetSystemFontSet(FALSE, &systemSet_), "GetSystemFontSet");
   ComPtr<IDWriteFontSet3> set3;
-  check(systemSet_.As(&set3), "IDWriteFontSet3");
+  checkRequiredInterface(systemSet_.As(&set3), "IDWriteFontSet3");
   for (UINT32 index = 0; index < systemSet_->GetFontCount(); ++index) {
     ComPtr<IDWriteFontFaceReference1> reference;
     check(systemSet_->GetFontFaceReference(index, &reference), "GetFontFaceReference(source)");
