@@ -5,7 +5,8 @@
 #include "cf.h"
 
 // Test hooks: register a font file for the current process only, the scope
-// whose fonts disappear with the process and are visible to no other app.
+// whose fonts disappear with the process and are visible to no other app, and
+// disable or enable the fonts of such a file.
 
 namespace sfi::platform {
 namespace {
@@ -41,6 +42,16 @@ void unregisterFontForTesting(const std::string& path) {
     Ref<CFErrorRef> owned(error);
     throwFailure("unregister", path, error);
   }
+}
+
+void setFontEnabledForTesting(const std::string& path, bool enabled) {
+  const auto url = fileUrl(path);
+  const Ref<CFArrayRef> descriptors(CTFontManagerCreateFontDescriptorsFromURL(url.get()));
+  if (!descriptors || CFArrayGetCount(descriptors.get()) == 0) {
+    throw std::runtime_error("system-font-info: " + path + " holds no fonts to " + (enabled ? "enable" : "disable"));
+  }
+  // The call reports nothing; the font is off or on in this process only when it was registered for the process.
+  CTFontManagerEnableFontDescriptors(descriptors.get(), enabled);
 }
 
 }  // namespace sfi::platform

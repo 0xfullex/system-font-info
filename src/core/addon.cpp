@@ -149,6 +149,19 @@ Napi::Value unregisterFont(const Napi::CallbackInfo& info) {
   return info.Env().Undefined();
 }
 
+Napi::Value setFontEnabled(const Napi::CallbackInfo& info) {
+  std::string path = pathArgument(info, "setFontEnabled");
+  if (info.Length() < 2 || !info[1].IsBoolean()) {
+    throw Napi::TypeError::New(info.Env(), "setFontEnabled: enabled must be a boolean");
+  }
+  try {
+    platform::setFontEnabledForTesting(path, info[1].As<Napi::Boolean>().Value());
+  } catch (const std::exception& e) {
+    throw Napi::Error::New(info.Env(), e.what());
+  }
+  return info.Env().Undefined();
+}
+
 // Reads one face of a font file through the same table reader the platform
 // backends use, and returns its `opentype` object. The optional third argument
 // lists the entries to build (`tables`, `names`, `head`, ...); all by default.
@@ -209,6 +222,7 @@ Napi::Object initModule(Napi::Env env, Napi::Object exports) {
   Napi::Object testing = Napi::Object::New(env);
   testing.Set("registerFont", Napi::Function::New(env, registerFont, "registerFont"));
   testing.Set("unregisterFont", Napi::Function::New(env, unregisterFont, "unregisterFont"));
+  testing.Set("setFontEnabled", Napi::Function::New(env, setFontEnabled, "setFontEnabled"));
   testing.Set("getFamiliesWithWork", Napi::Function::New(env, getFamiliesWithWork, "getFamiliesWithWork"));
   testing.Set("readFontFile", Napi::Function::New(env, readFontFile, "readFontFile"));
   exports.Set("__testing", testing);

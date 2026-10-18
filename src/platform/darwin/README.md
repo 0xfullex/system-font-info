@@ -16,7 +16,7 @@ first for the contract.
 | `coverage.*` | character set to code point ranges |
 | `language_coverage.*` | a family's default face and the count of an orthography's code points it covers |
 | `legacy_text.cpp` | `decodeLegacyText` |
-| `testing.cpp` | the register / unregister test hooks |
+| `testing.cpp` | the register, unregister and enable / disable test hooks |
 | `autorelease_pool.*` | the autorelease pool the worker thread runs in (the only Objective-C++) |
 | `cf.*` | owning CF reference and checked accessors |
 
@@ -216,5 +216,7 @@ Johab (`Windows1361`) is not available in CoreFoundation and gives `nullopt`
 
 ## Test hooks
 
-`CTFontManagerRegisterFontsForURL` / `UnregisterFontsForURL` with process scope.
-A failure throws `std::runtime_error` with the `CFError` description.
+`CTFontManagerRegisterFontsForURL` / `UnregisterFontsForURL` with process scope;
+`setFontEnabledForTesting` is `CTFontManagerEnableFontDescriptors` over
+`CTFontManagerCreateFontDescriptorsFromURL` of the file. For a font registered for
+the process the disabling holds in this process only. A failure throws `std::runtime_error` with the `CFError` description.

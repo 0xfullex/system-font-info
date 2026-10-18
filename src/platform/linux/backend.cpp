@@ -23,4 +23,9 @@ void registerFontForTesting(const std::string&) { notImplemented(); }
 
 void unregisterFontForTesting(const std::string&) { notImplemented(); }
 
+// The platform has no disabled state, so this stays unsupported when the backend is written.
+void setFontEnabledForTesting(const std::string&, bool) {
+  throw std::runtime_error("system-font-info: this platform has no disabled fonts: setFontEnabled is not supported");
+}
+
 }  // namespace sfi::platform

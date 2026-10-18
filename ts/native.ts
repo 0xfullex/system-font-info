@@ -44,6 +44,8 @@ export interface NativeBinding {
   __testing: {
     registerFont(path: string): void
     unregisterFont(path: string): void
+    /** Turns the fonts of a file registered for this process off or on, for this process only. Throws where the platform has no disabled state. */
+    setFontEnabled(path: string, enabled: boolean): void
     /** The `opentype` object of one face of a font file, with the named entries only (every entry when omitted). */
     readFontFile(path: string, index: number, entries?: string[]): NonNullable<FontFace['opentype']>
     getFamiliesWithWork(request: NativeRequest): Promise<{ families: RawFamily[]; work: WorkLog }>

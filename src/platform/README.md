@@ -50,6 +50,10 @@ the interface in `../core/platform.h` and fills the structs of
 - `registerFontForTesting` / `unregisterFontForTesting` make a font file
   available to the current process only, through the service enumeration reads
   from, and throw `std::runtime_error` with the OS error text on failure.
+- `setFontEnabledForTesting(path, enabled)` turns the fonts of a file registered
+  that way off or on again, for the current process only, so a test can have a
+  disabled font without touching the machine's fonts. A platform with no
+  disabled state (DirectWrite, fontconfig) throws "not supported".
 
 ## What a backend must do
 
