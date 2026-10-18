@@ -107,8 +107,10 @@ jobs:
           arch: ${{ matrix.arch }}
           node-major: ${{ env.NODE_MAJOR }}
           linux-packages: ${{ env.LINUX_PACKAGES }}
+          # The tests run later, on the assembled prebuilds.
+          verify: none
           # The container writes the prebuild to prebuilds/<id>/, where the other platforms' copy-prebuild puts it.
-          linux-options: --prebuild-out ${{ github.workspace }}/prebuilds
+          prebuild-out: ${{ github.workspace }}/prebuilds
       - name: Strip and copy the addon to prebuilds/
         if: matrix.platform != 'linux'
         shell: bash

@@ -80,16 +80,8 @@ jobs:
           arch: ${{ matrix.arch }}
           node-major: ${{ env.NODE_MAJOR }}
           linux-packages: ${{ env.LINUX_PACKAGES }}
-
-      # Linux ran the tests in the container.
-      - name: Test
-        if: matrix.platform != 'linux' && matrix.tests
-        run: npm test
-      # A target whose tests are off is still built and loaded, so a broken build or loader shows.
-      - name: Load the addon
-        if: matrix.platform != 'linux' && !matrix.tests
-        run: |
-          node -e "require('./dist/index.js').getFamilies({ fields: [] }).then((families) => console.log(families.length, 'families'))"
+          # The target table decides whether the test suite runs; a target with tests off is only built and loaded.
+          verify: ${{ matrix.tests && 'tests' || 'load' }}
 
   # The addon is a Node-API binary, so other Node.js versions differ only in the JavaScript layer: one platform is enough.
   node-versions:

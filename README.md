@@ -109,14 +109,14 @@ To make `git blame` skip the commit that formatted the whole tree, run `git conf
 
 ### Continuous integration
 
-`.github/workflows/ci.yml` runs on every push to every branch (and on demand). One job runs the platform-independent checks: typecheck, lint, format check and the generators' `--check`. The test matrix is made from the target table (`node scripts/targets.mjs --matrix`): each target builds the addon and runs `npm test` on its own runner, never cross-compiled. Linux targets build and test inside a `manylinux_2_28` container; `scripts/ci/linux-container.sh` is the one script that does it, so a Linux failure can be reproduced anywhere Docker runs:
+`.github/workflows/ci.yml` runs on every push to every branch (and on demand). One job runs the platform-independent checks: typecheck, lint, format check and the generators' `--check`. The test matrix is made from the target table (`node scripts/targets.mjs --matrix`): each target builds the addon and runs `npm test` on its own runner (or only loads it, when the target's `tests` flag is off; `.github/actions/build-addon` makes that decision for every platform alike), never cross-compiled. Linux targets build and test inside a `manylinux_2_28` container; `scripts/ci/linux-container.sh` is the one script that does it, so a Linux failure can be reproduced anywhere Docker runs:
 
 ```sh
 scripts/ci/linux-container.sh quay.io/pypa/manylinux_2_28_x86_64 24 \
   fontconfig-devel freetype-devel fontconfig dejavu-sans-fonts google-noto-sans-cjk-ttc-fonts
 ```
 
-The arguments are the image, the Node.js major version and the packages to install: the headers to build against and the fonts the tests need, since a container has none. The workflow's `LINUX_PACKAGES` is the list CI uses. `--prebuild-out <directory>` before the image builds a release instead: the stripped addon goes to `<directory>/<target id>/`, and no tests run.
+The arguments are the image, the Node.js major version and the packages to install: the headers to build against and the fonts the tests need, since a container has none. The workflow's `LINUX_PACKAGES` is the list CI uses. `--verify tests|load|none` before the image says what runs after the build: the test suite (the default), only a load of the package and a listing of the families (for a target whose `tests` flag in the target table is off), or nothing. `--prebuild-out <directory>` also writes the stripped addon to `<directory>/<target id>/`, owned by the invoking user; a release build is `--prebuild-out <directory> --verify none`.
 
 The steps the CI and release workflows share live in two local actions, `.github/actions/target-matrix` (the matrix from the target table) and `.github/actions/build-addon` (build one target natively); `scripts/ci/README.md` lists the scripts.
 

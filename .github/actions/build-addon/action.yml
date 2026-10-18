@@ -1,8 +1,8 @@
 name: Build the addon
 description: >
   Builds the addon of one target natively, never cross-compiled: in a manylinux container on Linux (the same
-  script a developer runs), with the runner's toolchain elsewhere. On Linux the container also runs the tests unless
-  linux-options asks for a release build. The repository must be checked out first.
+  script a developer runs), with the runner's toolchain elsewhere, then verifies it as the verify input says, on every
+  platform alike. The repository must be checked out first.
 
 inputs:
   id:
@@ -20,8 +20,15 @@ inputs:
   linux-packages:
     description: The packages the Linux container installs before building.
     required: true
-  linux-options:
-    description: Options of scripts/ci/linux-container.sh, before the image.
+  verify:
+    description: >
+      What runs after the build: "tests" (the test suite), "load" (the package is only loaded, for a target whose
+      tests are off in the target table) or "none" (a release build, which tests the assembled prebuilds later).
+    default: tests
+  prebuild-out:
+    description: >
+      Linux only: a directory that receives the stripped addon at <directory>/<target id>/, the layout of prebuilds/.
+      Other platforms copy theirs with `npm run copy-prebuild -- --strip`.
     default: ''
 
 runs:
@@ -37,9 +44,10 @@ runs:
         IMAGE: quay.io/pypa/manylinux_2_28_${{ inputs.arch == 'x64' && 'x86_64' || 'aarch64' }}
         NODE_MAJOR: ${{ inputs.node-major }}
         PACKAGES: ${{ inputs.linux-packages }}
-        OPTIONS: ${{ inputs.linux-options }}
-      # The options and the packages are lists of words.
-      run: scripts/ci/linux-container.sh $OPTIONS "$IMAGE" "$NODE_MAJOR" $PACKAGES
+        VERIFY: ${{ inputs.verify }}
+        PREBUILD_OUT: ${{ inputs.prebuild-out }}
+      # The packages are a list of words.
+      run: scripts/ci/linux-container.sh ${PREBUILD_OUT:+--prebuild-out "$PREBUILD_OUT"} --verify "$VERIFY" "$IMAGE" "$NODE_MAJOR" $PACKAGES
 
     - name: Set up Node.js
       if: inputs.platform != 'linux'
@@ -72,3 +80,12 @@ runs:
         npm run build
       env:
         npm_config_devdir: ${{ runner.temp }}/node-gyp
+    - name: Test
+      if: inputs.platform != 'linux' && inputs.verify == 'tests'
+      shell: bash
+      run: npm test
+    # A target whose tests are off is still built and loaded, so a broken build or loader shows.
+    - name: Load the addon
+      if: inputs.platform != 'linux' && inputs.verify == 'load'
+      shell: bash
+      run: node scripts/ci/load-smoke.mjs
