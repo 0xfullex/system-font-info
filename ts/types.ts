@@ -337,7 +337,7 @@ export interface DarwinNative {
   shadowed?: Array<{ path: string; variable: boolean }>
 }
 
-/** DirectWrite's raw values. Not final: the Windows backend is not implemented yet. */
+/** DirectWrite's raw values. */
 export interface Win32Native {
   os: 'win32'
   /** DWRITE_FONT_WEIGHT (IDWriteFont::GetWeight), 1-999 */
