@@ -181,7 +181,9 @@ jobs:
           path: prebuilds
       - run: npm ci
       - run: npm run build:ts
-      - run: npm pack --pack-destination package
+      - run: |
+          mkdir package
+          npm pack --pack-destination package
       - name: Show the package
         run: |
           ls -l package
