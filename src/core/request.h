@@ -30,7 +30,9 @@ inline constexpr Platform kCurrentPlatform = Platform::Linux;
 
 // The request the JS layer has planned: the fields of the closure (ts/field-closure.ts), which are fields this
 // platform fetches itself. The output (to_js.cpp) holds exactly what the request wants, so a backend may compute more
-// than it is asked for but must never compute less.
+// than it is asked for but must never compute less. The one exception is `opentype`: to_js.cpp outputs the object the
+// backend built whole, so a backend builds it from `openTypeSelection` (never `OpenTypeSelection::all()`), which is
+// what keeps unrequested entries, and the errors of their tables, out of the result.
 struct Request {
   // The requested fields that this platform provides. A field the platform derives is never in it (the JS layer
   // computes those), and neither is one the platform does not have.
@@ -42,7 +44,8 @@ struct Request {
   std::optional<std::vector<std::string>> families;
   // The orthographies whose coverage is counted, in the order of `Family::languageCoverage`.
   std::vector<const orthography::Orthography*> orthographies;
-  // The `faces.opentype.*` entries requested, for `sfnt::openTypeValue`.
+  // The `faces.opentype.*` entries requested. A backend passes it to `sfnt::openTypeValue` and attaches the value as
+  // it is: the conversion does not filter an `opentype` object again.
   sfnt::OpenTypeSelection openTypeSelection;
 
   bool wants(Field field) const { return fields.test(size_t(field)); }

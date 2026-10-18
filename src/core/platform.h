@@ -21,7 +21,11 @@ namespace sfi::platform {
 // Returns only the families for which `request.wantsFamily` is true. Fills what
 // the request wants (`request.wants`, `wantsAnyOpenType`, the orthographies);
 // the conversion to JS outputs only that, so a backend may fill more but never
-// less. Adds the costly OS work it does (groups C, D and E) to `work`.
+// less. The exception is `Face::opentype`, which the conversion outputs as the
+// backend built it: build it from `request.openTypeSelection` and never from
+// `OpenTypeSelection::all()`, or the result holds entries (and table errors)
+// the caller did not select. Adds the costly OS work it does (groups C, D and E)
+// to `work`.
 std::vector<Family> enumerateFonts(const Request& request, WorkLog& work);
 
 // Converts bytes in a legacy character encoding (a `name` table string that is

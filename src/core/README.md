@@ -32,7 +32,7 @@ interface NativeRequest {
 
 ## Output gating
 
-`to_js.cpp` is the one place that decides what reaches JS, and the only one: a key is output when `request.wants` its field. `faces` only when `wantsAnyFace()`, `platform` (with `os` and the requested platform fields only) when `platformObject`, `opentype` when `wantsAnyOpenType()`, `languageCoverage` when the request names orthographies, the family-level `familyNames` when requested. Backends never filter output: computing more than asked is harmless (and only slow), computing less is the defect. The one exception is `opentype`, whose entries the backend builds from `Request::openTypeSelection`, because that is what avoids reading the tables, and so that `errors` lists only the tables of the requested entries.
+`to_js.cpp` is the one place that decides what reaches JS, and the only one: a key is output when `request.wants` its field. `faces` only when `wantsAnyFace()`, `platform` (with `os` and the requested platform fields only) when `platformObject`, `opentype` when `wantsAnyOpenType()`, `languageCoverage` when the request names orthographies, the family-level `familyNames` when requested. Backends never filter output: computing more than asked is harmless (and only slow), computing less is the defect. The one exception is `opentype`: `to_js.cpp` outputs the object the backend built whole, with no second filter, so a backend must build it from `Request::openTypeSelection` and never from `OpenTypeSelection::all()`. That is what avoids reading the tables, and what makes `errors` list only the tables of the requested entries.
 
 ## `WorkLog`
 

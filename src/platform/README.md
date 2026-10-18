@@ -14,10 +14,19 @@ the interface in `../core/platform.h` and fills the structs of
   installed at the moment of the call: a backend keeps nothing between two
   calls, no cache, no handle to the OS font service, no thread.
   - It returns only the families for which `request.wantsFamily` is true, and
-    every one of them with all its faces, whatever the request.
+    every one of them with the faces the full listing gives it: which families
+    are asked for never changes a family's faces. A backend that gets the faces
+    of the asked families from a narrower OS query than the full listing uses
+    (darwin's family lookup) relies on that query naming every face of the
+    family. The one known exception, faces the lookup does not name (none was
+    found on the machine measured), is in `docs/platforms.md`, and the test
+    "asking for every family name of a full run gives the full run" in
+    `test/darwin.test.mjs` is the check.
   - It fills what the request wants: `request.wants(field)`,
-    `wantsAnyOpenType()` (the `opentype` entries are built from
-    `request.openTypeSelection`), `request.orthographies` (the family's
+    `wantsAnyOpenType()` (the `opentype` object is built from
+    `request.openTypeSelection`, never `OpenTypeSelection::all()`: it is the
+    one thing `core/to_js.cpp` does not cut to the request, see below),
+    `request.orthographies` (the family's
     `languageCoverage`, in that order). A field the platform derives is never
     requested. Work of a group (`docs/platforms.md`, "Source groups") that no
     requested field reaches is wasted, and work a requested field needs is the
@@ -64,6 +73,10 @@ the interface in `../core/platform.h` and fills the structs of
   duplicates (the same font listed twice by the OS) may be merged. Selecting
   families by name is the one filter, and it is `request.wantsFamily`'s.
 - Cut the output to the request: `core/to_js.cpp` does, once, for all platforms.
+  The exception is the `opentype` object, which `to_js.cpp` outputs whole: the
+  backend builds it from `request.openTypeSelection`, because that is the cut
+  (it is also what avoids reading the tables of unrequested entries and keeps
+  their errors out of `errors`).
 - Canonicalize language tags, merge or de-duplicate names across records, pick
   default strings, compute family-level aggregates or sort. The JS layer owns
   all of that, so the rules live in one place.
