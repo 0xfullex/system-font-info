@@ -200,6 +200,17 @@ describe('DirectWrite process-local test fonts', { skip }, () => {
     assert.ok(variable.families.find((entry) => entry.family === 'SFITest Variable').faces.every((face) => face.variable))
   })
 
+  test('format alone reads each table directory once and opens no font face', async () => {
+    const { work, families } = await loadNative().__testing.getFamiliesWithWork({
+      fields: ['faces.format'],
+      families: fixtureFamilies,
+      orthographies: []
+    })
+    // One directory file per fixture file; every fixture face has glyf or CFF, so GetType is never needed.
+    assert.deepEqual(work, { fontsOpened: files.length, tableEntries: 0, characterSets: 0 })
+    assert.deepEqual(new Set(families.flatMap((family) => family.faces.map((face) => face.format))), new Set(['truetype', 'cff']))
+  })
+
   test('languageCoverage counts the default face with E work only', async () => {
     const tags = ['en', 'zh-cn', 'ja']
     const [counts, ranges] = await Promise.all([

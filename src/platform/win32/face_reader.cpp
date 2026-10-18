@@ -68,13 +68,16 @@ std::vector<std::string> supportedLanguages(IDWriteFont* font) {
   return result;
 }
 
-Format formatOf(const sfnt::FontTables& tables, DWRITE_FONT_FACE_TYPE type) {
-  const auto has = [&](uint32_t tag) { return std::binary_search(tables.tags.begin(), tables.tags.end(), tag); };
+// `type` is read only when the directory names no outline table, because that needs an opened face.
+template <typename TypeOf>
+Format formatOf(const std::vector<uint32_t>& tags, TypeOf type) {
+  const auto has = [&](uint32_t tag) { return std::find(tags.begin(), tags.end(), tag) != tags.end(); };
   if (has(sfnt::makeTag("CFF2"))) return Format::Cff2;
   if (has(sfnt::makeTag("CFF "))) return Format::Cff;
   if (has(sfnt::makeTag("glyf"))) return Format::TrueType;
-  if (type == DWRITE_FONT_FACE_TYPE_TYPE1) return Format::Type1;
-  if (type == DWRITE_FONT_FACE_TYPE_BITMAP) return Format::Bitmap;
+  const DWRITE_FONT_FACE_TYPE faceType = type();
+  if (faceType == DWRITE_FONT_FACE_TYPE_TYPE1) return Format::Type1;
+  if (faceType == DWRITE_FONT_FACE_TYPE_BITMAP) return Format::Bitmap;
   return Format::Unknown;
 }
 
@@ -107,9 +110,8 @@ IDWriteFontFace3* FaceReader::openFace(Resource& resource, const Reference& refe
   return resource.face.Get();
 }
 
-const sfnt::FontTables& FaceReader::tables(Resource& resource, const Reference& reference) {
-  if (resource.tables) return *resource.tables;
-  const auto face = openFace(resource, reference);
+const std::vector<uint32_t>& FaceReader::tableTags(Resource& resource, const Reference& reference) {
+  if (resource.tags) return *resource.tags;
   std::vector<uint32_t> tags;
   if (!reference.path.empty()) {
     const auto [entry, inserted] = files_.try_emplace(reference.path);
@@ -119,6 +121,14 @@ const sfnt::FontTables& FaceReader::tables(Resource& resource, const Reference& 
     }
     if (entry->second) tags = entry->second->tableTags(reference.key.second);
   }
+  resource.tags = std::move(tags);
+  return *resource.tags;
+}
+
+const sfnt::FontTables& FaceReader::tables(Resource& resource, const Reference& reference) {
+  if (resource.tables) return *resource.tables;
+  const auto face = openFace(resource, reference);
+  const auto& tags = tableTags(resource, reference);
   const sfnt::TableFetcher fetch = [face](uint32_t tag) { return copyTable(face, tag); };
   resource.tables = sfnt::readFontTables(tags, fetch, decodeLegacyText);
   if (request_.wantsAnyOpenType()) {
@@ -244,7 +254,7 @@ ReadFace FaceReader::read(IDWriteFont* font, const LocalizedStrings& familyNames
   }
 
   if (wanted(Field::FacesFormat))
-    face.format = formatOf(tables(shared, reference), openFace(shared, reference)->GetType());
+    face.format = formatOf(tableTags(shared, reference), [&] { return openFace(shared, reference)->GetType(); });
   if (request_.wantsAnyOpenType()) {
     tables(shared, reference);
     face.opentype = shared.opentype;

@@ -4,6 +4,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "../../core/request.h"
 #include "../../sfnt/sfnt.h"
@@ -27,6 +28,7 @@ class FaceReader {
   struct Resource {
     ComPtr<IDWriteFontFace3> face;
     ComPtr<IDWriteFontResource> resource;
+    std::optional<std::vector<uint32_t>> tags;  // The table directory, from the file; empty when unreadable.
     std::optional<sfnt::FontTables> tables;
     Value::Shared opentype;
     SharedAxes axes;
@@ -35,6 +37,7 @@ class FaceReader {
 
   Resource& resource(const Reference& reference);
   IDWriteFontFace3* openFace(Resource& resource, const Reference& reference);
+  const std::vector<uint32_t>& tableTags(Resource& resource, const Reference& reference);
   const sfnt::FontTables& tables(Resource& resource, const Reference& reference);
   const Value& resourceAxes(Resource& resource, const Reference& reference);
   SharedAxes axes(Resource& resource, const Reference& reference);
