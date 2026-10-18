@@ -79,16 +79,23 @@ for (const target of TARGETS) {
     const env = environment({ platform: target.platform, arch: target.arch, libc: target.libc, available: [target.id] })
     assert.equal(loadBinding(env).loaded, target.id)
     assert.deepEqual(env.calls.prebuilt, [target.id])
-    assert.deepEqual(env.calls.files, [])
+    // The local build is tried first and, absent, falls through.
+    assert.deepEqual(env.calls.files, [path.join(ROOT, 'build', 'Release', 'system-font-info.node')])
     // The libc is asked on Linux only.
     assert.equal(env.calls.libc, target.platform === 'linux' ? 1 : 0)
   })
 }
 
-test('a local build is used when the prebuilt addon does not load', () => {
-  const env = environment({ platform: 'darwin', arch: 'arm64', available: [localBuild] })
+test('a local build is used before the prebuilt addon, so a stale prebuild never shadows it', () => {
+  const env = environment({ platform: 'darwin', arch: 'arm64', available: [localBuild, 'darwin-arm64'] })
   assert.equal(loadBinding(env).loaded, localBuild)
-  assert.deepEqual(env.calls.prebuilt, ['darwin-arm64'])
+  assert.deepEqual(env.calls.prebuilt, [])
+})
+
+test('the prebuilt addon is used when there is no local build', () => {
+  const env = environment({ platform: 'darwin', arch: 'arm64', available: ['darwin-arm64'] })
+  assert.equal(loadBinding(env).loaded, 'darwin-arm64')
+  assert.deepEqual(env.calls.files, [localBuild])
 })
 
 test('a platform without a target can only use a local build, and the error names the supported targets', () => {
@@ -123,8 +130,8 @@ test('the error lists every path tried with its underlying failure', () => {
     thrown(() => loadBinding(env)).message,
     [
       'system-font-info: cannot load the native addon for win32-x64. Tried:',
-      `  ${prebuilt('win32-x64')}: bad image`,
-      `  ${localBuild}: no such file`
+      `  ${localBuild}: no such file`,
+      `  ${prebuilt('win32-x64')}: bad image`
     ].join('\n')
   )
 })

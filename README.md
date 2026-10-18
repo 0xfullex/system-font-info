@@ -28,7 +28,7 @@ Node.js 22 or newer. The package ships a prebuilt binary for each of these targe
 
 On Windows the backend uses DirectWrite interfaces that builds before 1809 lack, has no fallback for them, and reports that requirement as its error. On Linux the addon links the system `libfontconfig.so.1` and `libfreetype.so.6` dynamically, so they must be installed (`apt install libfontconfig1` on Debian and Ubuntu, `dnf install fontconfig` on Fedora and RHEL; minimal container images often lack them), and loading without them fails with an error that says so. musl (Alpine) is not supported yet and is reported as such.
 
-The binaries live under `prebuilds/<platform>-<arch>/` (`prebuilds/<platform>-<arch>-glibc/` on Linux). If none matches, or you built from source (see below), the package falls back to `build/Release/`.
+The binaries live under `prebuilds/<platform>-<arch>/` (`prebuilds/<platform>-<arch>-glibc/` on Linux). A build from source (see below) in `build/Release/` takes precedence over them, so a fresh local build is never shadowed by an older copy in `prebuilds/`; the installed package has no `build/`, so it loads the prebuilt binary of its platform.
 
 ## Usage
 
@@ -84,7 +84,7 @@ npm run copy-prebuild  # optional: build/Release/*.node -> prebuilds/<target>/
 npm test
 ```
 
-`copy-prebuild` names the directory from the target table (`ts/targets.ts`, compiled by `npm run build:ts`); `npm run copy-prebuild -- --arch x64` names the target architecture of a cross build. `npm run copy-prebuild -- --strip` strips the copy, as a release build does.
+The package loads `build/Release/system-font-info.node` before any `prebuilds/` binary, so `npm run build` is enough to use your own build; `copy-prebuild` is for assembling the directories a package ships. `copy-prebuild` names the directory from the target table (`ts/targets.ts`, compiled by `npm run build:ts`); `npm run copy-prebuild -- --arch x64` names the target architecture of a cross build. `npm run copy-prebuild -- --strip` strips the copy, as a release build does.
 
 ## Development
 

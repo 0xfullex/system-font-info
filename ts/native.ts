@@ -132,8 +132,8 @@ function missingLibraryHints(failures: string[]): string[] {
 }
 
 /**
- * Loads the addon: the prebuilt one of this platform, architecture and (on Linux) libc, else the one a local build left
- * in `build/Release`. A process that matches no target (musl, or a platform not listed) can only use a local build.
+ * Loads the addon: the one a local build left in `build/Release`, else the prebuilt one of this platform, architecture
+ * and (on Linux) libc. A process that matches no target (musl, or a platform not listed) can only use a local build.
  * Throws an error that lists every path tried with its failure.
  */
 export function loadBinding(environment: LoaderEnvironment): NativeBinding {
@@ -142,12 +142,13 @@ export function loadBinding(environment: LoaderEnvironment): NativeBinding {
   const name = targetName(platform, arch, libc)
   const target = findTarget(platform, arch, libc)
 
-  const attempts: { file: string; load: () => unknown }[] = []
+  // A local build comes first: it is the newer thing a developer just made, while a `prebuilds/<id>` directory may be a
+  // stale copy from an earlier `copy-prebuild`. The published package has no `build/`, so users reach the prebuilt addon.
+  const localBuild = path.join(packageRoot, 'build', 'Release', ADDON_FILE)
+  const attempts: { file: string; load: () => unknown }[] = [{ file: localBuild, load: () => environment.requireFile(localBuild) }]
   if (target) {
     attempts.push({ file: path.join(packageRoot, 'prebuilds', target.id, ADDON_FILE), load: () => environment.requirePrebuilt(target.id) })
   }
-  const localBuild = path.join(packageRoot, 'build', 'Release', ADDON_FILE)
-  attempts.push({ file: localBuild, load: () => environment.requireFile(localBuild) })
 
   const failures: string[] = []
   for (const { file, load } of attempts) {
