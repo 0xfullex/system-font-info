@@ -1,16 +1,16 @@
 # system-font-info
 
-List the fonts installed on a system, with full metadata, through the operating system's own font service: CoreText on macOS, DirectWrite on Windows, fontconfig on Linux. It is a Node-API addon with prebuilt binaries; nothing is compiled when you install it.
+List the font families installed on a system, with full metadata, through the operating system's own font service: CoreText on macOS, DirectWrite on Windows, fontconfig on Linux. It is a Node-API addon with prebuilt binaries; nothing is compiled when you install it.
 
-Every platform returns one shape: localized family, full and style names in every language the font carries, weight, width and style on one scale, supported languages, variable-font axes and named instances, file location, the font's own OpenType tables, and optionally the code point coverage.
+Every platform returns one shape, and the caller declares which fields it wants: localized family, full and style names in every language the font carries, weight, width and style on one scale, supported languages, variable-font axes and named instances, file location, the font's own OpenType tables, character coverage, and each platform's raw values.
 
 ## Status
 
 | Platform | State |
 | --- | --- |
 | macOS | implemented |
-| Windows | in progress |
-| Linux | in progress |
+| Windows | in development |
+| Linux | in development |
 
 ## Install
 
@@ -23,62 +23,29 @@ Node.js 18 or newer. The package ships a binary per platform and architecture un
 ## Usage
 
 ```js
-const { getFonts, pickName } = require('system-font-info')
+const { getFamilies, getFamily, pickName } = require('system-font-info')
 
-const families = await getFonts()
-for (const family of families) {
-  const face = family.faces[0]
-  console.log(family.family, face.postscriptName, pickName(face.fullNames, ['zh-CN', 'en']))
+async function main() {
+  // Family names only: the cheapest call.
+  const families = await getFamilies({ preset: 'names' })
+  for (const family of families) {
+    console.log(family.family, pickName(family.familyNames, ['zh-CN', 'en']))
+  }
+
+  // Chosen fields of one family's faces.
+  const helvetica = await getFamily('Helvetica Neue', { fields: ['faces.postscriptName', 'faces.weight', 'faces.style'] })
+  console.log(helvetica?.faces)
 }
+
+main()
 ```
 
-### `getFonts(options?)`
+`fields` or `preset` is required ([why](docs/api.md#options)); `preset: 'full'` returns everything except character coverage.
 
-Returns `Promise<FontFamily[]>`, sorted by family name. The work runs on a worker thread, not on the JS thread.
+## Documentation
 
-| Option | Default | Meaning |
-| --- | --- | --- |
-| `tables` | `true` | Read the standard OpenType tables of every face into `face.opentype`. |
-| `coverage` | `false` | Include `face.coverage`, the inclusive code point ranges of the face. The ranges are large. |
-
-### `pickName(names, locales)`
-
-Picks the entry of a `LocalizedString[]` (for example `face.fullNames`) that best fits an ordered list of locales, and returns its `value`, or `undefined` when none fits. Locales are tried in order; a locale is tried at four match levels before the next locale is considered: the same canonical tag, the same tag after adding likely subtags (so `zh-CN` matches `zh-Hans-CN`), the same language and script, the same language. Entries whose language is `""` never match.
-
-The default strings `fullName`, `styleName` and `axes[].name` are already chosen for you: `en-US`, else any English, else the entry without a language, else the first.
-
-## Font changes
-
-The module runs nothing between calls: no background thread, no operating system listener, no timer. Each `getFonts()` call asks the operating system at that moment and keeps no result, so it reflects the fonts installed when it is called. On macOS this holds for a long-running plain Node process too: a font copied into `~/Library/Fonts` or removed from it by another process was visible to the next `getFonts()` call about a second later, the time the system font service took to register the change. The tests cover fonts registered in the same process; on Windows and Linux, fonts installed by another process have not been measured yet.
-
-To react to installed fonts changing, call `getFonts()` again at a moment that suits your application, for example when a window regains focus or a font picker opens. In the main process of an Electron app on macOS you can instead observe `kCTFontManagerRegisteredFontsChangedNotification` yourself. The OS delivers it only on the main thread's run loop, which plain Node does not service, so this module cannot receive it without running an event loop of its own.
-
-## The result
-
-`FontFamily` groups `FontFace` objects under the name the platform matcher uses (what goes into CSS `font-family`). The family-level `familyNames`, `languages`, `variable` and `enabled` are derived from its faces. The complete, documented shape is in [`ts/types.ts`](ts/types.ts); the public types are exported from the package.
-
-Highlights of a `FontFace`:
-
-- Identity: `postscriptName` (not a key), `fullName` / `fullNames`, `styleName` / `styleNames`, `familyNames`. Language tags are canonical BCP 47 (`Intl.getCanonicalLocales`); localized arrays hold no exact duplicates.
-- Normalized traits: `weight` (CSS 1-1000), `width` (CSS percentage), `style`, `monospace`, `color`, `symbol`.
-- State: `enabled`, `simulations`, `scope`, `format`, `file`.
-- Variations: `variable`, `axes`, `coordinates`, `namedInstance` (an index into `opentype.fvar.instances`). Faces of one font share their `axes` and `opentype` objects.
-- `opentype`: `head`, `hhea`, `vhea`, `os2`, `post`, `maxp`, `cmap`, `fvar`, `meta` and the GSUB/GPOS feature lists, as stored in the font, plus every `name` record unmerged.
-- `platform`: raw platform values and platform-only information, tagged by `os`.
-
-PostScript names are not keys: on Windows several coordinates of one variable font can share a name, and a font installed as two files gives two faces with one name. The identity of a face is `(file.path, file.index, coordinates, simulations)`; a part a face does not have counts as absent. Every face the platform enumerates is returned and none is merged. On macOS CoreText resolves each PostScript name to one face, so the library reports one face per name there (the others are listed in `platform.shadowed`).
-
-Nothing is filtered: every language and every name a font carries is kept; only exact duplicates are merged.
-
-## Differences between platforms
-
-- `languages`: on macOS, the languages the font declares (`kCTFontLanguagesAttribute`); on Windows, DirectWrite's supported script and language tags; on Linux, fontconfig's `FC_LANG`, which fontconfig computes from the font's character coverage.
-- Availability on macOS:
-  - Private system fonts whose names start with "." are not listed by the OS and are not returned.
-  - Fonts the user disabled in Font Book are returned with `enabled: false`.
-  - Fonts that can be downloaded but have not been downloaded are not returned.
-- `simulations` is `false` everywhere except Windows, where DirectWrite synthesizes bold and oblique faces.
-- `platform` is a different object per platform; see `DarwinNative`, `Win32Native` and `LinuxNative` in the types.
+- [docs/api.md](docs/api.md): the functions, options, presets, every field, and the rules the results follow.
+- [docs/platforms.md](docs/platforms.md): where each field comes from on each platform, what is listed, how quickly font changes show, and measured costs.
 
 ## Electron
 
