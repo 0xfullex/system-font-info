@@ -98,5 +98,4 @@ the interface in `../core/platform.h` and fills the structs of
 
 | Directory | Status |
 | --- | --- |
-| `darwin/`, `win32/` | implemented; see their READMEs |
-| `linux/` | stub that throws "not implemented yet" |
+| `darwin/`, `win32/`, `linux/` | implemented; see their READMEs |

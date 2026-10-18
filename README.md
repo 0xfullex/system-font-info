@@ -10,7 +10,7 @@ Every platform returns one shape, and the caller declares which fields it wants:
 | --- | --- |
 | macOS | implemented |
 | Windows | implemented |
-| Linux | in development |
+| Linux | implemented |
 
 ## Install
 
@@ -63,7 +63,7 @@ Use the package from the main process only; load it from the renderer through IP
 
 ## Building from source
 
-Requires Node.js, a C++20 compiler and Python (for node-gyp). On macOS, the Xcode command line tools.
+Requires Node.js, a C++20 compiler and Python (for node-gyp). On macOS, the Xcode command line tools. On Linux, pkg-config, fontconfig 2.15 or newer, and the fontconfig and FreeType development packages (`pkg-config libfontconfig-dev libfreetype-dev` on Debian / Ubuntu).
 
 ```sh
 npm install

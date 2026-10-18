@@ -6,9 +6,9 @@ How each operating system provides the fields that [api.md](api.md) defines: the
 | --- | --- | --- |
 | macOS | CoreText | implemented |
 | Windows | DirectWrite | implemented |
-| Linux | fontconfig, with FreeType for WOFF tables | in development |
+| Linux | fontconfig, with FreeType for WOFF tables | implemented |
 
-The Windows backend and its selected-field paths are measured directly below; separate component observations are identified as such. The Linux sources and measured figures come from a standalone implementation of those sources. Where a platform's behaviour has not been established, this document says it is not yet documented.
+The Windows backend and its selected-field paths are measured directly below; separate component observations are identified as such. The Linux figures are measured on the backend. Where a platform's behaviour has not been established, this document says it is not yet documented.
 
 - [Source groups](#source-groups)
 - [Family grouping](#family-grouping)
@@ -313,12 +313,12 @@ Measured on the machine below, with a test font installed into the user's font d
 ### What is listed
 
 - **Each call loads a fresh configuration** (`FcInitLoadConfigAndFonts`), owns it alone and destroys it at the end, so the call sees the fonts on disk now and shares no fontconfig state with the rest of the process. With warm fontconfig caches this costs about 5 ms.
-- **The list** is one `FcFontList` call over that configuration, with `FC_NAMELANG` set to `en` and one fixed object set whatever fields are selected: the scalar fontconfig objects the field table below uses (including the [platform fields](#platform-fields-2)) plus `FC_FILE`, `FC_INDEX` and `FC_VARIABLE`. `FC_CHARSET` and `FC_LANG` are added only when a field needing them is selected: `languageCoverage` and `faces.coverage` (`FC_CHARSET`), `supportedLanguages` of a family or a face (`FC_LANG`). `FcFontList` returns its patterns in the order of a hash of the requested objects' values, so its order changes with the object set; the backend does not use it (see member order below).
+- **The list** is `FcFontList` over that configuration, with `FC_NAMELANG` set to `en` and one fixed object set whatever fields are selected: the scalar fontconfig objects the field table below uses (including the [platform fields](#platform-fields-2)) plus `FC_FILE`, `FC_INDEX` and `FC_VARIABLE`. `FC_CHARSET` and `FC_LANG` are added only when a field needing them is selected: `languageCoverage` and `faces.coverage` (`FC_CHARSET`), `supportedLanguages` of a family or a face (`FC_LANG`). `FcFontList` returns its patterns in the order of a hash of the requested objects' values, so its order changes with the object set; the backend does not use it (see member order below).
 - **A face is a pattern with fixed coordinates.** fontconfig also lists, for each variable font, a pattern whose weight and width are ranges (`FC_VARIABLE` true); it describes the whole design space, so it is not a face, and its ranges are the face's `axes`. A variable font is listed as its default instance and its named instances. On the machine measured this leaves 806 of 816 patterns, with 806 distinct identities.
-- **Not listed**: fonts the configuration rejects (`<rejectfont>`); fontconfig offers no enumeration of them. Fonts an application adds to its own configuration (`FcConfigAppFontAddFile`) are not in the configuration the call loads, so `scope` is never `process` on Linux.
+- **Not listed**: fonts the configuration rejects (`<rejectfont>`); fontconfig offers no enumeration of them. Fonts an application adds to its own configuration (`FcConfigAppFontAddFile`) are not in the configuration the call loads, so `scope` is never `process` on Linux. The testing hooks alone add a process-specific temporary directory to each private configuration; the resulting symlink paths have `unknown` scope, and child processes do not inherit them.
 - **Type 1 fonts** are listed with the attributes fontconfig gives and no `opentype`.
 - **Member order** is the faces' order in the configuration's font sets (`FcConfigGetFonts`: the system set, then the application set), the order fontconfig loaded them and the order `FcFontList` walks before hashing. It does not depend on the fields selected, so the order of faces, and of a family's names collected from them, is the same in every projection, as the [invariants](api.md#invariants) require.
-- **`families`**: `FcFontList` with a family condition gives the candidates (it matches any of a font's family names); the backend keeps only the families whose `family` is exactly the requested string.
+- **`families`**: one `FcFontList` query per distinct requested family gives the candidates (it matches any of a font's family names); the results are merged, and the backend keeps only the families whose `family` is exactly a requested string. Several family conditions in one query mean intersection rather than union.
 
 ### Field sources
 
@@ -329,7 +329,7 @@ The group of each field is in [the matrix of Source groups](#the-group-of-every-
 | `family` | See [Family grouping](#family-grouping). |
 | `familyNames` | The union of the faces' `familyNames`. |
 | `supportedLanguages`, `variable`, `enabled` (family) | Aggregates of the faces' values. |
-| `languageCoverage` | Default face: `FcFontSetMatch` over the family's own patterns for regular weight, normal width and roman slant, after `FcConfigSubstitute` and `FcDefaultSubstitute`; its `FC_CHARSET` against the orthography. Matching within the family keeps an alias rule from substituting another family. |
+| `languageCoverage` | Default face: `FcFontSetMatch` over the family's original fixed-coordinate configuration patterns for regular weight, normal width and roman slant, after `FcConfigSubstitute` and `FcDefaultSubstitute`; its `FC_CHARSET` against the orthography. Matching within the family keeps an alias rule from substituting another family. Using original patterns preserves match properties that `FcFontList` leaves out, so requesting languages does not change the default face. |
 | `postscriptName` | `FC_POSTSCRIPT_NAME`. |
 | `fullNames` | `FC_FULLNAME` with `FC_FULLNAMELANG`. A named instance: composed from the `name` and `fvar` tables as on macOS. |
 | `styleNames` | `FC_STYLE` with `FC_STYLELANG`. A named instance: its `fvar` subfamily name. |
@@ -357,11 +357,11 @@ The group of each field is in [the matrix of Source groups](#the-group-of-every-
 Semantics specific to Linux:
 
 - `familyNames` contains aliases: the legacy weight-split names (`IBM Plex Sans Thin`) next to the typographic name. Their language tags are fontconfig's, so English is mostly `en` rather than the `name` table's `en-US`. The preferred name of each language is the first, and `pickName(familyNames, ['en'])` equalled `family` for all 301 families measured (the machine's 296 plus 5 test families added for the measurement).
-- `width` is fontconfig's value. For a static font fontconfig derives it from `OS/2` `usWidthClass` with its own constants, which put semi-condensed at 87 and semi-expanded at 113 where CSS uses 87.5 and 112.5. Which values occur in practice is not yet documented.
+- `width` is fontconfig's value. For a static font fontconfig derives it from `OS/2` `usWidthClass` with its own constants, which put semi-condensed at 87 and semi-expanded at 113 where CSS uses 87.5 and 112.5. The 806 faces measured had widths 75 (48 faces), 85 (16), 87 (4) and 100 (738).
 - `monospace` counts dual-width fonts (a Latin advance and a double CJK advance, such as Sarasa Term), which CSS `monospace` can use; the raw value is `platform.spacing`. It differed from `post.isFixedPitch` for 13 fonts measured.
 - `supportedLanguages` is computed by fontconfig from the face's character coverage against its orthographies, not declared by the font.
 - `scope` for fonts inside Snap or Flatpak sandboxes is not yet documented.
-- Which color glyph formats set `FC_COLOR` is not yet documented. No CFF2 or bitmap font was present on the machine measured.
+- `FC_COLOR` was true for the installed CBDT / CBLC font. COLR, sbix and SVG were not present, so their flags have not been measured. No CFF2 or bitmap font was present on the machine measured.
 
 ### Platform fields
 
@@ -373,7 +373,7 @@ Measured on Ubuntu 26.04.1 with fontconfig 2.17.1: a font added to or removed fr
 
 ## Measured cost
 
-Indicative figures, not guarantees. Unless a table says otherwise, each figure is the median of 5 freshly started Node processes, with the minimum and maximum in brackets, in milliseconds, from the call until the normalized result is ready in JS; Node start-up and module loading are excluded. OS file caches were warm. All were measured in October 2026. The three machines and font sets differ, so a row is not a comparison of the backends. The macOS rows for the family list, `familyNames` and `languageCoverage` come from measurement functions built against the backend's sources, not from the backend itself, as do the single-family rows except the backend figures noted in their row. The other macOS rows come from the backend, the breakdown below from a synchronous copy of it instrumented with timers. On macOS the rows that give a first and a later call were measured through `getFamilies` and `getFamily` themselves, each with 5 freshly started processes making 5 calls in a row: the first call is the first of the process, the later figure is the median of the other four calls of one process, and the median and range are taken over the 5 processes. Windows selected-field calls are measured on the backend, with standalone component costs listed separately; the Linux figures come from a standalone implementation of the sources above.
+Indicative figures, not guarantees. Unless a table says otherwise, each figure is the median of 5 freshly started Node processes, with the minimum and maximum in brackets, in milliseconds, from the call until the normalized result is ready in JS; Node start-up and module loading are excluded. OS file caches were warm. All were measured in October 2026. The three machines and font sets differ, so a row is not a comparison of the backends. The macOS rows for the family list, `familyNames` and `languageCoverage` come from measurement functions built against the backend's sources, not from the backend itself, as do the single-family rows except the backend figures noted in their row. The other macOS rows come from the backend, the breakdown below from a synchronous copy of it instrumented with timers. On macOS the rows that give a first and a later call were measured through `getFamilies` and `getFamily` themselves, each with 5 freshly started processes making 5 calls in a row: the first call is the first of the process, the later figure is the median of the other four calls of one process, and the median and range are taken over the 5 processes. Windows selected-field calls are measured on the backend, with standalone component costs listed separately; the Linux figures come from the backend itself and distinguish the first call from subsequent calls.
 
 ### macOS
 
@@ -428,22 +428,22 @@ Every resource mode visits 906 resources. The directory/name experiment uses the
 
 ### Linux
 
-Intel Core i5-1135G7, 4 cores / 8 threads, about 15 GiB, Ubuntu 26.04.1, fontconfig 2.17.1, FreeType 2.14.2, Node 24.13.0. 296 families, 816 patterns (806 faces), 710 font resources, 684 files.
+Intel Core i5-1135G7, 4 cores / 8 threads, about 15 GiB, Ubuntu 26.04.1, fontconfig 2.17.1, FreeType 2.14.2, Node 24.22.0. Measured on 2026-10-18 UTC: 296 families, 816 patterns (806 faces), 710 font resources, 684 files; no test fonts registered.
 
-| Selection | Groups | ms |
-| --- | --- | --- |
-| Loading the configuration only | | 5.99 [5.97-11.91] |
-| `family`, `familyNames`, with an object set of family names only (`FC_FAMILY`, `FC_FAMILYLANG`); the backend's fixed set is larger and its `fields: []` call is not measured | A | 8.13 [8.01-8.26] |
-| `family`, `familyNames`, `languageCoverage` for one language: `zh-CN` / `zh-TW` / `ja` | A, E | 95.06 [92.13-195.10] / 92.42 [90.57-194.60] / 91.90 [90.89-95.59] |
-| Every fontconfig object of every pattern, raw, no tables | A, B | 65.23 [52.05-85.85] |
-| Every field except `opentype` and `coverage`, tables of 592 sfnt files read directly | A, B, C | 135.43 [132.17-183.91] |
-| The same, tables of all 632 sfnt and WOFF/WOFF2 resources through FreeType | A, B, C | 199.72 [196.63-294.90] |
-| Every field except `coverage`, 592 sfnt files read directly | A-D | 229.97 [229.69-324.55] |
-| The same, all 632 resources through FreeType | A-D | 287.57 [286.93-349.37] |
-| Every field except `coverage`, one family (2-32 faces) | A-D | 11.3-20.5 |
-| `faces.coverage` | E | not yet documented |
+Each selection ran in 5 fresh Node processes, with 6 successive calls in each. First-call figures summarize the 5 first calls; later-call figures summarize the remaining 25 calls. Times include the public API's normalization and projection. The package's JS module was imported before timing; loading the native addon lazily is part of the first call. File caches were warm. All calls use the backend's full fixed scalar object set, with `FC_LANG` and `FC_CHARSET` only when needed.
 
-- The backend reads sfnt files directly and only WOFF and WOFF2 files through FreeType, a mix neither pair of rows measures exactly.
-- The same configuration measured again gave 168.50 [132.36-203.62] for the row of 135.43, so differences of that size between runs are noise.
-- With fontconfig's caches empty, loading the configuration took 380-520 ms instead of about 5.
-- JSON size: 1.95 MB without `opentype`, 6.92 MB with it.
+| Selection | Groups | First call, ms | Later calls, ms |
+| --- | --- | --- | --- |
+| `fields: []` | A | 13.30 [12.94-28.51] | 11.35 [9.23-24.35] |
+| `names` | A | 18.34 [18.17-22.53] | 14.30 [12.42-27.27] |
+| `styles` | A, B; C for variable faces | 90.09 [68.31-101.31] | 52.07 [47.75-77.59] |
+| `details` | A, B, C | 138.93 [96.93-150.81] | 82.35 [73.61-138.57] |
+| `full` | A-D | 213.43 [210.14-273.95] | 189.59 [171.03-300.56] |
+| `names`, `languageCoverage: ['zh-CN']` | A, E | 129.07 [119.90-239.71] | 116.47 [105.58-248.50] |
+| `names`, `languageCoverage: ['zh-TW']` | A, E | 178.16 [132.65-243.20] | 128.96 [120.95-224.30] |
+| `names`, `languageCoverage: ['ja']` | A, E | 108.84 [106.30-215.17] | 97.89 [92.90-220.01] |
+| `fields: ['faces.coverage']` | A, B, E; C for variable faces | 75.01 [72.65-112.15] | 65.60 [54.65-92.13] |
+
+- The backend reads sfnt files directly and only WOFF and WOFF2 through FreeType.
+- An independent configuration-only probe took 5.99 [5.97-11.91] ms. With fontconfig's caches empty, loading the configuration took 380-520 ms instead of about 5.
+- The ranges show substantial scheduling noise; small differences between selections or runs are not meaningful.
