@@ -1,10 +1,12 @@
-// Copies the freshly built addon to prebuilds/<platform>-<arch>/, where the
-// package loads it from. `--arch <arch>` names the target architecture of a
-// cross build; the default is the architecture of this process.
+// Copies the freshly built addon to prebuilds/<target id>/, where the package loads it from (the ids are the
+// target table's, ts/targets.ts: `npm run build:ts` compiles it to dist/targets.js). The target is this
+// machine's platform and, on Linux, libc. `--arch <arch>` names the target architecture of a cross build; the
+// default is the architecture of this process.
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
+import { detectLibc, findTarget, targetName } from '../dist/targets.js'
 
 const { values } = parseArgs({ options: { arch: { type: 'string', default: process.arch } } })
 
@@ -15,8 +17,15 @@ if (!existsSync(source)) {
   process.exit(1)
 }
 
-const targetDir = join(root, 'prebuilds', `${process.platform}-${values.arch}`)
+const libc = process.platform === 'linux' ? detectLibc() : undefined
+const target = findTarget(process.platform, values.arch, libc)
+if (!target) {
+  console.error(`copy-prebuild: ${targetName(process.platform, values.arch, libc)} is not a target of the package (ts/targets.ts)`)
+  process.exit(1)
+}
+
+const targetDir = join(root, 'prebuilds', target.id)
 mkdirSync(targetDir, { recursive: true })
-const target = join(targetDir, 'system-font-info.node')
-copyFileSync(source, target)
-console.log(`copy-prebuild: ${target}`)
+const destination = join(targetDir, 'system-font-info.node')
+copyFileSync(source, destination)
+console.log(`copy-prebuild: ${destination}`)

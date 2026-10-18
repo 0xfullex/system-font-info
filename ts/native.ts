@@ -1,5 +1,6 @@
 import * as path from 'node:path'
 
+import { detectLibc, findTarget, type Libc, TARGETS, type TargetId, targetName } from './targets'
 import type { FontFace, LocalizedString, VariationAxis } from './types'
 
 // What the native addon is asked for and what it returns, before the JS layer
@@ -54,24 +55,111 @@ export interface NativeBinding {
 
 const ADDON_FILE = 'system-font-info.node'
 
-let binding: NativeBinding | undefined
+/** What the loader reads from its surroundings. The real one is `realEnvironment`; tests pass their own. */
+export interface LoaderEnvironment {
+  platform: string
+  arch: string
+  /** Asked on Linux only. */
+  libc: () => Libc
+  /** The directory that holds `prebuilds/` and `build/`. */
+  packageRoot: string
+  /** Requires the prebuilt addon of a target. */
+  requirePrebuilt: (id: TargetId) => unknown
+  /** Requires the addon file a local build left at `file`. */
+  requireFile: (file: string) => unknown
+}
 
-/** Loads the addon on first use: a prebuilt binary for this platform and architecture, else a local build. */
-export function loadNative(): NativeBinding {
-  if (binding) return binding
-  const packageRoot = path.join(__dirname, '..')
-  const candidates = [
-    path.join(packageRoot, 'prebuilds', `${process.platform}-${process.arch}`, ADDON_FILE),
-    path.join(packageRoot, 'build', 'Release', ADDON_FILE)
-  ]
+/**
+ * Requires the prebuilt addon of a target. Each target has its own string-literal `require`, so a bundler can trace
+ * every path and include it; a path assembled at run time would be invisible to it. The compiler checks that the cases
+ * cover `TargetId` and `test/native.test.mjs` that they are the table's targets, each with its own directory.
+ */
+function requirePrebuilt(id: TargetId): unknown {
+  switch (id) {
+    case 'darwin-arm64':
+      return require('../prebuilds/darwin-arm64/system-font-info.node')
+    case 'darwin-x64':
+      return require('../prebuilds/darwin-x64/system-font-info.node')
+    case 'win32-x64':
+      return require('../prebuilds/win32-x64/system-font-info.node')
+    case 'win32-arm64':
+      return require('../prebuilds/win32-arm64/system-font-info.node')
+    case 'linux-x64-glibc':
+      return require('../prebuilds/linux-x64-glibc/system-font-info.node')
+    case 'linux-arm64-glibc':
+      return require('../prebuilds/linux-arm64-glibc/system-font-info.node')
+  }
+}
+
+function realEnvironment(): LoaderEnvironment {
+  return {
+    platform: process.platform,
+    arch: process.arch,
+    libc: detectLibc,
+    packageRoot: path.join(__dirname, '..'),
+    requirePrebuilt,
+    requireFile: (file) => require(file)
+  }
+}
+
+/** The system libraries the Linux addon links dynamically, with the package that provides each. */
+const SYSTEM_LIBRARIES = [
+  { soname: 'libfontconfig.so.1', debian: 'libfontconfig1', rpm: 'fontconfig' },
+  { soname: 'libfreetype.so.6', debian: 'libfreetype6', rpm: 'freetype' }
+]
+
+/** For each system library the dynamic loader reported missing, how to install it; empty when none was. */
+function missingLibraryHints(failures: string[]): string[] {
+  return SYSTEM_LIBRARIES.filter(({ soname }) =>
+    failures.some((failure) => failure.includes(`${soname}: cannot open shared object file`))
+  ).map(
+    ({ soname, debian, rpm }) =>
+      `${soname} is not installed. Install it: apt install ${debian} (Debian, Ubuntu), dnf install ${rpm} (Fedora, RHEL).`
+  )
+}
+
+/**
+ * Loads the addon: the prebuilt one of this platform, architecture and (on Linux) libc, else the one a local build left
+ * in `build/Release`. A process that matches no target (musl, or a platform not listed) can only use a local build.
+ * Throws an error that lists every path tried with its failure.
+ */
+export function loadBinding(environment: LoaderEnvironment): NativeBinding {
+  const { platform, arch, packageRoot } = environment
+  const libc = platform === 'linux' ? environment.libc() : undefined
+  const name = targetName(platform, arch, libc)
+  const target = findTarget(platform, arch, libc)
+
+  const attempts: { file: string; load: () => unknown }[] = []
+  if (target) {
+    attempts.push({ file: path.join(packageRoot, 'prebuilds', target.id, ADDON_FILE), load: () => environment.requirePrebuilt(target.id) })
+  }
+  const localBuild = path.join(packageRoot, 'build', 'Release', ADDON_FILE)
+  attempts.push({ file: localBuild, load: () => environment.requireFile(localBuild) })
+
   const failures: string[] = []
-  for (const candidate of candidates) {
+  for (const { file, load } of attempts) {
     try {
-      binding = require(candidate) as NativeBinding
-      return binding
+      return load() as NativeBinding
     } catch (error) {
-      failures.push(`  ${candidate}: ${error instanceof Error ? error.message : String(error)}`)
+      failures.push(`  ${file}: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
-  throw new Error(`system-font-info: cannot load the native addon for ${process.platform}-${process.arch}. Tried:\n${failures.join('\n')}`)
+
+  const reason =
+    libc === 'musl'
+      ? `musl libc is not supported yet, so there is no prebuilt addon for ${name}`
+      : target
+        ? `cannot load the native addon for ${name}`
+        : `no prebuilt addon for ${name}`
+  const supported = target ? '' : ` (prebuilt targets: ${TARGETS.map((t) => t.id).join(', ')})`
+  const hints = platform === 'linux' ? missingLibraryHints(failures) : []
+  throw new Error([`system-font-info: ${reason}${supported}. Tried:`, ...failures, ...hints].join('\n'))
+}
+
+let binding: NativeBinding | undefined
+
+/** Loads the addon on first use, see `loadBinding`. */
+export function loadNative(): NativeBinding {
+  binding ??= loadBinding(realEnvironment())
+  return binding
 }
