@@ -36,7 +36,10 @@ std::vector<Family> enumerateFonts(const Request& request, WorkLog& work);
 std::optional<std::string> decodeLegacyText(sfnt::LegacyEncoding encoding, std::span<const uint8_t> bytes);
 
 // Test hooks: make a font file available to the current process only, through
-// the same OS service enumeration reads from, and take it away again.
+// the same OS service enumeration reads from, and take it away again. The
+// caller keeps the file in place until it has unregistered it: a platform may
+// read the file again on every enumeration, so a file removed while registered
+// can break the calls that follow.
 void registerFontForTesting(const std::string& path);
 void unregisterFontForTesting(const std::string& path);
 

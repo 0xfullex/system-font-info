@@ -49,7 +49,10 @@ the interface in `../core/platform.h` and fills the structs of
   enumerator, so a new one is a compile error until each backend maps it.
 - `registerFontForTesting` / `unregisterFontForTesting` make a font file
   available to the current process only, through the service enumeration reads
-  from, and throw `std::runtime_error` with the OS error text on failure.
+  from, and throw `std::runtime_error` with the OS error text on failure. The
+  caller keeps the file in place until it unregisters it: a platform may read
+  the file again on every enumeration, so a file deleted while registered can
+  break the calls that follow.
 - `setFontEnabledForTesting(path, enabled)` turns the fonts of a file registered
   that way off or on again, for the current process only, so a test can have a
   disabled font without touching the machine's fonts; turning off a file that

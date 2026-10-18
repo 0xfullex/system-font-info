@@ -108,6 +108,11 @@ plant a font directory that a real call would then list. Registering a file
 first validates it with `FcConfigAppFontAddFile` on an independent empty
 configuration, then adds its path to the list (a path already listed stays
 listed once). Unregistering removes the path and throws when it is not listed.
+The registered file must stay in place until it is unregistered: each
+enumeration re-adds it, and a file that was deleted meanwhile makes
+`FcConfigAppFontAddFile` fail, so every later call in the process throws until
+the path is unregistered. The failure is deliberate; it exposes a test that
+removed its font too early.
 Each enumeration adds every listed path to its private configuration with
 `FcConfigAppFontAddFile`, which makes them the configuration's application
 set, the only fonts that set holds. A child process starts with an empty list.
