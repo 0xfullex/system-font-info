@@ -85,7 +85,7 @@ A family is keyed by the chosen descriptor's `kCTFontFamilyNameAttribute`, in
 first-seen order (the JS layer sorts). The faces of a family follow the order of
 `CTFontCollectionCreateWithFontDescriptors` over one descriptor that names the
 family (disabled fonts included), a PostScript name counted once at its first
-position; this is the order CoreText's own matcher returns and a browser walks.
+position; this is the order CoreText's own matcher returns.
 Faces that list does not name come after, in collection order. It equals
 `NSFontManager availableMembersOfFontFamily` for every family on the machine it
 was checked on (252 of 252), so AppKit is not needed. The enumeration runs in an

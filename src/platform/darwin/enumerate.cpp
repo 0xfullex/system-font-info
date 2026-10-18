@@ -182,7 +182,7 @@ std::vector<FamilySeeds> groupByFamily(const std::vector<Group>& groups, const R
 }
 
 // The descriptors CoreText's family lookup returns for `family`, in the order its matcher lists them, which is the
-// order a browser walks them. Disabled fonts are included. Null when CoreText cannot make the lookup.
+// family's member order. Disabled fonts are included. Null when CoreText cannot make the lookup.
 Ref<CFArrayRef> lookUpFamily(const std::string& family) {
   const auto familyName = makeString(family);
   const void* attributeKeys[] = {kCTFontFamilyNameAttribute};

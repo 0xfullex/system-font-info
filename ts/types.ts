@@ -27,7 +27,7 @@ export interface LanguageCoverage {
 export interface FontFamily {
   /** The name the platform matcher groups faces by; what goes into CSS `font-family`. Unique among the families of a result. */
   family: string
-  /** Union of the faces' `familyNames`, source order, exact duplicates merged. */
+  /** Union of the faces' `familyNames`, in first-seen order, exact duplicates merged. Within each language the first entry is the platform's preferred name. */
   familyNames: LocalizedString[]
   /** Union of the faces' `supportedLanguages`, first-seen order. */
   supportedLanguages: string[]
@@ -37,16 +37,17 @@ export interface FontFamily {
   enabled: boolean
   /** Present only when the `languageCoverage` option is given. */
   languageCoverage?: LanguageCoverage[]
-  /** In the platform's own member order (the order a browser on that platform walks them). */
+  /** In the platform's own member order: the order the platform lists them. */
   faces: FontFace[]
 }
 
 /**
  * The complete shape of one face of a font family; a call returns the part of it that its options select (`SelectedFace`).
  *
- * The identity of a face is `(file.path, file.index, coordinates, simulations)`. Every face the platform
- * enumerates is returned; none is merged, so two faces differ in at least one of those four fields. A part
- * a face does not have (`file`, `file.index`, `coordinates`) counts as absent in the comparison.
+ * The identity of a face is `(file.path, file.index, coordinates, simulations)`. Only exact duplicates are merged
+ * (an entry the platform lists twice with identical content appears once); every other face it lists is returned,
+ * so two faces of a family differ in at least one of those four fields. A part a face does not have (`file`,
+ * `file.index`, `coordinates`) counts as absent in the comparison.
  */
 export interface FontFace {
   // ---- names

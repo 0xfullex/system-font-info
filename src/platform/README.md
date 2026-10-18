@@ -61,8 +61,8 @@ the interface in `../core/platform.h` and fills the structs of
   identical on every platform. The platform-specific raw values go into
   `Face::platform`, a `Value` whose first key is `"os"` and whose shape is the
   matching `*Native` type in `ts/types.ts`.
-- Keep the platform's own order of families' members (`Family::faces`): it is
-  the order a browser on that platform walks them.
+- Keep the platform's own order of families' members (`Family::faces`): the
+  order the platform lists them, never a sort of the backend's own.
 - Share what is shared: faces that come from one font resource (named
   instances of a variable font) point at the same `opentype` value and the same
   `SharedAxes`.

@@ -26,7 +26,7 @@ Node.js 18 or newer. The package ships a binary per platform and architecture un
 const { getFamilies, getFamily, pickName } = require('system-font-info')
 
 async function main() {
-  // Family names only: the cheapest call.
+  // Family names in every language. (The cheapest call is `fields: []`: the `family` name only.)
   const families = await getFamilies({ preset: 'names' })
   for (const family of families) {
     console.log(family.family, pickName(family.familyNames, ['zh-CN', 'en']))
@@ -77,7 +77,7 @@ npm test
 ## Development
 
 ```sh
-npm run typecheck      # tsc --noEmit
+npm run typecheck      # tsc --noEmit for two projects: the package and the type-level tests in test/types
 npm run lint           # Biome lint of the TypeScript and JavaScript
 npm run format:check   # Biome and clang-format, check only
 npm run format         # Biome and clang-format, rewrite the files
