@@ -20,6 +20,7 @@ These headers are the seams between the parts; change one only as its own piece 
 - `core/value.h`: the JSON-like `Value` tree for open-ended data, with `Shared` subtrees.
 - `core/model.h`: `Family`, `Face` and the small structs and enums of the result.
 - `core/platform.h`: what a backend implements (`enumerateFonts`, `decodeLegacyText`, the test hooks).
+- `core/field_catalogue.h`: the generated field table (levels, per-platform availability and groups of OS work, the tables of each `opentype` entry); its source is `../ts/field-catalogue.ts`.
 - `sfnt/sfnt.h`: the table reader API.
 - `../ts/types.ts`: the public TypeScript types, which the native result and the JS layer must agree with.
 

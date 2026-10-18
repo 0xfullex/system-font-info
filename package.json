@@ -38,6 +38,8 @@
     "build:native": "node-gyp rebuild",
     "build:native:debug": "node-gyp rebuild --debug",
     "build:ts": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.json",
+    "build:catalogue": "tsc -p tsconfig.catalogue.json",
+    "generate": "npm run build:catalogue && node scripts/gen-fields.mjs && node scripts/gen-orthographies.mjs",
     "build": "npm run build:native && npm run build:ts",
     "test": "node --test",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p test/types/tsconfig.json --noEmit",

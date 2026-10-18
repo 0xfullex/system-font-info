@@ -2,6 +2,7 @@
 #include <array>
 #include <set>
 
+#include "../core/field_catalogue.h"
 #include "internal.h"
 
 namespace sfi::sfnt {
@@ -13,28 +14,30 @@ std::string tagToString(uint32_t tag) {
 
 namespace {
 
-// Each entry of `opentype`, its name, and the tables it is made of: the one
-// place that maps entries to tables.
-struct EntryInfo {
-  OpenTypeEntry entry;
-  std::string_view name;
-  std::array<uint32_t, 2> tables;  // unused slots are 0
+// The `opentype` entries are the catalogue's `faces.opentype.<entry>` fields: the catalogue holds each entry's name
+// and the tables it is made of. This array only says which field is which enumerator.
+constexpr std::array<Field, size_t(OpenTypeEntry::Count_)> kEntryFields = {
+    Field::FacesOpentypeTables, Field::FacesOpentypeNames, Field::FacesOpentypeHead, Field::FacesOpentypeHhea,
+    Field::FacesOpentypeVhea,   Field::FacesOpentypeOs2,   Field::FacesOpentypePost, Field::FacesOpentypeMaxp,
+    Field::FacesOpentypeCmap,   Field::FacesOpentypeFvar,  Field::FacesOpentypeMeta, Field::FacesOpentypeLayout,
 };
 
-constexpr std::array<EntryInfo, size_t(OpenTypeEntry::Count_)> kEntries = {{
-    {OpenTypeEntry::Tables, "tables", {}},
-    {OpenTypeEntry::Names, "names", {makeTag("name")}},
-    {OpenTypeEntry::Head, "head", {makeTag("head")}},
-    {OpenTypeEntry::Hhea, "hhea", {makeTag("hhea")}},
-    {OpenTypeEntry::Vhea, "vhea", {makeTag("vhea")}},
-    {OpenTypeEntry::Os2, "os2", {makeTag("OS/2")}},
-    {OpenTypeEntry::Post, "post", {makeTag("post")}},
-    {OpenTypeEntry::Maxp, "maxp", {makeTag("maxp")}},
-    {OpenTypeEntry::Cmap, "cmap", {makeTag("cmap")}},
-    {OpenTypeEntry::Fvar, "fvar", {makeTag("fvar")}},
-    {OpenTypeEntry::Meta, "meta", {makeTag("meta")}},
-    {OpenTypeEntry::Layout, "layout", {makeTag("GSUB"), makeTag("GPOS")}},
-}};
+constexpr const FieldInfo& entryInfo(OpenTypeEntry entry) { return kFields[size_t(kEntryFields[size_t(entry)])]; }
+
+constexpr std::string_view kEntryNamePrefix = "faces.opentype.";
+
+constexpr bool entryFieldsAreOpenTypeEntries() {
+  for (size_t i = 0; i < kEntryFields.size(); ++i) {
+    const FieldInfo& info = entryInfo(OpenTypeEntry(i));
+    if (info.level != Level::OpenType || !info.name.starts_with(kEntryNamePrefix)) return false;
+  }
+  return true;
+}
+static_assert(entryFieldsAreOpenTypeEntries(), "OpenTypeEntry and the catalogue's opentype fields must correspond");
+// The catalogue writes tags in the encoding of makeTag.
+static_assert(entryInfo(OpenTypeEntry::Layout).tables[0] == makeTag("GSUB") &&
+                  entryInfo(OpenTypeEntry::Layout).tables[1] == makeTag("GPOS"),
+              "the catalogue and sfnt must encode table tags alike");
 
 // Fetches a present table and runs `convert` on its bytes. A table that is
 // absent gives nullopt without an error; one that cannot be fetched or parsed
@@ -57,8 +60,8 @@ auto readTable(const std::vector<uint32_t>& presentTags, const TableFetcher& fet
 }  // namespace
 
 std::optional<OpenTypeEntry> openTypeEntryFromName(std::string_view name) {
-  for (const EntryInfo& info : kEntries) {
-    if (info.name == name) return info.entry;
+  for (size_t i = 0; i < size_t(OpenTypeEntry::Count_); ++i) {
+    if (entryInfo(OpenTypeEntry(i)).name.substr(kEntryNamePrefix.size()) == name) return OpenTypeEntry(i);
   }
   return std::nullopt;
 }
@@ -115,9 +118,10 @@ Value::Shared openTypeValue(const FontTables& tables, const OpenTypeSelection& s
   if (selection.has(OpenTypeEntry::Names)) opentype.set("names", nameRecordsToValue(tables.names));
 
   std::set<uint32_t> errorTags;
-  for (const EntryInfo& info : kEntries) {
-    if (!selection.has(info.entry)) continue;
-    for (const uint32_t tag : info.tables) {
+  for (size_t i = 0; i < size_t(OpenTypeEntry::Count_); ++i) {
+    const OpenTypeEntry entry = OpenTypeEntry(i);
+    if (!selection.has(entry)) continue;
+    for (const uint32_t tag : entryInfo(entry).tables) {
       if (failed.contains(tag)) errorTags.insert(tag);
     }
   }

@@ -31,19 +31,114 @@ Every field belongs, on each platform, to one group of OS work. A call does the 
 | constant | No OS work: the platform has no such notion and the value is fixed. |
 | derived | Computed by the package from another field, which it fetches: `fullName`, `styleName`, `axes[].name`, and the family-level aggregates. |
 
-The groups each preset reaches:
+### The group of every field
 
+The group of OS work each field needs on each platform. A cell is read as follows:
+
+- `B, C` is both groups, always. ``B; C for `cff2` `` is B always and C in the case named; `C, for variable faces only` is C in that case alone.
+- `constant` and `derived` are the two kinds of field in the table above. A `derived` cell costs what the fields it is computed from cost on that platform: a family-level field the face field of the same name (`variable` from `faces.variable`; `familyNames` too, except on Windows, where DirectWrite gives a family's names directly and the field is group A), `faces.fullName` the field `faces.fullNames`, and `faces.styleName` the field `faces.styleNames`.
+- `not yet documented`: the platform provides the field and its source has not been established.
+- `—`: the platform does not provide the field.
+
+`family` and the `languageCoverage` option are not field names and have no row: they are groups A and E.
+
+<!-- BEGIN GENERATED: field-groups (scripts/gen-fields.mjs) -->
+| Field | macOS | Windows | Linux |
+| --- | --- | --- | --- |
+| `familyNames` | derived | A | derived |
+| `supportedLanguages` | derived | derived | derived |
+| `variable` | derived | derived | derived |
+| `enabled` | derived | derived | derived |
+| `faces.postscriptName` | B | B | B |
+| `faces.fullName` | derived | derived | derived |
+| `faces.fullNames` | C | B | B; C for named instances |
+| `faces.styleName` | derived | derived | derived |
+| `faces.styleNames` | C | B | B; C for named instances |
+| `faces.familyNames` | C | A | A |
+| `faces.weight` | B | B | B |
+| `faces.width` | B | B | B |
+| `faces.style` | B | B | B |
+| `faces.monospace` | B | B | B |
+| `faces.color` | B | B | B |
+| `faces.symbol` | C | B | B |
+| `faces.enabled` | B | constant | constant |
+| `faces.simulations` | constant | B | constant |
+| `faces.supportedLanguages` | B | B | B |
+| `faces.scope` | B | B | B |
+| `faces.file` | B, C | B | B |
+| `faces.variable` | B | C | B |
+| `faces.format` | B; C for `cff2` | C | B; C for `cff2` |
+| `faces.axes` | C | C | C |
+| `faces.coordinates` | C | C | C, for variable faces only |
+| `faces.namedInstanceIndex` | C | C | C, for variable faces only |
+| `faces.coverage` | E | E | E |
+| `faces.opentype.tables` | D | D | D |
+| `faces.opentype.names` | D | D | D |
+| `faces.opentype.head` | D | D | D |
+| `faces.opentype.hhea` | D | D | D |
+| `faces.opentype.vhea` | D | D | D |
+| `faces.opentype.os2` | D | D | D |
+| `faces.opentype.post` | D | D | D |
+| `faces.opentype.maxp` | D | D | D |
+| `faces.opentype.cmap` | D | D | D |
+| `faces.opentype.fvar` | D | D | D |
+| `faces.opentype.meta` | D | D | D |
+| `faces.opentype.layout` | D | D | D |
+| `faces.platform.weight` | B | B | B |
+| `faces.platform.width` | B | B | B |
+| `faces.platform.slant` | B | B | B |
+| `faces.platform.symbolicTraits` | B | — | — |
+| `faces.platform.format` | B | not yet documented | B |
+| `faces.platform.priority` | B | — | — |
+| `faces.platform.registrationScope` | B | — | — |
+| `faces.platform.downloadable` | B | — | — |
+| `faces.platform.downloaded` | B | — | — |
+| `faces.platform.styleName` | B | — | — |
+| `faces.platform.displayName` | B | — | — |
+| `faces.platform.localizedFamilyName` | B | — | — |
+| `faces.platform.localizedStyleName` | B | — | — |
+| `faces.platform.fixedAdvance` | B | — | — |
+| `faces.platform.features` | C | — | — |
+| `faces.platform.metrics` | C | — | — |
+| `faces.platform.shadowed` | B | — | — |
+| `faces.platform.typographicFamilyNames` | — | B | — |
+| `faces.platform.typographicStyleNames` | — | B | — |
+| `faces.platform.designLanguages` | — | B | — |
+| `faces.platform.supportedLanguages` | — | B | — |
+| `faces.platform.inactiveFamilyPreference` | — | not yet documented | — |
+| `faces.platform.sourceType` | — | B | — |
+| `faces.platform.sourceName` | — | B | — |
+| `faces.platform.axisValues` | — | B | — |
+| `faces.platform.resourceAxes` | — | C | — |
+| `faces.platform.additionalInformationalStrings` | — | C | — |
+| `faces.platform.index` | — | — | B |
+| `faces.platform.spacing` | — | — | B |
+| `faces.platform.fontWrapper` | — | — | B |
+| `faces.platform.foundry` | — | — | B |
+| `faces.platform.decorative` | — | — | B |
+| `faces.platform.fontHasHint` | — | — | B |
+| `faces.platform.order` | — | — | B |
+| `faces.platform.outline` | — | — | B |
+| `faces.platform.scalable` | — | — | B |
+| `faces.platform.antialias` | — | — | B |
+| `faces.platform.pixelSize` | — | — | B |
+<!-- END GENERATED: field-groups -->
+
+The groups each preset reaches. A selection costs the groups of the fields it selects, of the face identity when it selects a `faces.*` field ([api.md](api.md#always-included)), and of the fields the package computes the selected ones from:
+
+<!-- BEGIN GENERATED: preset-groups (scripts/gen-fields.mjs) -->
 | Selection | macOS | Windows | Linux |
 | --- | --- | --- | --- |
 | `fields: []` (`family` only) | A | A | A |
 | `names` | A, C | A | A |
-| `styles` | A, B, C | A, B, C | A, B; C for variable faces |
+| `styles` | A, B, C | A, B, C | A, B; C for named instances; C for variable faces only |
 | `details` | A, B, C | A, B, C | A, B, C |
 | `full` | A, B, C, D | A, B, C, D | A, B, C, D |
+<!-- END GENERATED: preset-groups -->
 
-Because every face carries its identity ([api.md](api.md#always-included)), any `faces.*` selection reaches C on macOS (`file.index`) and on Windows (telling whether a face is variable, for `coordinates`), and on Linux only for variable faces.
+A selection that includes a `faces.*` field gives every face its identity ([api.md](api.md#always-included)), so it reaches C on macOS (`file.index`, `coordinates`) and on Windows (`coordinates`: telling whether a face is variable), and on Linux only for variable faces (`coordinates`). `names` selects no face field and so carries no identity: on Windows `familyNames` is group A, and on macOS and Linux the package computes it from the faces' `familyNames`, which cost C on macOS and A on Linux.
 
-On macOS `names` is C because CoreText has no API for a family's names in every language, and `styles` reaches C because the face names, `symbol` and `file.index` are C there. The face identity always includes `coordinates`, which a variable font's named instances take from its `fvar` table; a static face has no coordinates. On Linux a face is known to be variable without reading its file (see `variable` in the Linux field sources), so `styles` reaches A and B, and C only for a variable face. On Windows telling whether a face is variable is itself C (`IDWriteFontResource::HasVariations`), so `styles` reaches C for every font resource.
+On macOS `names` is C because CoreText has no API for a family's names in every language, and `styles` reaches C because the face names, `symbol` and `file.index` are C there. The face identity includes `coordinates`, which a variable font's named instances take from its `fvar` table; a static face has no coordinates. On Linux a face is known to be variable without reading its file (see `variable` in the Linux field sources), so `styles` reaches A and B, and C only for the faces of variable fonts (their `coordinates`, and the names of the named instances). On Windows telling whether a face is variable is itself C (`IDWriteFontResource::HasVariations`), so `styles` reaches C for every font resource.
 
 `faces.format` is in `details`, not `styles`, because on Windows telling a face's format needs each font resource's table directory (C): `CFF2`, `CFF` and `glyf` are told apart there. On Windows C covers two kinds of work: creating each font resource object (enough for `HasVariations`) and reading its table directory or tables (needed for `format`). Their costs have not been measured separately. `format` is kept out of `styles` so that `styles` needs only the first kind; how much the second adds is not measured. On Linux and macOS `format` is B, except that telling CFF2 from CFF needs the table directory (C).
 
@@ -80,35 +175,37 @@ Using `family` in CSS, as measured (each figure is for the stated machine and br
 
 ### Field sources
 
-| Field | Source | Group |
-| --- | --- | --- |
-| `family` | See [Family grouping](#family-grouping). It comes from the descriptors of the font collection the backend enumerates. `CTFontManagerCopyAvailableFontFamilyNames` gives the same set only while no font is registered for the process: after `CTFontManagerRegisterFontsForURL` with process scope, the collection had 253 families and the call still 252 one second later. | A |
-| `familyNames` | The union of the faces' `familyNames`. | C |
-| `supportedLanguages`, `variable`, `enabled` (family) | Aggregates of the faces' values. | B |
-| `languageCoverage` | Default face: `CTFontDescriptorCreateMatchingFontDescriptor` for the family name with traits weight 0 and width 0; its `kCTFontCharacterSetAttribute` against the orthography. | E |
-| `postscriptName` | `kCTFontNameAttribute`. | B |
-| `fullNames` | `name` ID 4. A named instance: composed in every language that has both, from the typographic family name (ID 16, else 1) and the instance's `fvar` subfamily name. CoreText's own composed string is `platform.displayName`, in one language. | C |
-| `styleNames` | `name` ID 17, else ID 2, per language. A named instance: its `fvar` subfamily name. | C |
-| `familyNames` (face) | `name` ID 16, else ID 1, per language. | C |
-| `weight` | `kCTFontWeightTrait`, mapped to 100...900 with the fixed boundaries browsers use for CoreText's weights, so the value is the weight a browser on macOS classifies the face as. | B |
-| `width` | `kCTFontWidthTrait` `w` as `100 + w * (w < 0 ? 50 : 100)`, clamped to 50-200, rounded to a thousandth. | B |
-| `style` | The italic symbolic trait: `italic`, else `normal`. | B |
-| `monospace` | `kCTFontMonoSpaceTrait` symbolic trait. | B |
-| `color` | `kCTFontColorGlyphsTrait` symbolic trait. | B |
-| `symbol` | The `cmap` has a (3,0) subtable: macOS has no OS flag for symbol fonts. | C |
-| `enabled` | `kCTFontEnabledAttribute` (a number or a boolean; a font without it is enabled). | B |
-| `simulations` | Always false: CoreText lists no synthesized faces. | constant |
-| `supportedLanguages` | `kCTFontLanguagesAttribute`. | B |
-| `scope` | The first rule that applies: `registrationScope` process: `process`; `registrationScope` session: `user`; `priority` 40000: `user`; 10000, 20000 or 30000: `system`; 60000 with the persistent registration scope (downloaded system font assets under `/System/Library/AssetsV2`): `system`; anything else: `unknown`. Priority 60000 alone is ambiguous: a font registered for the process has it too. | B |
-| `format` | `kCTFontFormatAttribute`: OpenType PostScript is `cff`, or `cff2` when the font has a `CFF2` table; OpenType TrueType and TrueType are `truetype`; PostScript is `type1`; bitmap is `bitmap`; anything else `unknown`. | B; C for `cff2` |
-| `file.path` | `kCTFontURLAttribute`, when it is a file URL. | B |
-| `file.index` | CoreText does not say which face of a collection a font is: it is the collection face whose `name` table equals the font's. A face that cannot be told apart, and a font in a file the table reader cannot open (`.dfont`), get no index. | C |
-| `variable` | The descriptor has a non-empty `kCTFontVariationAxesAttribute`. | B |
-| `axes` | `kCTFontVariationAxesAttribute` (tag, range, default, hidden); the names are those of the `fvar` axis with the same tag, and `hidden` falls back to the `fvar` flag. | C |
-| `coordinates` | `CTFontCopyVariation`, which lists only axes away from their default, filled up to every axis. CoreText reports coordinates cut to four decimals. | C |
-| `namedInstanceIndex` | The first `fvar` instance whose coordinates equal `coordinates`, within 5e-4. | C |
-| `opentype` | Tag list from `CTFontCopyAvailableTables`, bytes from `CTFontCopyTable`. When CoreText creates another font than the descriptor names, the tables come from the descriptor's file instead, and `platform.features` and `platform.metrics` are left out. | D |
-| `coverage` | `kCTFontCharacterSetAttribute` through `CFCharacterSetCreateBitmapRepresentation`. | E |
+The group of each field is in [the matrix of Source groups](#the-group-of-every-field).
+
+| Field | Source |
+| --- | --- |
+| `family` | See [Family grouping](#family-grouping). It comes from the descriptors of the font collection the backend enumerates. `CTFontManagerCopyAvailableFontFamilyNames` gives the same set only while no font is registered for the process: after `CTFontManagerRegisterFontsForURL` with process scope, the collection had 253 families and the call still 252 one second later. |
+| `familyNames` | The union of the faces' `familyNames`. |
+| `supportedLanguages`, `variable`, `enabled` (family) | Aggregates of the faces' values. |
+| `languageCoverage` | Default face: `CTFontDescriptorCreateMatchingFontDescriptor` for the family name with traits weight 0 and width 0; its `kCTFontCharacterSetAttribute` against the orthography. |
+| `postscriptName` | `kCTFontNameAttribute`. |
+| `fullNames` | `name` ID 4. A named instance: composed in every language that has both, from the typographic family name (ID 16, else 1) and the instance's `fvar` subfamily name. CoreText's own composed string is `platform.displayName`, in one language. |
+| `styleNames` | `name` ID 17, else ID 2, per language. A named instance: its `fvar` subfamily name. |
+| `familyNames` (face) | `name` ID 16, else ID 1, per language. |
+| `weight` | `kCTFontWeightTrait`, mapped to 100...900 with the fixed boundaries browsers use for CoreText's weights, so the value is the weight a browser on macOS classifies the face as. |
+| `width` | `kCTFontWidthTrait` `w` as `100 + w * (w < 0 ? 50 : 100)`, clamped to 50-200, rounded to a thousandth. |
+| `style` | The italic symbolic trait: `italic`, else `normal`. |
+| `monospace` | `kCTFontMonoSpaceTrait` symbolic trait. |
+| `color` | `kCTFontColorGlyphsTrait` symbolic trait. |
+| `symbol` | The `cmap` has a (3,0) subtable: macOS has no OS flag for symbol fonts. |
+| `enabled` | `kCTFontEnabledAttribute` (a number or a boolean; a font without it is enabled). |
+| `simulations` | Always false: CoreText lists no synthesized faces. |
+| `supportedLanguages` | `kCTFontLanguagesAttribute`. |
+| `scope` | The first rule that applies: `registrationScope` process: `process`; `registrationScope` session: `user`; `priority` 40000: `user`; 10000, 20000 or 30000: `system`; 60000 with the persistent registration scope (downloaded system font assets under `/System/Library/AssetsV2`): `system`; anything else: `unknown`. Priority 60000 alone is ambiguous: a font registered for the process has it too. |
+| `format` | `kCTFontFormatAttribute`: OpenType PostScript is `cff`, or `cff2` when the font has a `CFF2` table; OpenType TrueType and TrueType are `truetype`; PostScript is `type1`; bitmap is `bitmap`; anything else `unknown`. |
+| `file.path` | `kCTFontURLAttribute`, when it is a file URL. |
+| `file.index` | CoreText does not say which face of a collection a font is: it is the collection face whose `name` table equals the font's. A face that cannot be told apart, and a font in a file the table reader cannot open (`.dfont`), get no index. |
+| `variable` | The descriptor has a non-empty `kCTFontVariationAxesAttribute`. |
+| `axes` | `kCTFontVariationAxesAttribute` (tag, range, default, hidden); the names are those of the `fvar` axis with the same tag, and `hidden` falls back to the `fvar` flag. |
+| `coordinates` | `CTFontCopyVariation`, which lists only axes away from their default, filled up to every axis. CoreText reports coordinates cut to four decimals. |
+| `namedInstanceIndex` | The first `fvar` instance whose coordinates equal `coordinates`, within 5e-4. |
+| `opentype` | Tag list from `CTFontCopyAvailableTables`, bytes from `CTFontCopyTable`. When CoreText creates another font than the descriptor names, the tables come from the descriptor's file instead, and `platform.features` and `platform.metrics` are left out. |
+| `coverage` | `kCTFontCharacterSetAttribute` through `CFCharacterSetCreateBitmapRepresentation`. |
 
 Semantics specific to macOS:
 
@@ -121,7 +218,7 @@ Semantics specific to macOS:
 
 ### Platform fields
 
-The definitions are in [api.md](api.md#macos-darwinnative). Every one is a descriptor attribute (group B), except: `features` (`CTFontCopyFeatures`, which needs a `CTFont`, C; read once per font resource) and `metrics` (C, needs a `CTFont`), and `shadowed`, which comes from grouping the collection by PostScript name (B).
+The definitions are in [api.md](api.md#macos-darwinnative). Every one is a descriptor attribute, except: `features` (`CTFontCopyFeatures`, which needs a `CTFont`; read once per font resource) and `metrics` (needs a `CTFont`), and `shadowed`, which comes from grouping the collection by PostScript name.
 
 ### Freshness
 
@@ -141,35 +238,37 @@ Measured on macOS 27.0.1: a font copied into `~/Library/Fonts` by another proces
 
 ### Field sources
 
-| Field | Source | Group |
-| --- | --- | --- |
-| `family` | See [Family grouping](#family-grouping). | A |
-| `familyNames` | `IDWriteFontFamily::GetFamilyNames`, every locale: the names DirectWrite's matcher recognizes. Other names in the font's `name` table are in `opentype.names`. | A |
-| `supportedLanguages`, `variable`, `enabled` (family) | Aggregates of the faces' values. | B; C for `variable` |
-| `languageCoverage` | Default face: `IDWriteFontFamily::GetFirstMatchingFont(400, DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_NORMAL)`; its `IDWriteFont1::GetUnicodeRanges` against the orthography. | E |
-| `postscriptName` | Informational string `DWRITE_INFORMATIONAL_STRING_POSTSCRIPT_NAME`, the `en-us` value, else the first. | B |
-| `fullNames` | Informational string `DWRITE_INFORMATIONAL_STRING_FULL_NAME`, every locale, as DirectWrite gives it for the member (named instances and simulated members included). | B |
-| `styleNames` | `IDWriteFont::GetFaceNames`, every locale: the member's name within its WSS family. The typographic style names are `platform.typographicStyleNames`. | B |
-| `familyNames` (face) | `GetFamilyNames` of the member's family. | A |
-| `weight` | `IDWriteFont::GetWeight`, unrounded. | B |
-| `width` | `IDWriteFont::GetStretch` 1-9 mapped to 50, 62.5, 75, 87.5, 100, 112.5, 125, 150, 200. | B |
-| `style` | `IDWriteFont::GetStyle`: normal, oblique, italic. | B |
-| `monospace` | `IDWriteFont1::IsMonospacedFont`. | B |
-| `color` | `IDWriteFont2::IsColorFont`. | B |
-| `symbol` | `IDWriteFont::IsSymbolFont`. | B |
-| `enabled` | Always true: DirectWrite has no disabled state. | constant |
-| `simulations` | `IDWriteFont::GetSimulations` bits. | B |
-| `supportedLanguages` | Informational string `DWRITE_INFORMATIONAL_STRING_SUPPORTED_SCRIPT_LANGUAGE_TAG`, split into tags; a script alone becomes `und-` and the script (`Hans` is `und-Hans`). | B |
-| `scope` | `IDWriteFontSet3::GetFontSourceType` of the member's entry in the collection's font set (a simulated member takes its base font's entry): per-machine is `system`, per-user `user`, anything else (an app package, for example) `unknown`. | B, over the whole font set |
-| `format` | The table directory: `CFF2` is `cff2`, `CFF` is `cff`, `glyf` is `truetype`; without those, `DWRITE_FONT_FACE_TYPE` Type 1 is `type1` and bitmap is `bitmap`; anything else `unknown`. A collection is a container, not a format. | C |
-| `file.path` | `IDWriteFont3::GetFontFaceReference`, `IDWriteFontFaceReference::GetFontFile`, and the path from `IDWriteLocalFontFileLoader::GetFilePathFromKey`. | B |
-| `file.index` | `IDWriteFontFaceReference::GetFontFaceIndex`. | B |
-| `variable` | `IDWriteFontResource::HasVariations`. | C |
-| `axes` | The `fvar` axes only. The standard axes DirectWrite adds for a font that does not define them (a fixed `wdth` of 100, for example) are in `platform.resourceAxes`. | C |
-| `coordinates` | `IDWriteFontFaceReference1::GetFontAxisValues`, limited to the `fvar` axes. | C |
-| `namedInstanceIndex` | The first `fvar` instance whose coordinates equal `coordinates`, within 1/65536. | C |
-| `opentype` | One `IDWriteFontFace` per font resource, bytes from `IDWriteFontFace::TryGetFontTable`; the tag list from the file's sfnt directory, because `TryGetFontTable` cannot enumerate tables. | D |
-| `coverage` | `IDWriteFontFace1::GetUnicodeRanges`. | E |
+The group of each field is in [the matrix of Source groups](#the-group-of-every-field).
+
+| Field | Source |
+| --- | --- |
+| `family` | See [Family grouping](#family-grouping). |
+| `familyNames` | `IDWriteFontFamily::GetFamilyNames`, every locale: the names DirectWrite's matcher recognizes. Other names in the font's `name` table are in `opentype.names`. |
+| `supportedLanguages`, `variable`, `enabled` (family) | Aggregates of the faces' values. |
+| `languageCoverage` | Default face: `IDWriteFontFamily::GetFirstMatchingFont(400, DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_NORMAL)`; its `IDWriteFont1::GetUnicodeRanges` against the orthography. |
+| `postscriptName` | Informational string `DWRITE_INFORMATIONAL_STRING_POSTSCRIPT_NAME`, the `en-us` value, else the first. |
+| `fullNames` | Informational string `DWRITE_INFORMATIONAL_STRING_FULL_NAME`, every locale, as DirectWrite gives it for the member (named instances and simulated members included). |
+| `styleNames` | `IDWriteFont::GetFaceNames`, every locale: the member's name within its WSS family. The typographic style names are `platform.typographicStyleNames`. |
+| `familyNames` (face) | `GetFamilyNames` of the member's family. |
+| `weight` | `IDWriteFont::GetWeight`, unrounded. |
+| `width` | `IDWriteFont::GetStretch` 1-9 mapped to 50, 62.5, 75, 87.5, 100, 112.5, 125, 150, 200. |
+| `style` | `IDWriteFont::GetStyle`: normal, oblique, italic. |
+| `monospace` | `IDWriteFont1::IsMonospacedFont`. |
+| `color` | `IDWriteFont2::IsColorFont`. |
+| `symbol` | `IDWriteFont::IsSymbolFont`. |
+| `enabled` | Always true: DirectWrite has no disabled state. |
+| `simulations` | `IDWriteFont::GetSimulations` bits. |
+| `supportedLanguages` | Informational string `DWRITE_INFORMATIONAL_STRING_SUPPORTED_SCRIPT_LANGUAGE_TAG`, split into tags; a script alone becomes `und-` and the script (`Hans` is `und-Hans`). |
+| `scope` | `IDWriteFontSet3::GetFontSourceType` of the member's entry in the collection's font set (a simulated member takes its base font's entry): per-machine is `system`, per-user `user`, anything else (an app package, for example) `unknown`. |
+| `format` | The table directory: `CFF2` is `cff2`, `CFF` is `cff`, `glyf` is `truetype`; without those, `DWRITE_FONT_FACE_TYPE` Type 1 is `type1` and bitmap is `bitmap`; anything else `unknown`. A collection is a container, not a format. |
+| `file.path` | `IDWriteFont3::GetFontFaceReference`, `IDWriteFontFaceReference::GetFontFile`, and the path from `IDWriteLocalFontFileLoader::GetFilePathFromKey`. |
+| `file.index` | `IDWriteFontFaceReference::GetFontFaceIndex`. |
+| `variable` | `IDWriteFontResource::HasVariations`. |
+| `axes` | The `fvar` axes only. The standard axes DirectWrite adds for a font that does not define them (a fixed `wdth` of 100, for example) are in `platform.resourceAxes`. |
+| `coordinates` | `IDWriteFontFaceReference1::GetFontAxisValues`, limited to the `fvar` axes. |
+| `namedInstanceIndex` | The first `fvar` instance whose coordinates equal `coordinates`, within 1/65536. |
+| `opentype` | One `IDWriteFontFace` per font resource, bytes from `IDWriteFontFace::TryGetFontTable`; the tag list from the file's sfnt directory, because `TryGetFontTable` cannot enumerate tables. |
+| `coverage` | `IDWriteFontFace1::GetUnicodeRanges`. |
 
 Semantics specific to Windows:
 
@@ -183,15 +282,15 @@ Semantics specific to Windows:
 
 The definitions are in [api.md](api.md#windows-win32native).
 
-| Fields | Group |
+| Fields | Source |
 | --- | --- |
-| `weight`, `width`, `slant` | B |
-| `typographicFamilyNames`, `typographicStyleNames`, `designLanguages`, `supportedLanguages` | B (informational strings) |
-| `sourceType`, `sourceName` | B, over the whole font set |
-| `axisValues` | B |
-| `inactiveFamilyPreference` | One registry read per call; its cost is not yet documented. |
-| `resourceAxes` | C |
-| `additionalInformationalStrings` | C: every informational string is compared with the `name` table. |
+| `weight`, `width`, `slant` | The raw `IDWriteFont` values (`GetWeight`, `GetStretch`, `GetStyle`). |
+| `typographicFamilyNames`, `typographicStyleNames`, `designLanguages`, `supportedLanguages` | Informational strings. |
+| `sourceType`, `sourceName` | `IDWriteFontSet3::GetFontSourceType` and `GetFontSourceName` of the face's entry in the whole system font set. |
+| `axisValues` | `IDWriteFontFaceReference1::GetFontAxisValues`. |
+| `inactiveFamilyPreference` | One registry read per call; its group is not yet documented. |
+| `resourceAxes` | The axes of the font resource (`IDWriteFontResource`). |
+| `additionalInformationalStrings` | Every informational string, compared with the `name` table. |
 | `format` | Not yet documented. |
 
 ### Freshness
@@ -212,35 +311,37 @@ Measured on the machine below, with a test font installed into the user's font d
 
 ### Field sources
 
-| Field | Source | Group |
-| --- | --- | --- |
-| `family` | See [Family grouping](#family-grouping). | A |
-| `familyNames` | The union of the faces' `familyNames`. | A |
-| `supportedLanguages`, `variable`, `enabled` (family) | Aggregates of the faces' values. | B |
-| `languageCoverage` | Default face: `FcFontSetMatch` over the family's own patterns for regular weight, normal width and roman slant, after `FcConfigSubstitute` and `FcDefaultSubstitute`; its `FC_CHARSET` against the orthography. Matching within the family keeps an alias rule from substituting another family. | E |
-| `postscriptName` | `FC_POSTSCRIPT_NAME`. | B |
-| `fullNames` | `FC_FULLNAME` with `FC_FULLNAMELANG`. A named instance: composed from the `name` and `fvar` tables as on macOS. | B; C for named instances |
-| `styleNames` | `FC_STYLE` with `FC_STYLELANG`. A named instance: its `fvar` subfamily name. | B; C for named instances |
-| `familyNames` (face) | Every `FC_FAMILY` value with its `FC_FAMILYLANG`, aliases included. | A |
-| `weight` | `FC_WEIGHT` through `FcWeightToOpenTypeDouble`. A named instance has the instance's weight, which can differ from the font's `OS/2` weight. | B |
-| `width` | `FC_WIDTH`. | B |
-| `style` | `FC_SLANT`: roman is `normal`, italic `italic`, oblique `oblique`. | B |
-| `monospace` | `FC_SPACING` mono (100), dual-width (90) or character cell (110); proportional, or no value, is false. | B |
-| `color` | `FC_COLOR`. | B |
-| `symbol` | `FC_SYMBOL`. | B |
-| `enabled` | Always true: a font fontconfig rejects is not listed. | constant |
-| `simulations` | Always false: fontconfig synthesizes bold and oblique only when matching (`FC_EMBOLDEN`, `FC_MATRIX` in a match result), never in the list. | constant |
-| `supportedLanguages` | `FC_LANG`. | B |
-| `scope` | The `FC_FILE` path, compared at directory boundaries: under `/usr/share/fonts` or `/usr/local/share/fonts` is `system`; under `$XDG_DATA_HOME/fonts` (by default `~/.local/share/fonts`) or `~/.fonts` is `user`; anything else `unknown`. fontconfig has no field saying who installed a font, so this is the path's convention, not a fact the OS reports. | B |
-| `format` | `FC_FONTFORMAT`: `TrueType` and `Type 42` are `truetype`; `CFF` is `cff`, or `cff2` when the font has a `CFF2` table; `Type 1` and `CID Type 1` are `type1`; `PCF`, `BDF` and `Windows FNT` are `bitmap`; anything else `unknown`. | B; C for `cff2` |
-| `file.path` | `FC_FILE`. | B |
-| `file.index` | The low 16 bits of `FC_INDEX`. | B |
-| `variable` | The face's file and index (the low 16 bits of `FC_INDEX`) have a range pattern: a pattern whose weight, width or other axis is a range (`FC_VARIABLE` true), which is not a face itself. Every variable resource has exactly one. | B |
-| `axes` | `fvar`. | C |
-| `coordinates` | A named instance: its `fvar` instance's coordinates; the default instance: the `fvar` defaults. A static face has none. | C, for variable faces only |
-| `namedInstanceIndex` | The first `fvar` instance whose coordinates equal `coordinates`. fontconfig does not list a named instance whose coordinates equal the default instance's: it lists that face once, with the high 16 bits of `FC_INDEX` zero, so `FC_INDEX` alone cannot give the default face its index. | C, variable faces only |
-| `opentype` | An sfnt file is read directly by the table parser. A WOFF or WOFF2 file is read through FreeType (`FT_Sfnt_Table_Info` for the tag list, `FT_Load_Sfnt_Table` for the bytes). A Type 1 or bitmap font has none. | D |
-| `coverage` | `FC_CHARSET`. | E |
+The group of each field is in [the matrix of Source groups](#the-group-of-every-field).
+
+| Field | Source |
+| --- | --- |
+| `family` | See [Family grouping](#family-grouping). |
+| `familyNames` | The union of the faces' `familyNames`. |
+| `supportedLanguages`, `variable`, `enabled` (family) | Aggregates of the faces' values. |
+| `languageCoverage` | Default face: `FcFontSetMatch` over the family's own patterns for regular weight, normal width and roman slant, after `FcConfigSubstitute` and `FcDefaultSubstitute`; its `FC_CHARSET` against the orthography. Matching within the family keeps an alias rule from substituting another family. |
+| `postscriptName` | `FC_POSTSCRIPT_NAME`. |
+| `fullNames` | `FC_FULLNAME` with `FC_FULLNAMELANG`. A named instance: composed from the `name` and `fvar` tables as on macOS. |
+| `styleNames` | `FC_STYLE` with `FC_STYLELANG`. A named instance: its `fvar` subfamily name. |
+| `familyNames` (face) | Every `FC_FAMILY` value with its `FC_FAMILYLANG`, aliases included. |
+| `weight` | `FC_WEIGHT` through `FcWeightToOpenTypeDouble`. A named instance has the instance's weight, which can differ from the font's `OS/2` weight. |
+| `width` | `FC_WIDTH`. |
+| `style` | `FC_SLANT`: roman is `normal`, italic `italic`, oblique `oblique`. |
+| `monospace` | `FC_SPACING` mono (100), dual-width (90) or character cell (110); proportional, or no value, is false. |
+| `color` | `FC_COLOR`. |
+| `symbol` | `FC_SYMBOL`. |
+| `enabled` | Always true: a font fontconfig rejects is not listed. |
+| `simulations` | Always false: fontconfig synthesizes bold and oblique only when matching (`FC_EMBOLDEN`, `FC_MATRIX` in a match result), never in the list. |
+| `supportedLanguages` | `FC_LANG`. |
+| `scope` | The `FC_FILE` path, compared at directory boundaries: under `/usr/share/fonts` or `/usr/local/share/fonts` is `system`; under `$XDG_DATA_HOME/fonts` (by default `~/.local/share/fonts`) or `~/.fonts` is `user`; anything else `unknown`. fontconfig has no field saying who installed a font, so this is the path's convention, not a fact the OS reports. |
+| `format` | `FC_FONTFORMAT`: `TrueType` and `Type 42` are `truetype`; `CFF` is `cff`, or `cff2` when the font has a `CFF2` table; `Type 1` and `CID Type 1` are `type1`; `PCF`, `BDF` and `Windows FNT` are `bitmap`; anything else `unknown`. |
+| `file.path` | `FC_FILE`. |
+| `file.index` | The low 16 bits of `FC_INDEX`. |
+| `variable` | The face's file and index (the low 16 bits of `FC_INDEX`) have a range pattern: a pattern whose weight, width or other axis is a range (`FC_VARIABLE` true), which is not a face itself. Every variable resource has exactly one. |
+| `axes` | `fvar`. |
+| `coordinates` | A named instance: its `fvar` instance's coordinates; the default instance: the `fvar` defaults. A static face has none. |
+| `namedInstanceIndex` | The first `fvar` instance whose coordinates equal `coordinates`. fontconfig does not list a named instance whose coordinates equal the default instance's: it lists that face once, with the high 16 bits of `FC_INDEX` zero, so `FC_INDEX` alone cannot give the default face its index. |
+| `opentype` | An sfnt file is read directly by the table parser. A WOFF or WOFF2 file is read through FreeType (`FT_Sfnt_Table_Info` for the tag list, `FT_Load_Sfnt_Table` for the bytes). A Type 1 or bitmap font has none. |
+| `coverage` | `FC_CHARSET`. |
 
 Semantics specific to Linux:
 
@@ -253,7 +354,7 @@ Semantics specific to Linux:
 
 ### Platform fields
 
-The definitions are in [api.md](api.md#linux-linuxnative). Every Linux platform field is an object of the same `FcFontList` call (group B).
+The definitions are in [api.md](api.md#linux-linuxnative). Every Linux platform field is an object of the same `FcFontList` call.
 
 ### Freshness
 

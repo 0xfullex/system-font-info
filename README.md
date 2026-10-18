@@ -81,7 +81,10 @@ npm run typecheck      # tsc --noEmit
 npm run lint           # Biome lint of the TypeScript and JavaScript
 npm run format:check   # Biome and clang-format, check only
 npm run format         # Biome and clang-format, rewrite the files
+npm run generate       # regenerate the generated files: the field catalogue outputs and the orthography data
 ```
+
+The field catalogue, `ts/field-catalogue.ts`, is the one source for the fields' levels, presets, platform availability and groups of OS work. `npm run generate` compiles the catalogue and its closure rule alone (`tsconfig.catalogue.json`, so the other TypeScript sources need not compile) and runs `scripts/gen-fields.mjs`, which writes from it the native field table `src/core/field_catalogue.h` and the generated regions of `docs/api.md` (the Presets table and the result types, copied from `ts/types.ts`) and `docs/platforms.md` (the group of every field, and the groups each preset reaches); those regions sit between `<!-- BEGIN GENERATED -->` and `<!-- END GENERATED -->` lines and are not edited by hand. `npm test` fails when a generated file is out of date (`node scripts/gen-fields.mjs --check` lists the stale files).
 
 TypeScript and JavaScript are formatted and linted by [Biome](https://biomejs.dev) (`biome.json`), installed with `npm install`. The C, C++ and Objective-C++ sources are formatted by clang-format (`.clang-format`), which is not an npm dependency: install **major version 20** and put it on your `PATH`. `scripts/clang-format.mjs` stops with a message when the version found is another major, because clang-format changes its output between majors.
 

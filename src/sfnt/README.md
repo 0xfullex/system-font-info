@@ -22,7 +22,7 @@ and both libraries are orders of magnitude larger than that.
 | `fvar.cpp` | `fvar` parsing and its `opentype.fvar` value. |
 | `layout.cpp` | GSUB / GPOS script, language system and feature lists, feature UI names. |
 | `opentype_tables.cpp` | head, hhea/vhea, OS/2, post, maxp, cmap, meta. |
-| `font_tables.cpp` | `readFontTables` (the table directory, `name`, `fvar`, `cmap`) and `openTypeValue` (the selected `opentype` entries); the one table of which entry is made of which tables. |
+| `font_tables.cpp` | `readFontTables` (the table directory, `name`, `fvar`, `cmap`) and `openTypeValue` (the selected `opentype` entries); the entries' tables come from the generated field catalogue (`../core/field_catalogue.h`), not from a table of its own. |
 | `file.cpp` | `FontFile`: sfnt and collection directories, table bytes on demand, face lookup by PostScript name. |
 | `language_tables.{h,cpp}` | Generated LCID and Mac language code to BCP 47 tables. |
 
@@ -118,7 +118,9 @@ is every entry). Numbers are as stored; the interpretations are:
   selected entries, reusing what the first step parsed and fetching the other
   tables itself. The entries are `tables`, `names`, `head`, `hhea`, `vhea`,
   `os2`, `post`, `maxp`, `cmap`, `fvar`, `meta` and `layout` (GSUB and GPOS);
-  `font_tables.cpp` maps each to its tables.
+  the catalogue (`../core/field_catalogue.h`, the `faces.opentype.<entry>`
+  fields) names each entry's tables, and `font_tables.cpp` only says which
+  `OpenTypeEntry` is which catalogue field.
 - `readFontTables` takes the tag list in any order and with repeats; it sorts
   and de-duplicates it, so `opentype.tables` is ascending whatever the caller
   passes.

@@ -87,12 +87,14 @@ A field name is a path into the result:
 
 A preset is a fixed list of fields, a shortcut for writing them in `fields`. Each preset contains the one before it. Their names describe what they contain; [platforms.md](platforms.md#source-groups) shows which kind of OS work each one reaches on each platform.
 
+<!-- BEGIN GENERATED: presets (scripts/gen-fields.mjs) -->
 | Preset | Contains |
 | --- | --- |
 | `names` | `familyNames` |
-| `styles` | `names`, and `supportedLanguages`, `enabled`, and on every face: `faces.postscriptName`, `faces.fullName`, `faces.fullNames`, `faces.styleName`, `faces.styleNames`, `faces.familyNames`, `faces.weight`, `faces.width`, `faces.style`, `faces.monospace`, `faces.color`, `faces.symbol`, `faces.enabled`, `faces.simulations`, `faces.supportedLanguages`, `faces.scope`, `faces.file`, `faces.coordinates` |
+| `styles` | `names`, and `supportedLanguages`, `enabled`, `faces.postscriptName`, `faces.fullName`, `faces.fullNames`, `faces.styleName`, `faces.styleNames`, `faces.familyNames`, `faces.weight`, `faces.width`, `faces.style`, `faces.monospace`, `faces.color`, `faces.symbol`, `faces.enabled`, `faces.simulations`, `faces.supportedLanguages`, `faces.scope`, `faces.file`, `faces.coordinates` |
 | `details` | `styles`, and `variable`, `faces.variable`, `faces.format`, `faces.axes`, `faces.namedInstanceIndex`, and every `faces.platform.<field>` |
 | `full` | `details`, and every `faces.opentype.<entry>` |
+<!-- END GENERATED: presets -->
 
 `full` is every field except `faces.coverage` and `languageCoverage`. `details` is `full` without the OpenType tables.
 
@@ -100,6 +102,7 @@ A preset is a fixed list of fields, a shortcut for writing them in `fields`. Eac
 
 The result type is exactly the selected fields. `FontFamily`, `FontFace`, `OpenTypeInfo` and the three platform types are the complete shapes defined by the tables in this document; the selection types narrow them.
 
+<!-- BEGIN GENERATED: result-typing (scripts/gen-fields.mjs) -->
 ```ts
 export type Preset = 'names' | 'styles' | 'details' | 'full'
 
@@ -157,6 +160,7 @@ export type SelectedFamily<O> = Pick<FontFamily, 'family' | (SelectedFields<O> &
     : { faces: Array<SelectedFace<Extract<SelectedFields<O>, `faces.${string}`>>> }) &
   (O extends { languageCoverage: readonly string[] } ? Required<Pick<FontFamily, 'languageCoverage'>> : unknown)
 ```
+<!-- END GENERATED: result-typing -->
 
 For example, `getFamilies({ fields: ['faces.weight', 'faces.platform.features'] })` is typed `Promise<Array<{ family: string; faces: Array<{ file?: …; coordinates?: …; simulations: …; weight: number; platform: { os: 'darwin'; features?: … } | { os: 'win32' } | { os: 'linux' } }> }>>`: the platform object is a union discriminated by `os`, and a platform field exists only on the member of the platform that defines it. When `fields` is a variable of type `Field[]` rather than a literal, the type falls back to every field.
 

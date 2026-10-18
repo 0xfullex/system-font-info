@@ -6,5 +6,5 @@
     "rootDir": "../..",
     "types": []
   },
-  "include": ["../../ts/types.ts", "./**/*.ts"]
+  "include": ["../../ts/types.ts", "../../ts/field-catalogue.ts", "./**/*.ts"]
 }
