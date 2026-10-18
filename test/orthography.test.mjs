@@ -1,10 +1,10 @@
 // The orthography table built into the addon: fontconfig's fc-lang, one entry per .orth file.
-// Loads the addon binary directly, so it does not depend on the TypeScript build.
 import assert from 'node:assert/strict'
-import { createRequire } from 'node:module'
 import { describe, test } from 'node:test'
 
-const { orthographies } = createRequire(import.meta.url)('../build/Release/system-font-info.node')
+import { loadNative } from '../dist/native.js'
+
+const { orthographies } = loadNative()
 
 describe('binding.orthographies', () => {
   test('has one entry per fontconfig orthography file', () => {

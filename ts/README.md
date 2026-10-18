@@ -1,6 +1,6 @@
 # ts
 
-The JS half of the package, compiled by `tsc` to `../dist` (CommonJS, with declarations; `npm run build:ts` empties it first, so output of deleted sources never ships). `types.ts` is the public type contract and is never edited as a side effect of other work. `../test/types/` holds its type-level tests (a separate TypeScript project, compiled by `npm run typecheck`).
+The JS half of the package, compiled by `tsc` to `../dist` (CommonJS, with declarations; `npm run build:ts` empties it first, so output of deleted sources never ships). `types.ts` is the public type contract and is never edited as a side effect of other work. `../test/types/` holds its type-level tests (a separate TypeScript project, compiled by `npm run typecheck` and never run: `npm test` runs `../test/*.test.mjs` only, because a bare `node --test` would also execute the `.test.ts` files, which only declare calls for the compiler).
 
 ## Files
 

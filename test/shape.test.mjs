@@ -1,11 +1,12 @@
-// Validates the real getFonts() result of the machine the tests run on against
-// the public types in ts/types.ts, and the invariants the types document.
+// Validates the real getFamilies() result of the machine the tests run on against
+// the public types in ts/types.ts, and the invariants docs/api.md documents.
 // The validator is written by hand from those types: a schema generated from
 // them would share their mistakes.
 import assert from 'node:assert/strict'
 import { before, describe, test } from 'node:test'
 
-import { getFonts } from '../dist/index.js'
+import { getFamilies } from '../dist/index.js'
+import { loadNative } from '../dist/native.js'
 
 // ---- a small schema language -------------------------------------------------
 // A schema is a function (value, path, errors) that pushes a message for every
@@ -281,8 +282,43 @@ const darwinNative = shape(
     shadowed: arrayOf(shape({ path: str, variable: bool }))
   }
 )
-const win32Native = shape({ os: literal('win32'), weight: num, width: num, slant: num, simulations: uint, faceType: uint })
-const linuxNative = shape({ os: literal('linux'), weight: num, width: num, slant: num, index: int })
+const win32Native = shape(
+  {
+    os: literal('win32'),
+    weight: num,
+    width: num,
+    slant: num,
+    format: uint,
+    typographicFamilyNames: localizedStrings,
+    typographicStyleNames: localizedStrings,
+    designLanguages: localizedStrings,
+    supportedLanguages: localizedStrings,
+    inactiveFamilyPreference: bool,
+    additionalInformationalStrings: recordOf(localizedStrings)
+  },
+  {
+    sourceType: uint,
+    sourceName: str,
+    axisValues: arrayOf(shape({ tag: tag4, value: num })),
+    resourceAxes: arrayOf(shape({ tag: tag4, min: num, max: num, default: num, attributes: uint, names: localizedStrings }))
+  }
+)
+const linuxNative = shape(
+  { os: literal('linux'), weight: num, width: num, slant: num, index: uint },
+  {
+    spacing: uint,
+    format: str,
+    fontWrapper: str,
+    foundry: str,
+    decorative: bool,
+    fontHasHint: bool,
+    order: uint,
+    outline: bool,
+    scalable: bool,
+    antialias: bool,
+    pixelSize: num
+  }
+)
 
 const fontFace = shape(
   {
@@ -300,7 +336,7 @@ const fontFace = shape(
     symbol: bool,
     enabled: bool,
     simulations: shape({ bold: bool, oblique: bool }),
-    languages: arrayOf(languageTag),
+    supportedLanguages: arrayOf(languageTag),
     scope: literal('system', 'user', 'process', 'unknown'),
     format: literal('truetype', 'cff', 'cff2', 'type1', 'bitmap', 'unknown'),
     variable: bool,
@@ -314,22 +350,27 @@ const fontFace = shape(
     file: shape({ path: str }, { index: uint }),
     axes: arrayOf(variationAxis),
     coordinates: recordOf(num),
-    namedInstance: uint,
+    namedInstanceIndex: uint,
     opentype: openTypeInfo,
     coverage: arrayOf(tuple(2, uint))
   }
 )
 
-const fontFamily = shape({
-  family: str,
-  familyNames: localizedStrings,
-  languages: arrayOf(languageTag),
-  variable: bool,
-  enabled: bool,
-  faces: arrayOf(fontFace)
-})
+const languageCoverage = shape({ language: languageTag, orthography: str, required: uint, covered: uint })
 
-// ---- invariants the types document ---------------------------------------------
+const fontFamily = shape(
+  {
+    family: str,
+    familyNames: localizedStrings,
+    supportedLanguages: arrayOf(languageTag),
+    variable: bool,
+    enabled: bool,
+    faces: arrayOf(fontFace)
+  },
+  { languageCoverage: arrayOf(languageCoverage) }
+)
+
+// ---- invariants the documentation states ----------------------------------------
 
 /** en-US, else any en / en-*, else language "", else the first, else "". */
 function defaultString(strings) {
@@ -369,14 +410,17 @@ function faceIdentity(face) {
   ])
 }
 
-/** Everything that can be said about a result without knowing which fonts the machine has. */
-function validateResult(families, { tables, coverage }) {
+/**
+ * Everything that can be said about a result without knowing which fonts the machine has.
+ * `coverage`: `faces.coverage` was selected. `languageCoverage`: the tags the option was given, or undefined.
+ */
+function validateResult(families, { coverage, languageCoverage }) {
   const errors = []
   arrayOf(fontFamily)(families, 'families', errors)
   assert.deepEqual(errors.slice(0, 20), [], `${errors.length} shape violations`)
 
-  const seenIdentity = new Map()
   const resources = new Map()
+  const seenFamilies = new Set()
   let previous
   families.forEach((family, f) => {
     const where = `families[${f}] (${family.family})`
@@ -384,7 +428,15 @@ function validateResult(families, { tables, coverage }) {
     const expect = (condition, message) => condition || problems.push(`${where}: ${message}`)
 
     expect(family.faces.length > 0, 'has no faces')
-    if (previous) {
+
+    // `family` is unique among the families, always the value of one entry of familyNames, and the families are sorted by it.
+    expect(!seenFamilies.has(family.family), 'family repeats an earlier family')
+    seenFamilies.add(family.family)
+    expect(
+      family.familyNames.some((name) => name.value === family.family),
+      'family is not the value of an entry of familyNames'
+    )
+    if (previous !== undefined) {
       const lower = [previous.toLowerCase(), family.family.toLowerCase()]
       expect(lower[0] < lower[1] || (lower[0] === lower[1] && previous < family.family), `sorted after ${previous}`)
     }
@@ -394,27 +446,44 @@ function validateResult(families, { tables, coverage }) {
     const names = mergeLocalized(family.faces.flatMap((face) => face.familyNames))
     expect(JSON.stringify(family.familyNames) === JSON.stringify(names), 'familyNames is not the union of the faces')
     expect(
-      JSON.stringify(family.languages) === JSON.stringify([...new Set(family.faces.flatMap((face) => face.languages))]),
-      'languages is not the union of the faces'
+      JSON.stringify(family.supportedLanguages) === JSON.stringify([...new Set(family.faces.flatMap((face) => face.supportedLanguages))]),
+      'supportedLanguages is not the union of the faces'
     )
     expect(family.variable === family.faces.some((face) => face.variable), 'variable is not any-of the faces')
     expect(family.enabled === family.faces.some((face) => face.enabled), 'enabled is not any-of the faces')
 
+    if (languageCoverage === undefined) expect(family.languageCoverage === undefined, 'languageCoverage was not requested')
+    else {
+      const entries = family.languageCoverage
+      expect(entries?.length === languageCoverage.length, 'languageCoverage has not one entry per requested tag')
+      languageCoverage.forEach((tag, i) => {
+        const entry = entries?.[i]
+        expect(entry?.language === Intl.getCanonicalLocales(tag)[0], `languageCoverage[${i}].language is not the canonical ${tag}`)
+        expect(
+          entry?.required === orthographies[entry?.orthography],
+          `languageCoverage[${i}].required is not the size of ${entry?.orthography}`
+        )
+        expect(entry?.covered <= entry?.required, `languageCoverage[${i}] covers more than it requires`)
+      })
+    }
+
+    // Face identity is unique within a family.
+    const identities = new Map()
     family.faces.forEach((face, i) => {
       const at = `${where} face ${i} (${face.postscriptName})`
       const fail = (message) => problems.push(`${at}: ${message}`)
 
       if (face.platform.os !== process.platform) fail(`platform.os is ${face.platform.os}`)
       const identity = faceIdentity(face)
-      if (seenIdentity.has(identity)) fail(`(file.path, file.index, coordinates, simulations) repeats ${seenIdentity.get(identity)}`)
-      seenIdentity.set(identity, at)
+      if (identities.has(identity)) fail(`(file.path, file.index, coordinates, simulations) repeats ${identities.get(identity)}`)
+      identities.set(identity, at)
 
       if (!(face.weight >= 1 && face.weight <= 1000)) fail(`weight ${face.weight} is outside 1-1000`)
       if (!(face.width >= 50 && face.width <= 200)) fail(`width ${face.width} is outside 50-200`)
       if (face.fullName !== defaultString(face.fullNames)) fail('fullName is not the default of fullNames')
       if (face.styleName !== defaultString(face.styleNames)) fail('styleName is not the default of styleNames')
 
-      // Variations: axes, coordinates and namedInstance exist together with `variable`.
+      // Variations: axes and coordinates exist together with `variable`; namedInstanceIndex points into opentype.fvar.instances.
       if (face.variable !== (face.axes !== undefined)) fail('axes is present iff variable')
       if (face.variable !== (face.coordinates !== undefined)) fail('coordinates is present iff variable')
       if (face.variable) {
@@ -429,10 +498,10 @@ function validateResult(families, { tables, coverage }) {
           if (axis.name !== defaultString(axis.names)) fail(`${axis.tag} name is not the default of names`)
         }
       }
-      if (face.namedInstance !== undefined) {
+      if (face.namedInstanceIndex !== undefined) {
         const instances = face.opentype?.fvar?.instances
-        if (!face.variable) fail('namedInstance on a face that is not variable')
-        else if (instances && !(face.namedInstance < instances.length)) fail('namedInstance is beyond opentype.fvar.instances')
+        if (!face.variable) fail('namedInstanceIndex on a face that is not variable')
+        else if (instances && !(face.namedInstanceIndex < instances.length)) fail('namedInstanceIndex is beyond opentype.fvar.instances')
       }
 
       // Faces of one font resource (one face of one file) share their objects.
@@ -446,8 +515,6 @@ function validateResult(families, { tables, coverage }) {
         }
       }
 
-      if (!tables && face.opentype !== undefined) fail('opentype with tables off')
-      if (!tables && face.platform.metrics !== undefined) fail('platform.metrics with tables off')
       if (coverage) {
         if (!face.coverage) fail('no coverage')
         else {
@@ -457,7 +524,7 @@ function validateResult(families, { tables, coverage }) {
               fail(`coverage range ${start}-${end} overlaps or touches ${face.coverage[r - 1]}`)
           })
         }
-      } else if (face.coverage !== undefined) fail('coverage was not requested')
+      } else if (face.coverage !== undefined) fail('coverage was not selected')
     })
     assert.deepEqual(problems.slice(0, 10), [], `${problems.length} invariant violations`)
   })
@@ -465,10 +532,12 @@ function validateResult(families, { tables, coverage }) {
 
 // ---- tests -----------------------------------------------------------------------
 
-describe('getFonts()', () => {
+const { orthographies } = loadNative()
+
+describe("getFamilies({ preset: 'full' })", () => {
   let families
   before(async () => {
-    families = await getFonts()
+    families = await getFamilies({ preset: 'full' })
   })
 
   test('lists fonts', () => {
@@ -476,14 +545,15 @@ describe('getFonts()', () => {
   })
 
   test('every family and face has the documented shape and invariants', () => {
-    validateResult(families, { tables: true, coverage: false })
+    validateResult(families, { coverage: false })
   })
 })
 
-test('getFonts({ tables: false }) leaves out opentype', async () => {
-  validateResult(await getFonts({ tables: false }), { tables: false, coverage: false })
+test("getFamilies({ preset: 'full', fields: ['faces.coverage'] }) adds ascending, non-overlapping ranges", async () => {
+  validateResult(await getFamilies({ preset: 'full', fields: ['faces.coverage'] }), { coverage: true })
 })
 
-test('getFonts({ coverage: true }) adds ascending, non-overlapping ranges', async () => {
-  validateResult(await getFonts({ coverage: true }), { tables: true, coverage: true })
+test("getFamilies({ preset: 'full', languageCoverage }) adds one entry per tag, in request order", async () => {
+  const languageCoverage = ['zh-CN', 'ja', 'en-US']
+  validateResult(await getFamilies({ preset: 'full', languageCoverage }), { coverage: false, languageCoverage })
 })

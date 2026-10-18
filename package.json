@@ -40,7 +40,7 @@
     "build:ts": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.json",
     "generate": "npm run build:ts && node scripts/gen-fields.mjs && node scripts/gen-orthographies.mjs",
     "build": "npm run build:native && npm run build:ts",
-    "test": "node --test",
+    "test": "node --test \"test/*.test.mjs\"",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p test/types/tsconfig.json --noEmit",
     "lint": "biome lint --error-on-warnings",
     "format": "biome format --write && node scripts/clang-format.mjs --fix",
