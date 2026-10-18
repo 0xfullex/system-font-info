@@ -39,7 +39,8 @@
                 "-mmacosx-version-min=11.0",
                 "-Wall",
                 "-Wextra",
-                "-Wno-unused-parameter"
+                "-Wno-unused-parameter",
+                "-Werror=unguarded-availability-new"
               ]
             }
           }
