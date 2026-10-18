@@ -88,6 +88,11 @@ function requirePrebuilt(id: TargetId): unknown {
       return require('../prebuilds/linux-x64-glibc/system-font-info.node')
     case 'linux-arm64-glibc':
       return require('../prebuilds/linux-arm64-glibc/system-font-info.node')
+    default: {
+      // Reached only when a target was added to the table without a case above: that fails to compile here.
+      const unknownTarget: never = id
+      throw new Error(`system-font-info: no prebuilt addon is required for ${unknownTarget}`)
+    }
   }
 }
 
