@@ -370,7 +370,7 @@ export interface Win32Native {
   additionalInformationalStrings: Record<string, LocalizedString[]>
 }
 
-/** fontconfig's raw values. Not final: the Linux backend is not implemented yet. */
+/** fontconfig's raw values. */
 export interface LinuxNative {
   os: 'linux'
   /** FC_WEIGHT, 0-215 */
