@@ -74,9 +74,12 @@ the interface in `../core/platform.h` and fills the structs of
 
 ## What a backend must not do
 
-- Filter, trim or hide fonts, even ones that look private or broken. Only exact
-  duplicates (the same font listed twice by the OS) may be merged. Selecting
-  families by name is the one filter, and it is `request.wantsFamily`'s.
+- Filter, trim or hide fonts, even ones that look private or broken. The only
+  entries a backend drops are repeats of an identity: when the OS reports one
+  identity (`file.path`, `file.index`, `coordinates`, `simulations`) more than
+  once, the backend keeps the first in member order and drops the rest, without
+  failing and even if their other fields differ. Selecting families by name is
+  the one filter, and it is `request.wantsFamily`'s.
 - Cut the output to the request: `core/to_js.cpp` does, once, for all platforms.
   The exception is the `opentype` object, which `to_js.cpp` outputs whole: the
   backend builds it from `request.openTypeSelection`, because that is the cut
@@ -85,9 +88,11 @@ the interface in `../core/platform.h` and fills the structs of
 - Canonicalize language tags, merge or de-duplicate names across records, pick
   default strings, compute family-level aggregates or sort. The JS layer owns
   all of that, so the rules live in one place.
-- Throw away information the platform layer cannot judge: if two OS entries
-  carry the same identity, the one that is not used is reported (see
-  `platform.shadowed` on macOS), not dropped.
+- Throw away information the platform layer cannot judge: where one face stands
+  for several OS entries that differ in identity (on macOS, files that share a
+  PostScript name), the entries that are not used are reported (see
+  `platform.shadowed`), not dropped. Only a repeated identity is dropped, as
+  above.
 
 ## Layout
 

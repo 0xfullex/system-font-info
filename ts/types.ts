@@ -44,9 +44,9 @@ export interface FontFamily {
 /**
  * The complete shape of one face of a font family; a call returns the part of it that its options select (`SelectedFace`).
  *
- * The identity of a face is `(file.path, file.index, coordinates, simulations)`. Only exact duplicates are merged
- * (an entry the platform lists twice with identical content appears once); every other face it lists is returned,
- * so two faces of a family differ in at least one of those four fields. A part a face does not have (`file`,
+ * The identity of a face is `(file.path, file.index, coordinates, simulations)`. When the platform reports one
+ * identity more than once, the first in its member order is kept and the others are dropped, even if their other
+ * fields differ; every other face it lists is returned, so two faces of a family differ in at least one of those four fields. A part a face does not have (`file`,
  * `file.index`, `coordinates`) counts as absent in the comparison.
  */
 export interface FontFace {
