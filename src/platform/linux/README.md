@@ -14,7 +14,7 @@ platform fields on a newer runtime and leaves them absent on an older one.
 | File | Role |
 | --- | --- |
 | `enumerate.cpp` | Fresh configuration, object set, family queries, member order and default-face language coverage |
-| `fc.h` | Owning fontconfig handles, checked attributes and file / index identities |
+| `fc.h` | Owning fontconfig handles, checked attributes, file / index identities and the lock for old fontconfig |
 | `face_reader.*` | Requested face fields, per-call resource sharing, table reads, variations and character ranges |
 | `traits.*` | Scope (application set, else path-based) and fontconfig format classification |
 | `legacy_text.cpp` | Legacy name decoding with the system's iconv converters |
@@ -98,7 +98,9 @@ instances. `FaceReader::lists` is the one place that rule lives.
 On a fontconfig older than 2.14 (`FcGetVersion() < 21400`), which had data
 races in loading a configuration and handling patterns, `enumerateFonts`
 holds a process-wide mutex for the whole call, so overlapping calls take
-turns. Newer versions run concurrently.
+turns; registering a test font takes the same mutex around its validation.
+Newer versions run concurrently. The mutex lives in `fc.h`, so any code that
+loads a configuration or handles patterns takes it from there.
 
 ## Test hooks
 

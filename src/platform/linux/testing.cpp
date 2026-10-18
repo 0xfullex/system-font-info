@@ -37,6 +37,7 @@ void linux_backend::addTestingFonts(FcConfig* config) {
 
 void registerFontForTesting(const std::string& path) {
   const auto file = normalized(path);
+  const auto turn = serializeOnOldFontconfig();
   Config validation(FcConfigCreate());
   require(bool(validation), "FcConfigCreate");
   require(FcConfigAppFontAddFile(validation.get(), reinterpret_cast<const FcChar8*>(file.c_str())),

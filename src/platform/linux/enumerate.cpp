@@ -1,5 +1,4 @@
 #include <map>
-#include <mutex>
 #include <set>
 
 #include "../../core/platform.h"
@@ -70,16 +69,6 @@ void languageCoverage(FcConfig* config, const std::string& family, const std::ve
     result.languageCoverage.push_back(orthography::countCovered(
         *orthography, [&](uint32_t codePoint) { return FcCharSetHasChar(characters, codePoint) != FcFalse; }));
   }
-}
-
-// Calls run on worker threads, so two can overlap. fontconfig before 2.14 had data races in loading a configuration
-// and handling patterns that overlapping calls could hit even though each owns its configuration; on those versions
-// the calls take turns.
-std::unique_lock<std::mutex> serializeOnOldFontconfig() {
-  static std::mutex mutex;
-  std::unique_lock<std::mutex> lock(mutex, std::defer_lock);
-  if (FcGetVersion() < 21400) lock.lock();
-  return lock;
 }
 }  // namespace
 

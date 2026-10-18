@@ -5,6 +5,7 @@
 #include <compare>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -35,6 +36,17 @@ using Pattern = Owned<FcPattern, FcPatternDestroy>;
 using FontSet = Owned<FcFontSet, FcFontSetDestroy>;
 using ObjectSet = Owned<FcObjectSet, FcObjectSetDestroy>;
 using StrList = Owned<FcStrList, FcStrListDone>;
+
+// Every use of fontconfig that loads a configuration or handles patterns holds the returned lock for its duration.
+// fontconfig before 2.14 had data races in those, which overlapping calls could hit even though each owns its
+// configuration; on those versions the calls take turns, and on newer ones the lock is empty and they run
+// concurrently. The caller keeps the returned lock alive for as long as it uses fontconfig.
+inline std::unique_lock<std::mutex> serializeOnOldFontconfig() {
+  static std::mutex mutex;
+  std::unique_lock<std::mutex> lock(mutex, std::defer_lock);
+  if (FcGetVersion() < 21400) lock.lock();
+  return lock;
+}
 
 inline void require(bool result, const char* operation) {
   if (!result) throw std::runtime_error(std::string("system-font-info: ") + operation + " failed");
