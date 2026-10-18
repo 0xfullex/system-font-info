@@ -35,6 +35,11 @@ without a font-set entry and fail the call.
 No factory, collection, source index, font object or parsed data is kept by
 the backend after the call. DirectWrite may retain its own shared state.
 
+Text from DirectWrite and the registry is converted to UTF-8 with a lone
+surrogate replaced by U+FFFD, the same replacement the name-table reader makes.
+Names and local file paths alike are affected; a font whose name is badly
+encoded stays listed instead of failing the call.
+
 The canonical family string is the family's `en-us` name, else its first
 name. The family-level and face-level `familyNames` both come from
 `GetFamilyNames`. A `families` request first uses `FindFamilyName` for

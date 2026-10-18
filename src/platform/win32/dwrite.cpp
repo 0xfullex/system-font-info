@@ -32,12 +32,14 @@ void checkRequiredInterface(HRESULT result, const char* operation) {
 
 std::string toUtf8(std::wstring_view text) {
   if (text.empty()) return {};
-  const int size = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, text.data(), static_cast<int>(text.size()),
-                                       nullptr, 0, nullptr, nullptr);
-  if (!size) throw std::runtime_error("system-font-info: invalid UTF-16 text from Windows");
+  // Flag 0 replaces a lone surrogate with U+FFFD, as the name-table reader does. WC_ERR_INVALID_CHARS would fail
+  // the whole enumeration for one badly encoded font name.
+  const int size =
+      WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0, nullptr, nullptr);
+  if (!size) throw std::runtime_error("system-font-info: UTF-8 conversion failed");
   std::string result(size, '\0');
-  if (!WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, text.data(), static_cast<int>(text.size()), result.data(),
-                           size, nullptr, nullptr))
+  if (!WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), result.data(), size, nullptr,
+                           nullptr))
     throw std::runtime_error("system-font-info: UTF-8 conversion failed");
   return result;
 }
