@@ -60,6 +60,8 @@ Scope scopeOf(std::optional<int64_t> priority, std::optional<int64_t> registrati
   // font has it, and so do the system font assets the OS downloads (under
   // /System/Library/AssetsV2), which are registered persistently.
   if (registrationScope == kCTFontManagerScopeProcess) return Scope::Process;
+  // A font registered for the login session is a user's font whatever priority it got.
+  if (registrationScope == kCTFontManagerScopeSession) return Scope::User;
   switch (priority.value_or(0)) {
     case kCTFontPriorityUser:
       return Scope::User;

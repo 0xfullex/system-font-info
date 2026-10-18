@@ -40,7 +40,9 @@ double cssWidth(std::optional<double> coreTextWidth);
 Style styleOf(const Traits& traits);
 
 // kCTFontPriorityAttribute and kCTFontRegistrationScopeAttribute -> who
-// installed the font; the rules are in the README. Either may be absent.
+// installed the font; the rules are in the README: the process registration
+// scope is `process`, the session registration scope is `user`, and otherwise
+// the priority decides. Either may be absent.
 Scope scopeOf(std::optional<int64_t> priority, std::optional<int64_t> registrationScope);
 
 // kCTFontFormatAttribute -> Format. `hasCff2` tells CFF from CFF2 in an

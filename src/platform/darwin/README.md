@@ -78,9 +78,10 @@ objects internally.
   boolean). The simulations are always false: macOS has none.
 - `supportedLanguages`: `kCTFontLanguagesAttribute`.
 - `scope`, first rule that applies: `kCTFontRegistrationScopeAttribute` is the
-  process scope: process. `kCTFontPriorityAttribute` 40000: user; 10000 /
-  20000 / 30000: system; 60000 with the persistent registration scope: system;
-  anything else: unknown. Priority 60000 alone is ambiguous. Measured on
+  process scope: process; the session scope: user. `kCTFontPriorityAttribute`
+  40000: user; 10000 / 20000 / 30000: system; 60000 with the persistent
+  registration scope: system; anything else: unknown. Priority 60000 alone is
+  ambiguous. Measured on
   macOS 27: a font registered for the process has priority 60000 and
   registration scope 1, while the downloaded system font assets (under
   `/System/Library/AssetsV2`, `downloadable` and `downloaded` both true) have
