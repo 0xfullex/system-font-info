@@ -144,7 +144,7 @@ FaceReader::OpenedFont FaceReader::openFont(CTFontDescriptorRef descriptor, cons
   OpenedFont opened;
   opened.font = Ref<CTFontRef>(CTFontCreateWithFontDescriptor(descriptor, 0, nullptr));
   if (!opened.font) throw std::runtime_error("system-font-info: CoreText cannot create the font " + postscriptName);
-  ++work_.fontResources;
+  ++work_.fontsOpened;
 
   // CoreText can create another font than the descriptor names (it substitutes
   // one when it cannot use the file). Whatever is read from that CTFont then

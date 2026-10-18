@@ -36,7 +36,7 @@ interface NativeRequest {
 
 ## `WorkLog`
 
-A call's costly OS work, counted by the backend as it does it: `fontResources` (C: a font object created or a font file opened to read a face), `tableEntries` (D: `opentype` entries built) and `characterSets` (E: character sets fetched and walked). Groups A and B are not counted (cheap; the line between them is not observable on every platform). The counts exist for tests: `__testing.getFamiliesWithWork(request)` resolves to `{ families, work }`. A `WorkLog` lives for one call, so the no-state rule below holds.
+A call's costly OS work, counted by the backend as it does it: `fontsOpened` (C: a font object created or a font file opened to read a face), `tableEntries` (D: `opentype` entries built) and `characterSets` (E: character sets fetched and walked). Groups A and B are not counted (cheap; the line between them is not observable on every platform). The counts exist for tests: `__testing.getFamiliesWithWork(request)` resolves to `{ families, work }`. A `WorkLog` lives for one call, so the no-state rule below holds.
 
 ## Invariants
 

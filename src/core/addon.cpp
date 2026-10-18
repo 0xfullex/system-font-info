@@ -87,7 +87,7 @@ class GetFamiliesWorker : public Napi::AsyncWorker {
         return;
       }
       Napi::Object work = Napi::Object::New(env);
-      work.Set("fontResources", Napi::Number::New(env, work_.fontResources));
+      work.Set("fontsOpened", Napi::Number::New(env, work_.fontsOpened));
       work.Set("tableEntries", Napi::Number::New(env, work_.tableEntries));
       work.Set("characterSets", Napi::Number::New(env, work_.characterSets));
       Napi::Object result = Napi::Object::New(env);

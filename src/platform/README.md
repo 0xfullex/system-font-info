@@ -38,7 +38,7 @@ the interface in `../core/platform.h` and fills the structs of
     the request by `core/to_js.cpp`, not by the backend, so extra work costs
     time but never changes a result.
   - It adds to `work` each costly unit of work as it does it: a font object or
-    file opened for a face (`fontResources`), an `opentype` entry built
+    file opened for a face (`fontsOpened`), an `opentype` entry built
     (`tableEntries`), a character set fetched and walked (`characterSets`).
 - `decodeLegacyText(encoding, bytes)` converts bytes in a legacy character
   encoding (`sfnt::LegacyEncoding`: Mac script encodings, Windows multi-byte

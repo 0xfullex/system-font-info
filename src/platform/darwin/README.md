@@ -25,7 +25,7 @@ first for the contract.
 The backend does the work of the groups the request reaches
 (`docs/platforms.md`, "Source groups") and no more; what reaches JS is cut to
 the request by `core/to_js.cpp`. `WorkLog` counts the work of groups C, D and E
-as it happens, and the tests hold it to the catalogue: `fontResources` (a
+as it happens, and the tests hold it to the catalogue: `fontsOpened` (a
 `CTFont` created for a face, C), `tableEntries` (an `opentype` entry built per
 font resource, D), `characterSets` (a character set fetched and walked: one
 per face for `faces.coverage`, one per family for `languageCoverage`, E).

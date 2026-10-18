@@ -26,7 +26,7 @@ const FAMILIES = [
 ]
 
 /** The counter of each group that is counted. */
-const COUNTERS = { C: 'fontResources', D: 'tableEntries', E: 'characterSets' }
+const COUNTERS = { C: 'fontsOpened', D: 'tableEntries', E: 'characterSets' }
 
 const SELECTIONS = [
   ...PRESETS.map((preset) => [`preset '${preset}'`, presetFields(preset)]),
@@ -79,13 +79,13 @@ describe('work per group', () => {
     const { work, closure } = await workOf([], ['zh-cn', 'ja'])
     assert.deepEqual([...closure], [])
     assert.ok(work.characterSets > 0, 'characterSets')
-    assert.equal(work.fontResources, 0, 'fontResources')
+    assert.equal(work.fontsOpened, 0, 'fontsOpened')
     assert.equal(work.tableEntries, 0, 'tableEntries')
   })
 
   test('the counters count: the full result with coverage does work of every counted group', async () => {
     const { work } = await workOf([...presetFields('full'), 'faces.coverage'], ['zh-cn'])
-    assert.ok(work.fontResources > 0, 'fontResources')
+    assert.ok(work.fontsOpened > 0, 'fontsOpened')
     assert.ok(work.tableEntries > 0, 'tableEntries')
     assert.ok(work.characterSets > 0, 'characterSets')
   })

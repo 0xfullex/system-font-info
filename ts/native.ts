@@ -32,7 +32,7 @@ export interface RawFamily {
 
 /** The groups of work a call did; only for tests. */
 export interface WorkLog {
-  fontResources: number
+  fontsOpened: number
   tableEntries: number
   characterSets: number
 }

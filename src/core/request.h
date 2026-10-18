@@ -66,7 +66,7 @@ struct Request {
 // What a call did, per kind of costly OS work (groups C, D and E). Groups A and B are not counted: they are cheap, and
 // the line between them is not observable on every platform. Tests read it through `__testing.getFamiliesWithWork`.
 struct WorkLog {
-  uint32_t fontResources = 0;  // C: font objects created or font files opened to read a face
+  uint32_t fontsOpened = 0;    // C: one per font object created or font file opened to read a face
   uint32_t tableEntries = 0;   // D: `opentype` entries built
   uint32_t characterSets = 0;  // E: character sets fetched and walked
 };
