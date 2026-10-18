@@ -137,10 +137,14 @@ To cut a release:
 2. Check the pipeline on the branch with `gh workflow run release.yml --ref <branch>` (a dry run by default), then land the branch on `main`.
 3. Tag the landed commit, `git tag -a vx.y.z -m vx.y.z`, and push the tag. When the jobs before `publish` are green, `publish` waits for a required reviewer of the `npm-release` environment to approve it.
 
-One-time setup on GitHub and npm: an `npm-release` environment with required reviewers, and a trusted publisher on the package (repository `0xfullex/system-font-info`, workflow `release.yml`, environment `npm-release`), after which the package can refuse token publishes.
+One-time setup on GitHub and npm:
 
-A trusted publisher can be configured only on a package that exists, so the first version is published by hand: run the dry run on the commit to release, download the `package` artifact of that green run (`gh run download <run id> --name package`), and publish that tarball with `npm stage publish` from a machine logged in with a passkey. That version has no provenance. Configure the trusted publisher right away (an unverified one expires after 48 hours) and push the tag only after the version is published; `publish` then finds it published and does nothing.
+- On GitHub, an `npm-release` environment with required reviewers **and** "Deployment branches and tags" restricted to the tag pattern `v*`. A trusted publisher binds the repository, the workflow file and the environment, not the git ref, so the environment is what keeps a run from any other branch or tag from publishing, and the reviewers add a human approval to every publish.
+- On npm, a trusted publisher on the package (repository `0xfullex/system-font-info`, workflow `release.yml`, environment `npm-release`), after which the package can refuse token publishes. A newly configured trusted publisher must complete its first successful publish through OIDC within 2 days or it expires and can no longer be used or edited (delete it and create it again); that first publish binds it to the repository for good. Configure it within the 2 days before the tag push that is meant to be its first publish, not earlier.
 
-## License
+The first release, 0.1.0, is published by hand, because a trusted publisher is configured on a package that exists and its first OIDC publish is then the release after it (0.1.1 or 0.2.0). Do not configure the trusted publisher until that release is about to be tagged. To publish 0.1.0:
 
-MIT. The language orthographies built into the addon are derived from [fontconfig](https://gitlab.freedesktop.org/fontconfig/fontconfig)'s `fc-lang` files; its notice ships with the package as `third_party/fontconfig/COPYING`.
+1. Run the dry run on the commit to release and download the `package` artifact of that green run: `gh run download <run id> --name package`.
+2. Stage that tarball from a machine logged in to npm with npm 11.15.0 or newer: `npm stage publish ./system-font-info-0.1.0.tgz`. Staging asks for no 2FA and prints a stage id (`npm stage list system-font-info` shows it again). The staged version is not public until it is approved.
+3. Promote it: `npm stage approve <stage-id>`, which asks for 2FA and publishes. That version has no provenance.
+4. Only after the approval, push the `v0.1.0` tag. A staged but unapproved version is not published, so the `publish` job's check for an existing version would not find it and the job would try to publish through OIDC, which is not configured yet. After the approval the job finds 0.1.0 published and does nothing.
