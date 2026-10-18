@@ -558,8 +558,10 @@ On macOS this leaves out two kinds of system fonts that apps can still use. Appl
 
 ## Freshness
 
-The package runs nothing between calls: no background thread, no OS listener, no timer, no cache. Each call asks the operating system at that moment and keeps nothing, so it reflects the fonts the OS has registered when it is called.
+The package runs nothing between calls: no background thread, no OS listener, no timer, and it keeps no cache of its own. Each call asks the operating system at that moment and keeps nothing, so it reflects the fonts the OS has registered when it is called.
 
-The OS needs time to register a font that another process installs or removes. Measured: on Linux the next call sees it; on Windows about 1 second after the change; on macOS about 4 seconds, sometimes 8-10. None of the platforms promises an upper bound. [platforms.md](platforms.md) has the measurements.
+The OS needs time to register a font that another process installs or removes. Measured: on Linux the next call sees it; on Windows about 1 second after the change; on macOS usually 1 to 2 seconds, and 4 to 8 seconds in some series of changes. None of the platforms promises an upper bound. [platforms.md](platforms.md) has the measurements.
+
+On macOS, a process that does not run the main run loop (plain Node, `worker_threads`) never has CoreText's own caches invalidated, and two things can differ from what a new process reports until the process runs its main run loop or restarts. When several files share one PostScript name (a system update can leave two), the file reported for the face can differ from the one a new process reports; a file that has been removed is not reported for the face. Raw platform values such as `platform.priority` may be stale. Electron renderer and utility processes were not verified.
 
 To follow font changes, call again at a moment that suits the application, for example when a window regains focus or a font picker opens. In the main process of an Electron app on macOS you can instead observe `kCTFontManagerRegisteredFontsChangedNotification` yourself. CoreText delivers it only on the main thread's run loop, which plain Node does not run, so this package cannot receive it without running an event loop of its own.

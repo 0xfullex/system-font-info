@@ -254,6 +254,23 @@ dropping of the zero bytes of Windows multi-byte strings, belong to `../../sfnt`
 Johab (`Windows1361`) is not available in CoreFoundation and gives `nullopt`
 (`CFStringIsEncodingAvailable`).
 
+## Freshness
+
+Every call lists the collection again (`CTFontCollectionCreateFromAvailableFonts`
+is fresh each time) and keeps nothing, so it follows the system font service,
+whose delay for a change made by another party is measured in
+`docs/platforms.md`. What CoreText caches in the process is the matcher: the
+answers of `CTFontDescriptorCreateMatchingFontDescriptor` and the family
+lookups' descriptors, invalidated on the main dispatch queue. A process that
+does not run the main run loop (plain Node, `worker_threads`) keeps them, which
+is why a resolution is checked against the listing of the call (see "One face
+per PostScript name") and why, in such a process, with two files that share a
+PostScript name the file reported can differ from a new process's choice, and
+the raw `platform.priority` of a descriptor the matcher returned can be stale.
+An Electron main process is not affected; Electron renderer and utility
+processes are not verified. The package does not run the loop itself: nothing
+runs between calls.
+
 ## Test hooks
 
 `CTFontManagerRegisterFontsForURL` / `UnregisterFontsForURL` with process scope;
