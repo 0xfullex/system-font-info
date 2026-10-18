@@ -267,6 +267,21 @@ describe('the families option', { skip }, () => {
     }
   })
 
+  test('a family the lookup of another requested name also yields comes once, with its own member order', async () => {
+    const names = full.map((entry) => entry.family)
+    const pairs = names.flatMap((name) => names.filter((other) => other.startsWith(`${name} `)).map((other) => [name, other]))
+    assert.ok(pairs.length > 0)
+    for (const [name, other] of pairs.slice(0, 5)) {
+      const options = { fields: ['faces.postscriptName'] }
+      const alone = [...(await getFamilies({ ...options, families: [name] })), ...(await getFamilies({ ...options, families: [other] }))]
+      assert.deepEqual(
+        await getFamilies({ ...options, families: [other, name] }),
+        alone.sort((a, b) => (a.family < b.family ? -1 : 1)),
+        name
+      )
+    }
+  })
+
   test('the result is sorted by family whatever the order of the list, and a repeated name gives one family', async () => {
     const result = await getFamilies({ fields: [], families: ['Skia', 'Helvetica Neue', 'Skia', 'PingFang SC'] })
     assert.deepEqual(result, [{ family: 'Helvetica Neue' }, { family: 'PingFang SC' }, { family: 'Skia' }])

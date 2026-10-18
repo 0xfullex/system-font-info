@@ -19,11 +19,15 @@ the interface in `../core/platform.h` and fills the structs of
     `wantsAnyOpenType()` (the `opentype` entries are built from
     `request.openTypeSelection`), `request.orthographies` (the family's
     `languageCoverage`, in that order). A field the platform derives is never
-    requested. `request.needs(group)` and `mayNeed(group)` say which groups of
-    OS work (`docs/platforms.md`, "Source groups") the request calls for; work
-    of a group it does not need is wasted, and what it needs is the defect to
-    avoid skipping. The output is cut to the request by `core/to_js.cpp`, not
-    by the backend, so extra work costs time but never changes a result.
+    requested. Work of a group (`docs/platforms.md`, "Source groups") that no
+    requested field reaches is wasted, and work a requested field needs is the
+    defect to avoid skipping. `request.needs(group)` and `mayNeed(group)` say
+    which groups the request always or perhaps calls for; they are offered for
+    decisions that are made per group (a backend whose work is one object set
+    per group, such as the fontconfig object set on Linux). The darwin backend
+    decides per field with `wants` and does not call them. The output is cut to
+    the request by `core/to_js.cpp`, not by the backend, so extra work costs
+    time but never changes a result.
   - It adds to `work` each costly unit of work as it does it: a font object or
     file opened for a face (`fontResources`), an `opentype` entry built
     (`tableEntries`), a character set fetched and walked (`characterSets`).

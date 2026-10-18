@@ -95,9 +95,11 @@ objects internally.
 With `request.families` the descriptors are not the whole collection but, for
 each distinct requested name, the family lookup that gives the member order
 (disabled fonts included). The lookup is case-insensitive and can return another
-family, so the family of that name is picked out by exact comparison, and the
-groups come out in the lookup's order, which is the member order, so the lookup
-is made once. `families: []` returns before any CoreText call. The lookup lists
+family, so the families it yields are selected with `Request::wantsFamily` (the
+one exact match), and one that several lookups yield (`Kefa` and `Kefa III`
+requested) is kept once, from the lookup of its own name. The groups of that
+lookup come out in its order, which is the member order, so the lookup is made
+once. `families: []` returns before any CoreText call. The lookup lists
 one file for a PostScript name, so the collection settles the names where that
 is not enough: it is listed (once per call, on first use) when the request wants
 `platform.shadowed`, whose files only the collection knows, and when resolution

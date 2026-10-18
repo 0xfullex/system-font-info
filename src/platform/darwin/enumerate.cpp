@@ -22,10 +22,8 @@
 //
 // Two ways to get the descriptors to group. Without `request.families` it is the
 // whole collection. With it, it is what CoreText's family lookup returns for
-// each requested name, which is far less work for a few families: the lookup
-// matches case-insensitively and by localized and legacy names, and can return
-// another family (`Kefa` returns `Kefa III`), so the families it yields are
-// then kept only when their `family` is exactly the requested name.
+// each requested name, which is far less work for a few families; the families
+// it yields are then selected with `request.wantsFamily`.
 
 namespace sfi::platform {
 namespace {
@@ -238,13 +236,18 @@ std::vector<FamilySeeds> familiesOfCollection(const Request& request, Collection
   return groupByFamily(collection.all(), request, nullptr);
 }
 
-// The faces of each requested family, from the family lookup. The groups come out in the lookup's order, so the
-// family's faces are in member order already; the faces the full collection would add after them (those the lookup
-// does not name) are not looked for. The lookup lists one file for a PostScript name; the collection settles the
-// names where that is not enough (see `groupByFamily`). `lookups` keeps the lookups' descriptors alive.
+// The faces of each requested family, from the family lookup. CoreText's lookup is case-insensitive, matches localized
+// and legacy names and can return another family (`Kefa` returns `Kefa III`), so the families it yields are filtered
+// with `request.wantsFamily`, the one exact match, and a family that several lookups yield (`Kefa` and `Kefa III`
+// both requested) is kept once, from the lookup of its own name: that is the one whose order is its member order.
+// The groups of a lookup come out in its order, so the faces of such a family are in member order already; the faces
+// the full collection would add after them (those the lookup does not name) are not looked for. The lookup lists one
+// file for a PostScript name; the collection settles the names where that is not enough (see `groupByFamily`).
+// `lookups` keeps the lookups' descriptors alive.
 std::vector<FamilySeeds> familiesOfLookups(const Request& request, CollectionGroups& collection,
                                            std::vector<Ref<CFArrayRef>>& lookups) {
   std::vector<FamilySeeds> result;
+  std::unordered_map<std::string, size_t> resultOfFamily;
   std::vector<std::string> looked;
   for (const std::string& name : *request.families) {
     if (std::find(looked.begin(), looked.end(), name) != looked.end()) continue;
@@ -252,12 +255,17 @@ std::vector<FamilySeeds> familiesOfLookups(const Request& request, CollectionGro
 
     Ref<CFArrayRef> members = lookUpFamily(name);
     if (!members) continue;
-    // The lookup may return other families, and the same family may come out of the lookup of another requested
-    // name: the family of this name is the one this lookup answers for.
     for (FamilySeeds& family : groupByFamily(groupByPostscriptName(members.get()), request, &collection)) {
-      if (family.name != name) continue;
-      family.ordered = true;
-      result.push_back(std::move(family));
+      if (!request.wantsFamily(family.name)) continue;
+      // A family of another name is in this lookup's order, not in its member order; it is put in member order
+      // later, unless the lookup of its own name comes by.
+      family.ordered = family.name == name;
+      const auto [entry, inserted] = resultOfFamily.try_emplace(family.name, result.size());
+      if (inserted) {
+        result.push_back(std::move(family));
+      } else if (family.ordered && !result[entry->second].ordered) {
+        result[entry->second] = std::move(family);
+      }
     }
     lookups.push_back(std::move(members));
   }
