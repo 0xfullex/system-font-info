@@ -98,7 +98,7 @@ test('a platform without a target can only use a local build, and the error name
 
   const error = thrown(() => loadBinding(environment({ platform: 'win32', arch: 'ia32' })))
   assert.match(error.message, /no prebuilt addon for win32-ia32 \(prebuilt targets: darwin-arm64, .*linux-arm64-glibc\)/)
-  assert.match(error.message, new RegExp(localBuild))
+  assert.ok(error.message.includes(localBuild), error.message)
 })
 
 test('musl is reported as not supported yet', () => {
@@ -141,7 +141,7 @@ test('a missing fontconfig or FreeType on Linux gets an install hint naming the 
     /libfontconfig\.so\.1 is not installed\. Install it: apt install libfontconfig1 .*dnf install fontconfig/
   )
   assert.doesNotMatch(fontconfig.message, /libfreetype/)
-  assert.match(fontconfig.message, new RegExp(prebuilt(id))) // the listing is still there
+  assert.ok(fontconfig.message.includes(prebuilt(id)), fontconfig.message) // the listing is still there
 
   const freetype = run('linux', { [id]: missing('libfreetype.so.6') })
   assert.match(freetype.message, /libfreetype\.so\.6 is not installed\. Install it: apt install libfreetype6 .*dnf install freetype/)
