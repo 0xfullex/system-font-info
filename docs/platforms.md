@@ -362,7 +362,7 @@ Measured on Ubuntu 26.04.1 with fontconfig 2.17.1: a font added to or removed fr
 
 ## Measured cost
 
-Indicative figures, not guarantees. Each figure is the median of 5 freshly started Node processes, with the minimum and maximum in brackets, in milliseconds, from the call until the normalized result is ready in JS; Node start-up and module loading are excluded. OS file caches were warm. All were measured in October 2026. The three machines and font sets differ, so a row is not a comparison of the backends. The macOS rows for the family list, `familyNames` and `languageCoverage` come from measurement functions built against the backend's sources, not from the backend itself, as do the single-family rows; the others come from the backend (the breakdown below from a synchronous copy of it instrumented with timers); the Windows and Linux figures from standalone implementations of the sources above.
+Indicative figures, not guarantees. Each figure is the median of 5 freshly started Node processes, with the minimum and maximum in brackets, in milliseconds, from the call until the normalized result is ready in JS; Node start-up and module loading are excluded. OS file caches were warm. All were measured in October 2026. The three machines and font sets differ, so a row is not a comparison of the backends. The macOS rows for the family list, `familyNames` and `languageCoverage` come from measurement functions built against the backend's sources, not from the backend itself, as do the single-family rows except the backend figures noted in their row; the others come from the backend (the breakdown below from a synchronous copy of it instrumented with timers); on macOS the rows that give a first and a later call were measured through `getFamilies` and `getFamily` themselves, each with 5 freshly started processes making 5 calls in a row: the first call is the first of the process, the later figure is the median of the other four calls of one process, and the median and range are taken over the 5 processes; the Windows and Linux figures from standalone implementations of the sources above.
 
 ### macOS
 
@@ -375,12 +375,15 @@ Apple M4, 10 cores, 16 GB, macOS 27.0.1 (26A434), Node 24.20.0. 252 families, 65
 | `family`, `familyNames`, `languageCoverage` for one language: `zh-CN` / `zh-TW` / `ja` | A, C, E | 119.74 [116.47-130.06] / 119.07 [116.37-130.18] / 116.93 [115.03-130.24] |
 | Every field except `opentype`, `coverage` and `platform.metrics` | A, B, C | 526.9 [504.7-631.2] |
 | Every field except `coverage` | A-D | 556.0 [545.2-685.5] |
-| Every field except `coverage`, one family (`families`), 6-14 faces | A-D | 14.6-21.6 |
-| `faces.coverage` | E | not yet documented |
+| Every field except `coverage`, one family (`families`), 6-14 faces | A-D | 14.6-21.6; the backend through `getFamily`, 4-14 faces (`Menlo`, `PingFang SC`, `Skia`, `Helvetica Neue`): first 15.66-24.46, later 8.67-9.44 (the range of the four families' medians) |
+| `fields: []`, the backend (`family` only; it also resolves duplicate PostScript names) | A | first 65.08 [62.00-71.21]; later 8.99 [8.73-10.24] |
+| `languageCoverage` for `zh-CN`, the backend | A, E | first 126.61 [126.49-130.11]; later 44.53 [43.91-49.03] |
+| Every field except `coverage`, the backend | A-D | first 502.47 [499.38-514.19]; later 149.69 [148.39-152.80] |
+| `faces.coverage` for every member, the backend | E | first 266.41 [265.83-280.34]; later 143.28 [142.13-150.30] |
 
-- The backend's `fields: []` path, which also resolves duplicate PostScript names, is not measured.
+- `faces.coverage` reads and walks the character set of each of the 654 faces (`characterSets` counts one per face); every field, `coverage` included, took first 616.28 [606.02-629.28] and later 249.17 [245.41-252.28].
 - Per-face attributes (B) have no figure of their own. In a synchronous copy of the backend instrumented with timers (509.4 ms in total), `CTFontCopyFeatures` (`platform.features`) took about 142 ms.
-- The first call in a process is slower than later ones: about 507 ms, then about 120 ms for every field except `opentype`, `coverage` and `platform.metrics`.
+- The first call in a process is slower than later ones: about 507 ms, then about 120 ms for every field except `opentype`, `coverage` and `platform.metrics`. Measured through the backend, later calls took 14% (`fields: []`) to 54% (`faces.coverage`) of the first call's time.
 - On the same machine under another workload every row took 2.5-3 times as long.
 - JSON size: 2.80 MB without `opentype`, 8.97 MB with it.
 
