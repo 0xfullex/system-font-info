@@ -406,11 +406,11 @@ Each selection ran in 5 new Node processes, with 6 sequential calls per process.
 
 | Selection | Groups | First in process (ms) | Later in process (ms) |
 | --- | --- | --- | --- |
-| `fields: []` (`family` only) | A | 8.022 [7.878-8.112] | 1.383 [1.296-2.369] |
-| `names` | A | 10.159 [10.097-10.286] | 2.391 [2.262-2.560] |
-| `styles` | A, B; C for variable faces only | 200.482 [200.279-423.887] | 82.788 [79.333-162.704] |
-| `details` | A, B, C | 1406.486 [1350.273-1504.691] | 1361.974 [1345.900-1493.190] |
-| `full` | A, B, C, D | 1609.709 [1596.950-1633.023] | 1568.712 [1555.365-1732.523] |
+| `fields: []` (`family` only) | A | 7.922 [7.699-8.426] | 1.437 [1.387-1.828] |
+| `names` | A | 9.944 [9.766-10.398] | 2.450 [2.189-2.784] |
+| `styles` | A, B; C for variable faces only | 213.832 [195.982-456.937] | 88.088 [83.587-129.228] |
+| `details` | A, B, C | 1164.076 [1074.385-1211.174] | 1150.844 [1102.217-1201.715] |
+| `full` | A, B, C, D | 1386.593 [1363.315-1393.517] | 1355.879 [1317.027-1460.280] |
 
 `fields: []` and `names` return 462 families without faces; the other three selections return 462 families and 2,562 faces. Neither coverage field is in these presets. Every call and its process exit code was recorded and the family and face counts were checked; the figures are medians and ranges over those calls. These measured calls replace the earlier selection estimates derived by subtracting a TRUE collection-update timing.
 
