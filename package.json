@@ -23,6 +23,7 @@
     "prebuilds/",
     "README.md",
     "LICENSE",
+    "CHANGELOG.md",
     "third_party/fontconfig/COPYING"
   ],
   "gypfile": false,
@@ -51,7 +52,8 @@
     "format:check": "biome format && node scripts/clang-format.mjs --check",
     "generate:orthographies": "node scripts/gen-orthographies.mjs",
     "copy-prebuild": "node scripts/copy-prebuild.mjs",
-    "pretest": "npm run build:ts"
+    "pretest": "npm run build:ts",
+    "prepack": "node scripts/check-package.mjs"
   },
   "keywords": [
     "fonts",
