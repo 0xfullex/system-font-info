@@ -71,7 +71,7 @@ Use the package from the main process only; load it from the renderer through IP
 
 (`asarUnpack` is the electron-builder option; use the equivalent setting of your packager. electron-builder unpacks modules that contain `.node` files on its own; with Electron Forge, use `@electron-forge/plugin-auto-unpack-natives`.)
 
-The addon is a Node-API (version 8) module without install-time compilation or a `binding.gyp` in the package, so `@electron/rebuild` has nothing to rebuild and is not needed. It ships the binaries of every target; an app that packages for one platform can leave the others out of its bundle, for example with the electron-builder `files` pattern `!**/node_modules/system-font-info/prebuilds/{win32,linux}-*`. On Linux the addon binds to the system fontconfig, the one GTK and Pango use inside Electron, so that library must be installed on the user's machine.
+The addon is a Node-API (version 8) module without install-time compilation or a `binding.gyp` in the package, so `@electron/rebuild` has nothing to rebuild and is not needed. It ships the binaries of every target; an app that packages for one platform can leave the others out of its bundle, for example with the electron-builder `files` pattern `!**/node_modules/system-font-info/prebuilds/{win32,linux}-*`. On Linux the addon binds to the system fontconfig, the one GTK and Pango use inside Electron, so that library must be installed on the user's machine. Every release is loaded and run in the main process of Electron 44 on each target before it is published (`scripts/ci/electron-smoke.mjs`); on Linux that run also checks that the process maps exactly one `libfontconfig`, the system's.
 
 ## Building from source
 
