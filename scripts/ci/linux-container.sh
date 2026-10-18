@@ -19,7 +19,8 @@ run_inside() {
   shift
 
   echo "::group::Install packages"
-  dnf install -y --setopt=install_weak_deps=False "$@"
+  # EPEL is enabled in the manylinux images but holds none of these packages, and a failing EPEL mirror would fail the install.
+  dnf install -y --disablerepo=epel --setopt=install_weak_deps=False "$@"
   echo "::endgroup::"
 
   echo "::group::Install Node.js ${node_major}"
