@@ -47,9 +47,10 @@ describe('work per group', () => {
     for (const file of TEST_FONTS) unregisterFont(file)
   })
 
-  const workOf = async (selected, orthographies = []) => {
+  /** `families` is null for the whole collection (the option is then omitted): a different path in the backend from a list of families. */
+  const workOf = async (selected, orthographies = [], families = FAMILIES) => {
     const closure = closureOf(selected, platform)
-    const { work } = await getFamiliesWithWork({ fields: [...closure], families: FAMILIES, orthographies })
+    const { work } = await getFamiliesWithWork({ fields: [...closure], ...(families && { families }), orthographies })
     return { work, closure }
   }
 
@@ -61,6 +62,15 @@ describe('work per group', () => {
     return allowed
   }
 
+  /** Asserts that every counted group the catalogue does not give the closure did no work. Returns the groups that may. */
+  const assertNoWorkOutsideCatalogue = (work, closure, orthographies = []) => {
+    const allowed = allowedGroups(closure, orthographies)
+    for (const [group, counter] of Object.entries(COUNTERS)) {
+      if (!allowed.has(group)) assert.equal(work[counter], 0, `${counter} (group ${group}) for ${[...closure].join(', ')}`)
+    }
+    return allowed
+  }
+
   for (const [name, selected] of SELECTIONS) {
     test(name, async (t) => {
       const { work, closure } = await workOf(selected)
@@ -68,12 +78,38 @@ describe('work per group', () => {
         (field) => FIELD_CATALOGUE.find((spec) => spec.name === field)?.sources[platform] === 'undocumented'
       )
       if (undocumented.length > 0) return t.skip(`the source of ${undocumented.join(', ')} is not documented on ${platform}`)
-      const allowed = allowedGroups(closure, [])
-      for (const [group, counter] of Object.entries(COUNTERS)) {
-        if (!allowed.has(group)) assert.equal(work[counter], 0, `${counter} (group ${group}) for ${[...closure].join(', ')}`)
-      }
+      assertNoWorkOutsideCatalogue(work, closure)
     })
   }
+
+  // Without `families` the backend lists the whole collection, a path of its own: the catalogue holds it to the same work.
+  describe('the whole collection (no families)', () => {
+    /** A field whose closure the catalogue gives groups A and B only on this platform: a family-level field needs no face identity. */
+    const onlyAB = FIELD_CATALOGUE.find((spec) => {
+      const { always, conditional } = groupsOf(closureOf([spec.name], platform), platform)
+      return spec.level === 'family' && conditional.length === 0 && always.every((group) => group === 'A' || group === 'B')
+    })
+
+    test('fields: [] does no C, D or E work', async () => {
+      const { work, closure } = await workOf([], [], null)
+      assert.deepEqual([...closure], [])
+      assert.deepEqual(work, { fontsOpened: 0, tableEntries: 0, characterSets: 0 })
+    })
+
+    test('a field the catalogue gives groups A and B only does no C, D or E work', async () => {
+      assert.ok(onlyAB, 'the catalogue has a family-level field of groups A and B on this platform')
+      const { work, closure } = await workOf([onlyAB.name], [], null)
+      const allowed = assertNoWorkOutsideCatalogue(work, closure)
+      assert.ok(!['C', 'D', 'E'].some((group) => allowed.has(group)), `${onlyAB.name} reaches groups ${[...allowed]}`)
+    })
+
+    test('languageCoverage alone does E work only', async () => {
+      const { work } = await workOf([], ['zh-cn', 'ja'], null)
+      assert.ok(work.characterSets > 0, 'characterSets')
+      assert.equal(work.fontsOpened, 0, 'fontsOpened')
+      assert.equal(work.tableEntries, 0, 'tableEntries')
+    })
+  })
 
   test('languageCoverage alone does group E work and no C or D work', async () => {
     const { work, closure } = await workOf([], ['zh-cn', 'ja'])
