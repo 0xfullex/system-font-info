@@ -64,26 +64,24 @@ std::string postscriptNameOf(CTFontDescriptorRef descriptor) {
   return toUtf8(asString(copyAttribute(descriptor, kCTFontNameAttribute).get()));
 }
 
-// The faces CoreText lists when it leaves the disabled fonts out, each as PostScript name and file. A disabled font
-// still reports `kCTFontEnabledAttribute` 1, with a priority and a registration scope CoreText makes up for it, so
-// being absent from this listing is the only sign that a face is disabled.
-class EnabledFaces {
+// The PostScript names CoreText lists when it leaves the disabled fonts out. A disabled font still reports
+// `kCTFontEnabledAttribute` 1, with a priority and a registration scope CoreText makes up for it, so being absent from
+// this listing is the only sign that a face is disabled. The rule is by name alone: disabling acts on a PostScript
+// name, so it turns off every file that provides the name, and a lookup that leaves the disabled fonts out lists one
+// file for a name, so a file would not be found in it although the name is enabled.
+class EnabledNames {
  public:
   // `descriptors` may be null: CoreText returns nothing when no font matches.
-  explicit EnabledFaces(CFArrayRef descriptors) {
+  explicit EnabledNames(CFArrayRef descriptors) {
     for (CFIndex i = 0; descriptors && i < CFArrayGetCount(descriptors); ++i) {
-      keys_.insert(keyOf(static_cast<CTFontDescriptorRef>(CFArrayGetValueAtIndex(descriptors, i))));
+      names_.insert(postscriptNameOf(static_cast<CTFontDescriptorRef>(CFArrayGetValueAtIndex(descriptors, i))));
     }
   }
 
-  bool contains(CTFontDescriptorRef descriptor) const { return keys_.count(keyOf(descriptor)) != 0; }
+  bool contains(const std::string& postscriptName) const { return names_.count(postscriptName) != 0; }
 
  private:
-  static std::string keyOf(CTFontDescriptorRef descriptor) {
-    return postscriptNameOf(descriptor) + '\0' + fileOf(descriptor);
-  }
-
-  std::unordered_set<std::string> keys_;
+  std::unordered_set<std::string> names_;
 };
 
 // Only `enabled` and `scope` depend on a face being enabled, and finding out costs a second listing.
@@ -193,7 +191,8 @@ std::vector<ShadowedFile> shadowedFiles(const Group& group, CTFontDescriptorRef 
 
 // Groups the resolved faces by family, in the order the families first appear. The shadowed files, which cost a
 // look at every other descriptor of a group, are found only when the request wants them. A face is enabled unless
-// `enabledFaces`, the listing without disabled fonts of the same scope as `groups`, is given and lacks it.
+// `enabledNames`, the listing without disabled fonts of the same scope as `groups`, is given and lacks its PostScript
+// name.
 //
 // `groups` come from the whole collection, or from a family lookup, which lists one file for a PostScript name. For a
 // lookup, `collection` is the whole collection: its group of the name stands in where the lookup's is not enough, that
@@ -205,7 +204,7 @@ std::vector<ShadowedFile> shadowedFiles(const Group& group, CTFontDescriptorRef 
 // lookup's group first, which is cheap and enough whenever it lists the file, and against the collection's group when
 // it does not (the lookup lists one file for a name, the resolution may name another).
 std::vector<FamilySeeds> groupByFamily(const std::vector<Group>& groups, const Request& request,
-                                       CollectionGroups* collection, const EnabledFaces* enabledFaces) {
+                                       CollectionGroups* collection, const EnabledNames* enabledNames) {
   std::vector<FamilySeeds> families;
   std::unordered_map<std::string, size_t> familyOfName;
   for (const Group& group : groups) {
@@ -219,7 +218,7 @@ std::vector<FamilySeeds> groupByFamily(const std::vector<Group>& groups, const R
       if (resolved && members != &group) listed = listsFileOf(*members, resolved);
     }
     seed.descriptor = listed ? resolved : members->descriptors.front();
-    seed.enabled = !enabledFaces || enabledFaces->contains(seed.descriptor);
+    seed.enabled = !enabledNames || enabledNames->contains(group.postscriptName);
     if (request.wants(Field::FacesPlatformShadowed)) seed.shadowed = shadowedFiles(*members, seed.descriptor);
 
     std::string family = toUtf8(asString(copyAttribute(seed.descriptor, kCTFontFamilyNameAttribute).get()));
@@ -283,9 +282,9 @@ void orderLikeCoreText(FamilySeeds& family) {
 
 // The faces of every family of the collection.
 std::vector<FamilySeeds> familiesOfCollection(const Request& request, CollectionGroups& collection) {
-  std::optional<EnabledFaces> enabledFaces;
-  if (needsEnabledState(request)) enabledFaces.emplace(copyCollectionDescriptors(false).get());
-  return groupByFamily(collection.all(), request, nullptr, enabledFaces ? &*enabledFaces : nullptr);
+  std::optional<EnabledNames> enabledNames;
+  if (needsEnabledState(request)) enabledNames.emplace(copyCollectionDescriptors(false).get());
+  return groupByFamily(collection.all(), request, nullptr, enabledNames ? &*enabledNames : nullptr);
 }
 
 // The faces of each requested family, from the family lookup. CoreText's lookup is case-insensitive, matches localized
@@ -307,11 +306,11 @@ std::vector<FamilySeeds> familiesOfLookups(const Request& request, CollectionGro
 
     Ref<CFArrayRef> members = lookUpFamily(name, true);
     if (!members) continue;
-    // The same lookup without the disabled fonts: the faces it lacks are the disabled ones.
-    std::optional<EnabledFaces> enabledFaces;
-    if (needsEnabledState(request)) enabledFaces.emplace(lookUpFamily(name, false).get());
+    // The same lookup without the disabled fonts: the names it lacks are the disabled ones.
+    std::optional<EnabledNames> enabledNames;
+    if (needsEnabledState(request)) enabledNames.emplace(lookUpFamily(name, false).get());
     for (FamilySeeds& family : groupByFamily(groupByPostscriptName(members.get()), request, &collection,
-                                             enabledFaces ? &*enabledFaces : nullptr)) {
+                                             enabledNames ? &*enabledNames : nullptr)) {
       if (!request.wantsFamily(family.name)) continue;
       // A family of another name is in this lookup's order, not in its member order; it is put in member order
       // later, unless the lookup of its own name comes by.
