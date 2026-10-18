@@ -51,7 +51,8 @@
               "<!@(node scripts/gyp-sources.js src/platform/win32)"
             ],
             "libraries": [
-              "dwrite.lib"
+              "dwrite.lib",
+              "advapi32.lib"
             ],
             "msvs_settings": {
               "VCCLCompilerTool": {

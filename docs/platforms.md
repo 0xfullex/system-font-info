@@ -5,10 +5,10 @@ How each operating system provides the fields that [api.md](api.md) defines: the
 | Platform | Font service | Status |
 | --- | --- | --- |
 | macOS | CoreText | implemented |
-| Windows | DirectWrite | in development |
+| Windows | DirectWrite | implemented |
 | Linux | fontconfig, with FreeType for WOFF tables | in development |
 
-For Windows and Linux the sources below are the ones the backends are built on, and the measured figures come from standalone implementations of those same sources. Where a platform's behaviour has not been established, this document says it is not yet documented.
+The Windows backend and its selected-field paths are measured directly below; separate component observations are identified as such. The Linux sources and measured figures come from a standalone implementation of those sources. Where a platform's behaviour has not been established, this document says it is not yet documented.
 
 - [Source groups](#source-groups)
 - [Family grouping](#family-grouping)
@@ -244,6 +244,7 @@ CoreText also keeps a cache in the process that answers PostScript name matching
 - **Not listed**: fonts whose data is not on the machine; fonts a process registered privately with `AddFontResourceEx(FR_PRIVATE)`, which are not in the system collection.
 - **Fonts marked as hidden** are listed, with `enabled: true` and `platform.inactiveFamilyPreference: true`.
 - **`families`**: `IDWriteFontCollection::FindFamilyName` (case-insensitive, accepts localized names) gives the candidates; the backend keeps only the families whose `family` is exactly the requested string. `scope` still needs the whole system font set (1,235 entries on the machine measured), even for one family.
+- **Process-local test fonts**: the test hooks combine registered files with the system set through `IDWriteFontSetBuilder2`, then construct a WSS collection. They install no font and change no registry value. The next call sees a hook registration or unregistration immediately; those resources have `scope: 'process'`. This test-only collection does not make fonts registered independently with `FR_PRIVATE` visible.
 
 ### Field sources
 
@@ -277,7 +278,7 @@ The group of each field is in [the matrix of Source groups](#the-group-of-every-
 | `coordinates` | `IDWriteFontFaceReference1::GetFontAxisValues`, limited to the `fvar` axes. |
 | `namedInstanceIndex` | The first `fvar` instance whose coordinates equal `coordinates`, within 1/65536. |
 | `opentype` | One `IDWriteFontFace` per font resource, bytes from `IDWriteFontFace::TryGetFontTable`; the tag list from the file's sfnt directory, because `TryGetFontTable` cannot enumerate tables. |
-| `coverage` | `IDWriteFontFace1::GetUnicodeRanges`. |
+| `coverage` | `IDWriteFont1::GetUnicodeRanges`, without explicit font-face creation. |
 
 Semantics specific to Windows:
 
@@ -371,7 +372,7 @@ Measured on Ubuntu 26.04.1 with fontconfig 2.17.1: a font added to or removed fr
 
 ## Measured cost
 
-Indicative figures, not guarantees. Each figure is the median of 5 freshly started Node processes, with the minimum and maximum in brackets, in milliseconds, from the call until the normalized result is ready in JS; Node start-up and module loading are excluded. OS file caches were warm. All were measured in October 2026. The three machines and font sets differ, so a row is not a comparison of the backends. The macOS rows for the family list, `familyNames` and `languageCoverage` come from measurement functions built against the backend's sources, not from the backend itself, as do the single-family rows except the backend figures noted in their row. The other macOS rows come from the backend, the breakdown below from a synchronous copy of it instrumented with timers. On macOS the rows that give a first and a later call were measured through `getFamilies` and `getFamily` themselves, each with 5 freshly started processes making 5 calls in a row: the first call is the first of the process, the later figure is the median of the other four calls of one process, and the median and range are taken over the 5 processes. The Windows and Linux figures come from standalone implementations of the sources above.
+Indicative figures, not guarantees. Unless a table says otherwise, each figure is the median of 5 freshly started Node processes, with the minimum and maximum in brackets, in milliseconds, from the call until the normalized result is ready in JS; Node start-up and module loading are excluded. OS file caches were warm. All were measured in October 2026. The three machines and font sets differ, so a row is not a comparison of the backends. The macOS rows for the family list, `familyNames` and `languageCoverage` come from measurement functions built against the backend's sources, not from the backend itself, as do the single-family rows except the backend figures noted in their row. The other macOS rows come from the backend, the breakdown below from a synchronous copy of it instrumented with timers. On macOS the rows that give a first and a later call were measured through `getFamilies` and `getFamily` themselves, each with 5 freshly started processes making 5 calls in a row: the first call is the first of the process, the later figure is the median of the other four calls of one process, and the median and range are taken over the 5 processes. Windows selected-field calls are measured on the backend, with standalone component costs listed separately; the Linux figures come from a standalone implementation of the sources above.
 
 ### macOS
 
@@ -398,7 +399,19 @@ Apple M4, 10 cores, 16 GB, macOS 27.0.1 (26A434), Node 24.20.0. 252 families, 65
 
 ### Windows
 
-The backend's `fields: []`, `names`, `styles`, `details`, and `full` paths have not yet been measured. The figures below are standalone component observations and an earlier standalone selection capture, not measurements of those backend presets.
+Backend capture on 2026-10-18: Intel Core i7-8700K, 6 cores / 12 logical CPUs, 31.93 GiB, Windows 11 Pro 10.0.26200 x64, dwrite.dll 6.2.26100.9711, Node 24.20.0, MSVC 19.29. The WSS collection has 462 families, 2,568 OS members, and 906 resources (20 variable); merging 6 identical repeated members leaves 2,562 returned faces. No test fonts were registered.
+
+Each selection ran in 5 new Node processes, with 6 sequential calls per process. The interval is `await getFamilies(options)`, through normalization and projection, with module loading and process startup excluded. Every call uses `checkForUpdates = FALSE`. First is the median of the 5 initial calls; later is the median of the 25 subsequent calls. Brackets give minimum and maximum in milliseconds. OS file caches were warm; this is not a reboot-cold capture. Every process succeeded, with identical family and face counts across its selection's 30 calls.
+
+| Selection | Groups | First in process (ms) | Later in process (ms) |
+| --- | --- | --- | --- |
+| `fields: []` (`family` only) | A | 8.022 [7.878-8.112] | 1.383 [1.296-2.369] |
+| `names` | A | 10.159 [10.097-10.286] | 2.391 [2.262-2.560] |
+| `styles` | A, B; C for variable faces only | 200.482 [200.279-423.887] | 82.788 [79.333-162.704] |
+| `details` | A, B, C | 1406.486 [1350.273-1504.691] | 1361.974 [1345.900-1493.190] |
+| `full` | A, B, C, D | 1609.709 [1596.950-1633.023] | 1568.712 [1555.365-1732.523] |
+
+`fields: []` and `names` return 462 families without faces; the other three selections return 462 families and 2,562 faces. Neither coverage field is in these presets. Every call and its process exit code was recorded and the family and face counts were checked; the figures are medians and ranges over those calls. These measured calls replace the earlier selection estimates derived by subtracting a TRUE collection-update timing.
 
 Component capture on 2026-10-18: Intel Core i7-8700K, 6 cores / 12 logical CPUs, 31.93 GiB, Windows 11 Pro 10.0.26200 x64, dwrite.dll 6.2.26100.9711, MSVC 19.29. WSS with `checkForUpdates` FALSE: 462 families, 2,568 members (1,333 simulated), 906 resources; 20 resources are variable. Each mode ran in 5 new processes with 6 sequential trials each. First is the median of the 5 initial trials; later is the median of the 25 subsequent trials. Brackets give minimum and maximum, in milliseconds. Resource discovery and file/index deduplication are excluded setup; OS file caches were warm.
 
@@ -411,27 +424,6 @@ Component capture on 2026-10-18: Intel Core i7-8700K, 6 cores / 12 logical CPUs,
 | One `Inactive Fonts` registry lookup, missing-key branch | 0.0574 [0.0558-0.0740] | 0.0129 [0.0120-0.0153] |
 
 Every resource mode visits 906 resources. The directory/name experiment uses the earlier standalone parser and intermediate JSON objects, not the product's sfnt parser or JS conversion. Resource objects are released during each trial, but DirectWrite's own in-process state may remain warm. Component medians must not be added.
-
-Earlier standalone selection capture: Intel Core i7-8700K, 12 logical CPUs, 31.93 GiB, Windows 11 Pro 10.0.26200, dwrite.dll 10.0.26100.8875, Node 24.20.0. 462 families, 2,568 members (1,333 simulated), 906 font resources, 882 files.
-
-The Windows source uses `GetSystemFontCollection` without the update check (`checkForUpdates` FALSE). Most figures in the earlier selection capture were measured with the update check (TRUE), which costs about 300 ms per call in a fresh process. The FALSE column says which figures were measured that way; the others are derived as the TRUE figure minus that run's collection step under TRUE, plus the 1.556 ms the collection step takes under FALSE. The update check's cost depends on DirectWrite's internal state (later calls in one process spend about 190 ms on it), so a derived figure is an order of magnitude only.
-
-| Selection | Groups | TRUE (measured) | FALSE |
-| --- | --- | --- | --- |
-| `family`, `familyNames` | A | 301.56 [298.12-331.56] | 4.747 [4.704-5.425], measured |
-| `family`, `familyNames`, `languageCoverage` for `zh-CN` | A, E | 385.20 [378.44-398.34] | about 66, derived |
-| The same for `zh-TW` / `ja` | A, E | 385.50 [381.11-489.88] / 382.86 [373.38-398.49] | not derived |
-| Per member: names, `weight`, `width`, `style`, `simulations` | A, B | 570.62 [562.57-837.94] | about 257, derived |
-| The same and `monospace`, `color`, `symbol`, `supportedLanguages` | A, B | 575.87 [570.19-582.75] | not derived |
-| The same and `file`, raw axis values | A, B | 593.97 [583.50-601.32] | about 277, derived |
-| Every field except `opentype` and `coverage` | A, B, C | 1,798.86 [1,778.13-1,831.50] | about 1,484, derived |
-| Every field except `coverage` | A-D | 2,054.43 [2,017.80-2,095.01] | about 1,740, derived |
-| Every field except `coverage`, one family | A-D | 310-328 | not measured |
-| Names and the code point ranges of one default face per family (273,621 ranges) | A, E | 463.85 [447.88-470.07] | not derived |
-| `faces.coverage` for every member | E | not yet documented | not yet documented |
-
-- Without `opentype` the call still reads 906 `name` tables and 20 `fvar` tables (3.2 MB); with it, 7,804 table reads (61.5 MB).
-- JSON size: 4.65 MB without `opentype`, 29.04 MB with it.
 
 ### Linux
 

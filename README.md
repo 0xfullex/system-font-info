@@ -9,7 +9,7 @@ Every platform returns one shape, and the caller declares which fields it wants:
 | Platform | State |
 | --- | --- |
 | macOS | implemented |
-| Windows | in development |
+| Windows | implemented |
 | Linux | in development |
 
 ## Install
