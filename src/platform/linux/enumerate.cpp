@@ -99,6 +99,7 @@ std::vector<Family> enumerateFonts(const Request& request, WorkLog& work) {
   struct Member {
     FcPattern* listed;
     FcPattern* original;
+    bool inApplicationSet;
   };
   std::vector<Member> ordered;
   std::set<Identity> seen;
@@ -112,7 +113,7 @@ std::vector<Family> enumerateFonts(const Request& request, WorkLog& work) {
       if (boolean(original, FC_VARIABLE).value_or(false)) {
         variableResources.insert(resource(id));
       } else if (auto found = candidates.find(id); found != candidates.end() && seen.insert(id).second) {
-        ordered.push_back({found->second, original});
+        ordered.push_back({found->second, original, which == FcSetApplication});
       }
     }
   }
@@ -131,7 +132,7 @@ std::vector<Family> enumerateFonts(const Request& request, WorkLog& work) {
     }
     const size_t index = position->second;
     originalMembers[index].push_back(member.original);
-    if (request.wantsAnyFace()) result[index].faces.push_back(reader.read(member.listed));
+    if (request.wantsAnyFace()) result[index].faces.push_back(reader.read(member.listed, member.inApplicationSet));
   }
   if (!request.orthographies.empty()) {
     for (size_t i = 0; i < result.size(); ++i)

@@ -124,7 +124,7 @@ const FaceReader::Resource& FaceReader::readResource(const Identity& id, const s
   return result;
 }
 
-Face FaceReader::read(FcPattern* pattern) {
+Face FaceReader::read(FcPattern* pattern, bool inApplicationSet) {
   const Identity id = identity(pattern);
   Face face;
   face.postscriptName = string(pattern, FC_POSTSCRIPT_NAME).value_or("");
@@ -141,7 +141,7 @@ Face FaceReader::read(FcPattern* pattern) {
   face.monospace = spacing == FC_MONO || spacing == FC_DUAL || spacing == FC_CHARCELL;
   face.color = boolean(pattern, FC_COLOR).value_or(false);
   face.symbol = boolean(pattern, FC_SYMBOL).value_or(false);
-  face.scope = scopeOf(id.path);
+  face.scope = scopeOf(id.path, inApplicationSet);
   face.format = formatOf(string(pattern, FC_FONTFORMAT).value_or(""));
   if (request_.platformObject) face.platform = platformValue(pattern);
   if (request_.wants(Field::FacesSupportedLanguages)) {

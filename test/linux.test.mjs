@@ -2,7 +2,8 @@
 // observed by the pure normalization tests. This suite exercises that OS seam.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { readFileSync, realpathSync } from 'node:fs'
+import { readdirSync, readFileSync, realpathSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { after, before, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
@@ -69,7 +70,8 @@ describe('Linux fontconfig backend', { skip }, () => {
     }
     assert.ok(family('SFITest Symbol').faces.every((face) => face.symbol))
     assert.ok(variable.faces.every((face) => !face.symbol))
-    assert.ok(names.flatMap((name) => family(name).faces).every((face) => face.scope === 'unknown'))
+    // Only the test hook fills a call's application set, so these fonts are registered for the process alone.
+    assert.ok(names.flatMap((name) => family(name).faces).every((face) => face.scope === 'process'))
   })
 
   test('lists fixed variable instances once, without a range face, sharing resource values', () => {
@@ -197,6 +199,32 @@ describe('Linux fontconfig backend', { skip }, () => {
     assert.deepEqual(JSON.parse(child.stdout), [])
   })
 
+  test('a directory another user can create in the temporary directory is never read as a registry', () => {
+    // The registry used to be a directory named after the user and process IDs, which anyone could create first.
+    const script = `import { copyFileSync, mkdirSync, rmSync } from 'node:fs';
+      import { tmpdir } from 'node:os';
+      import { join } from 'node:path';
+      import { getFamilies } from ${JSON.stringify(new URL('../dist/index.js', import.meta.url).href)};
+      const directory = join(tmpdir(), 'system-font-info-test-' + process.getuid() + '-' + process.pid);
+      mkdirSync(directory);
+      try {
+        copyFileSync(${JSON.stringify(files[0])}, join(directory, 'planted.ttf'));
+        process.stdout.write(JSON.stringify(await getFamilies({ fields: [], families: ['SFITest Variable'] })));
+      } finally {
+        rmSync(directory, { recursive: true });
+      }`
+    const child = spawnSync(process.execPath, ['--input-type=module', '-e', script], { encoding: 'utf8' })
+    assert.equal(child.status, 0, child.stderr)
+    assert.deepEqual(JSON.parse(child.stdout), [])
+  })
+
+  test('registration keeps no state outside the process', () => {
+    assert.deepEqual(
+      readdirSync(tmpdir()).filter((entry) => entry.startsWith('system-font-info-test-')),
+      []
+    )
+  })
+
   test('rejects an unreadable or invalid test font through fontconfig', () => {
     assert.throws(() => hooks().registerFont(fixture('not-a-font.ttf')), /FcConfigAppFontAddFile/)
   })
@@ -207,9 +235,11 @@ describe('Linux fontconfig backend', { skip }, () => {
 
   test('the next fresh configuration sees unregister and register', async () => {
     const file = files[2]
+    hooks().registerFont(file)
     hooks().unregisterFont(file)
     registered.splice(registered.indexOf(file), 1)
     assert.equal(await getFamily('SFITest Symbol', { fields: [] }), undefined)
+    assert.throws(() => hooks().unregisterFont(file), /test font registration/)
     hooks().registerFont(file)
     registered.push(file)
     assert.deepEqual(await getFamily('SFITest Symbol', { fields: [] }), { family: 'SFITest Symbol' })

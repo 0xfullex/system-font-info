@@ -14,7 +14,8 @@ class FaceReader {
  public:
   FaceReader(const Request& request, WorkLog& work, const std::set<Identity>& variableResources)
       : request_(request), work_(work), variableResources_(variableResources) {}
-  Face read(FcPattern* pattern);
+  // `inApplicationSet`: whether the pattern's font is in the configuration's application set (`FcSetApplication`).
+  Face read(FcPattern* pattern, bool inApplicationSet);
 
  private:
   struct Resource {

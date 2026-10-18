@@ -12,9 +12,9 @@ sfnt reader for font tables, and FreeType for WOFF / WOFF2 table access. Read
 | `enumerate.cpp` | Fresh configuration, object set, family queries, member order and default-face language coverage |
 | `fc.h` | Owning fontconfig handles, checked attributes and file / index identities |
 | `face_reader.*` | Requested face fields, per-call resource sharing, table reads, variations and character ranges |
-| `traits.*` | Path-based scope and fontconfig format classification |
+| `traits.*` | Scope (application set, else path-based) and fontconfig format classification |
 | `legacy_text.cpp` | Legacy name decoding with the system's iconv converters |
-| `testing.*` | Process-specific test directory and application-font registration in each private configuration |
+| `testing.*` | In-process registry of the test fonts, added as application fonts to each private configuration |
 
 ## Configuration and order
 
@@ -66,14 +66,19 @@ returns `nullopt`, so the shared reader preserves its bytes.
 
 ## Test hooks
 
-Registration first validates the file with `FcConfigAppFontAddFile` on an
-independent empty configuration. It then creates a symlink in the temporary
-directory `system-font-info-test-<uid>-<pid>`. Each enumeration adds that
-directory, if present, through `FcConfigAppFontAddDir` to its private
-configuration. Unregister removes the link and removes an empty directory.
-No static registration list or environment change is needed; a child has a
-different PID and does not inherit the registrations. `FC_FILE` is the link's
-path, so these fonts have `unknown` scope under the usual path rule.
+The registry is a mutex-protected list of absolute paths in the process's
+memory; it holds no state in the file system, where another local user could
+plant a font directory that a real call would then list. Registering a file
+first validates it with `FcConfigAppFontAddFile` on an independent empty
+configuration, then adds its path to the list (a path already listed stays
+listed once). Unregistering removes the path and throws when it is not listed.
+Each enumeration adds every listed path to its private configuration with
+`FcConfigAppFontAddFile`, which makes them the configuration's application
+set, the only fonts that set holds. A child process starts with an empty list.
+
+Fonts of the application set have `process` scope; every other font gets its
+scope from its path. `FC_FILE` is the registered path as fontconfig
+normalizes it.
 
 `setFontEnabledForTesting` throws "not supported": fontconfig lists a font or
 does not, and has no disabled state to turn on and off.

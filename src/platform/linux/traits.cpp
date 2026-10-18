@@ -11,7 +11,8 @@ bool under(const std::string& path, const std::string& directory) {
 }
 }  // namespace
 
-Scope scopeOf(const std::string& path) {
+Scope scopeOf(const std::string& path, bool inApplicationSet) {
+  if (inApplicationSet) return Scope::Process;
   if (under(path, "/usr/share/fonts") || under(path, "/usr/local/share/fonts")) return Scope::System;
   const char* home = std::getenv("HOME");
   const char* data = std::getenv("XDG_DATA_HOME");
