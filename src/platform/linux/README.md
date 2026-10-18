@@ -70,9 +70,15 @@ style names and composed full names come from the shared name and fvar tables.
 each face charset walked and each family charset used for language coverage
 at the operation that performs the work.
 
-Legacy names use iconv without approximate substitutions. The converter maps
-all `LegacyEncoding` enumerators explicitly; a Mac encoding the system lacks
-returns `nullopt`, so the shared reader preserves its bytes.
+Legacy names are converted by glibc iconv, without approximate substitutions.
+`legacy_text.cpp` decides statically only which iconv converter name an
+encoding uses, for every `LegacyEncoding` enumerator: Mac Roman, Icelandic,
+Central European and Cyrillic, and the Windows code pages 932, 936, 950, 949
+and 1361 (Johab) have one; every other Mac encoding has none and returns
+`nullopt` without calling iconv. Whether the converter exists on the system and
+whether the bytes convert is iconv's answer: an unknown converter or a failed
+conversion also returns `nullopt`, and the shared reader then preserves the
+bytes.
 
 ## Unreadable files and concurrency
 
