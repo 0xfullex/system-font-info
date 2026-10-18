@@ -48,6 +48,7 @@ const B = { groups: ['B'] } as const
 const C = { groups: ['C'] } as const
 const D = { groups: ['D'] } as const
 const E = { groups: ['E'] } as const
+const A_AND_B = { groups: ['A', 'B'] } as const
 const B_AND_C = { groups: ['B', 'C'] } as const
 const B_C_FOR_CFF2 = { groups: ['B'], when: [{ group: 'C', for: '`cff2`' }] } as const
 const B_C_FOR_NAMED_INSTANCES = { groups: ['B'], when: [{ group: 'C', for: 'named instances' }] } as const
@@ -98,7 +99,9 @@ export const FIELD_CATALOGUE = [
   { name: 'faces.monospace', level: 'face', preset: 'styles', sources: everywhere(B) },
   { name: 'faces.color', level: 'face', preset: 'styles', sources: everywhere(B) },
   { name: 'faces.symbol', level: 'face', preset: 'styles', sources: { darwin: C, win32: B, linux: B } },
-  { name: 'faces.enabled', level: 'face', preset: 'styles', sources: { darwin: B, win32: 'constant', linux: 'constant' } },
+  // On macOS a disabled font reports itself as enabled; only a second listing of the families without the disabled fonts
+  // tells them apart, so `enabled` (and `scope`, which depends on it) costs a family list (A) on top of the attributes.
+  { name: 'faces.enabled', level: 'face', preset: 'styles', sources: { darwin: A_AND_B, win32: 'constant', linux: 'constant' } },
   {
     name: 'faces.simulations',
     level: 'face',
@@ -107,7 +110,7 @@ export const FIELD_CATALOGUE = [
     sources: { darwin: 'constant', win32: B, linux: 'constant' }
   },
   { name: 'faces.supportedLanguages', level: 'face', preset: 'styles', sources: everywhere(B) },
-  { name: 'faces.scope', level: 'face', preset: 'styles', sources: everywhere(B) },
+  { name: 'faces.scope', level: 'face', preset: 'styles', sources: { darwin: A_AND_B, win32: B, linux: B } },
   // `file` is `file.path` and `file.index`; on macOS the index is C.
   { name: 'faces.file', level: 'face', preset: 'styles', identity: true, sources: { darwin: B_AND_C, win32: B, linux: B } },
   { name: 'faces.variable', level: 'face', preset: 'details', sources: { darwin: B, win32: C, linux: B } },

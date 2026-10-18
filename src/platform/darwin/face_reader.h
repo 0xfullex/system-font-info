@@ -33,7 +33,9 @@ class FaceReader {
  public:
   FaceReader(const Request& request, WorkLog& work);
 
-  Face read(CTFontDescriptorRef descriptor, const std::string& postscriptName,
+  // `enabled` is whether the face is listed when CoreText leaves the disabled fonts out; the descriptor of a disabled
+  // font cannot say (see `enumerate.cpp`).
+  Face read(CTFontDescriptorRef descriptor, const std::string& postscriptName, bool enabled,
             const std::vector<ShadowedFile>& shadowed);
 
  private:

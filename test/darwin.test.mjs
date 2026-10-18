@@ -2,7 +2,7 @@
 // fonts registered for this process. Skipped elsewhere.
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { after, before, describe, test } from 'node:test'
+import { after, afterEach, before, beforeEach, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 import { getFamilies, getFamily, pickName } from '../dist/index.js'
@@ -203,6 +203,85 @@ describe('getFamilies() freshness', { skip }, () => {
       unregisterFont(file)
     }
     assert.equal(await hasSymbolFamily(), false)
+  })
+})
+
+describe('disabled fonts', { skip }, () => {
+  const { registerFont, unregisterFont, setFontEnabled } = loadNative().__testing
+  const disabledFile = fixture('SFITest-Collection.ttc')
+  const enabledFile = fixture('SFITest-Variable.ttf')
+  const fields = ['faces.postscriptName', 'faces.enabled', 'enabled', 'faces.scope']
+  const orthographies = ['en', 'zh-cn']
+  const testFamilies = async () =>
+    (await getFamilies({ fields, languageCoverage: orthographies })).filter((entry) => entry.family.startsWith('SFITest'))
+  let before
+
+  beforeEach(async () => {
+    registerFont(disabledFile)
+    registerFont(enabledFile)
+    before = await testFamilies()
+  })
+  afterEach(() => {
+    // CoreText refuses to unregister a disabled font.
+    setFontEnabled(disabledFile, true)
+    unregisterFont(disabledFile)
+    unregisterFont(enabledFile)
+  })
+
+  test('are listed with enabled false, scope process and the member order they had', async () => {
+    setFontEnabled(disabledFile, false)
+    const after = await testFamilies()
+    const collection = after.find((entry) => entry.family === 'SFITest Collection')
+    assert.deepEqual(
+      collection.faces.map((face) => face.postscriptName),
+      before.find((entry) => entry.family === 'SFITest Collection').faces.map((face) => face.postscriptName)
+    )
+    assert.equal(collection.faces.length, 2)
+    assert.ok(collection.faces.every((face) => face.enabled === false && face.scope === 'process'))
+    // The family is enabled when some face is, and nothing else changes.
+    assert.equal(collection.enabled, false)
+    const variable = after.find((entry) => entry.family === 'SFITest Variable')
+    assert.equal(variable.enabled, true)
+    assert.ok(variable.faces.every((face) => face.enabled === true && face.scope === 'process'))
+    assert.deepEqual(
+      after.map((entry) => entry.family),
+      before.map((entry) => entry.family)
+    )
+  })
+
+  test('keep the raw priority and registration scope CoreText makes up for them', async () => {
+    setFontEnabled(disabledFile, false)
+    const [family] = await getFamilies({
+      fields: ['faces.platform.priority', 'faces.platform.registrationScope'],
+      families: ['SFITest Collection']
+    })
+    assert.ok(family.faces.every((face) => face.platform.priority === 60000 && face.platform.registrationScope === 1))
+  })
+
+  test('are enabled again once they are enabled', async () => {
+    setFontEnabled(disabledFile, false)
+    setFontEnabled(disabledFile, true)
+    assert.deepEqual(await testFamilies(), before)
+  })
+
+  test('are reported alike by the whole listing and the families option', async () => {
+    setFontEnabled(disabledFile, false)
+    const options = { preset: 'full', languageCoverage: orthographies }
+    const full = (await getFamilies(options)).filter((entry) => entry.family.startsWith('SFITest'))
+    assert.deepEqual(await getFamilies({ ...options, families: full.map((entry) => entry.family) }), full)
+    assert.deepStrictEqual(
+      await getFamily('SFITest Collection', options),
+      full.find((entry) => entry.family === 'SFITest Collection')
+    )
+  })
+
+  test('give a family with no enabled face the language coverage of its first face', async () => {
+    setFontEnabled(disabledFile, false)
+    const after = await testFamilies()
+    const coverage = (entries) => entries.find((entry) => entry.family === 'SFITest Collection').languageCoverage
+    // Every face of a test family maps the same characters and the family lists its regular face first.
+    assert.deepEqual(coverage(after), coverage(before))
+    assert.ok(coverage(after).some((entry) => entry.covered > 0))
   })
 })
 

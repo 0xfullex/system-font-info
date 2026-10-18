@@ -162,7 +162,7 @@ FaceReader::OpenedFont FaceReader::openFont(CTFontDescriptorRef descriptor, cons
   return opened;
 }
 
-Face FaceReader::read(CTFontDescriptorRef descriptor, const std::string& postscriptName,
+Face FaceReader::read(CTFontDescriptorRef descriptor, const std::string& postscriptName, bool enabled,
                       const std::vector<ShadowedFile>& shadowed) {
   Face face;
   face.postscriptName = postscriptName;
@@ -183,10 +183,7 @@ Face FaceReader::read(CTFontDescriptorRef descriptor, const std::string& postscr
   face.style = styleOf(traits);
   face.monospace = traits.symbolic.value_or(0) & kCTFontTraitMonoSpace;
   face.color = traits.symbolic.value_or(0) & kCTFontTraitColorGlyphs;
-  if (request_.wants(Field::FacesEnabled)) {
-    // CoreText stores the enabled state as a number or a boolean; a font without one is enabled.
-    face.enabled = booleanValue(copyAttribute(descriptor, kCTFontEnabledAttribute).get()).value_or(true);
-  }
+  face.enabled = enabled;
   if (request_.wants(Field::FacesSupportedLanguages)) {
     if (const auto languages = copyAttribute(descriptor, kCTFontLanguagesAttribute); asArray(languages.get())) {
       for (CFIndex i = 0; i < CFArrayGetCount(asArray(languages.get())); ++i) {
@@ -196,7 +193,7 @@ Face FaceReader::read(CTFontDescriptorRef descriptor, const std::string& postscr
   }
   if (request_.wants(Field::FacesScope)) {
     face.scope = scopeOf(integerValue(copyAttribute(descriptor, kCTFontPriorityAttribute).get()),
-                         integerValue(copyAttribute(descriptor, kCTFontRegistrationScopeAttribute).get()));
+                         integerValue(copyAttribute(descriptor, kCTFontRegistrationScopeAttribute).get()), enabled);
   }
   if (request_.wants(Field::FacesVariable)) face.variable = hasVariationAxes(descriptor);
 

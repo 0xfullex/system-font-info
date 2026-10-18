@@ -55,11 +55,14 @@ Style styleOf(const Traits& traits) {
   return (traits.symbolic.value_or(0) & kCTFontTraitItalic) ? Style::Italic : Style::Normal;
 }
 
-Scope scopeOf(std::optional<int64_t> priority, std::optional<int64_t> registrationScope) {
+Scope scopeOf(std::optional<int64_t> priority, std::optional<int64_t> registrationScope, bool enabled) {
   // Priority 60000 does not say who registered the font: a process-registered
   // font has it, and so do the system font assets the OS downloads (under
   // /System/Library/AssetsV2), which are registered persistently.
   if (registrationScope == kCTFontManagerScopeProcess) return Scope::Process;
+  // A disabled font that was not registered for the process has the priority 60000 and the persistent registration
+  // scope whoever installed it, so they say nothing about it.
+  if (!enabled) return Scope::Unknown;
   switch (priority.value_or(0)) {
     case kCTFontPriorityUser:
     // A font an application registered for the user (session or persistent

@@ -42,9 +42,11 @@ Style styleOf(const Traits& traits);
 
 // kCTFontPriorityAttribute and kCTFontRegistrationScopeAttribute -> who
 // installed the font; the rules are in the README: the process registration
-// scope is `process`, and otherwise the priority decides (the user and the
-// dynamic priorities are `user`). Either may be absent.
-Scope scopeOf(std::optional<int64_t> priority, std::optional<int64_t> registrationScope);
+// scope is `process`, a disabled font is otherwise `unknown` (CoreText makes up
+// its priority and its registration scope), and an enabled one is decided by
+// the priority (the user and the dynamic priorities are `user`). Either may be
+// absent.
+Scope scopeOf(std::optional<int64_t> priority, std::optional<int64_t> registrationScope, bool enabled);
 
 // kCTFontFormatAttribute -> Format. CoreText reports CFF and CFF2 as one
 // format, OpenType PostScript; only for that format `hasCff2` is called, to tell

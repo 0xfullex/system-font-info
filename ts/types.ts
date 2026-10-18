@@ -292,9 +292,9 @@ export interface DarwinNative {
   symbolicTraits?: number
   /** kCTFontFormatAttribute (CTFontFormat: 0 unrecognized, 1 OpenType PostScript, 2 OpenType TrueType, 3 TrueType, 4 PostScript, 5 bitmap). */
   format?: number
-  /** kCTFontPriorityAttribute (system 10000 ... process 60000) */
+  /** kCTFontPriorityAttribute (system 10000 ... process 60000). CoreText makes the value up for a disabled font. */
   priority?: number
-  /** kCTFontRegistrationScopeAttribute */
+  /** kCTFontRegistrationScopeAttribute. CoreText makes the value up for a disabled font. */
   registrationScope?: number
   /** kCTFontDownloadableAttribute */
   downloadable?: boolean

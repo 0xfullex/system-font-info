@@ -31,7 +31,8 @@ font resource, D), `characterSets` (a character set fetched and walked: one
 per face for `faces.coverage`, one per family for `languageCoverage`, E).
 
 - **A** is always done: the descriptors, grouped by PostScript name, resolved
-  and grouped by family (`family` needs the resolution).
+  and grouped by family (`family` needs the resolution). `enabled` and `scope`
+  add a second listing without the disabled fonts (below).
 - **Faces** are built, and the members put in order, only when the request wants
   a face-level field (`wantsAnyFace()`).
 - **B**: a face reads only the descriptor attributes of its requested fields.
@@ -79,6 +80,25 @@ the first collection descriptor of that name is used. The files of the other
 descriptors go to `platform.shadowed` (`path`, `variable`); a descriptor that
 names the chosen file again is the same font and is merged without a trace.
 
+## Disabled fonts
+
+A disabled font is listed, but CoreText does not mark it: its descriptor reports
+`kCTFontEnabledAttribute` 1, a priority of 60000 and registration scope 2 that
+are made up, and it is absent from name matching and from the
+`CTFontManagerCopyAvailable*` lists. The one reliable sign is that the face is
+absent from the same listing made without `kCTFontCollectionIncludeDisabledFontsOption`.
+So when the request wants `enabled` or `scope` (`needsEnabledState` in
+`enumerate.cpp`), `enumerate.cpp` makes that second listing and hands each face its
+verdict as an argument of `FaceReader::read`: for the whole collection one extra
+`CTFontCollectionCreateFromAvailableFonts`, with `request.families` one extra
+family lookup per requested name, so the verdict comes from the listing the faces
+came from. A face is enabled when its PostScript name and file are both in that
+listing. Disabled fonts the collection lists twice (identical descriptors) are one
+face, merged by the grouping above. A font registered for the process and then
+disabled is listed once and keeps registration scope 1. The raw `platform.priority`
+and `platform.registrationScope` of a disabled font are CoreText's invention and
+are reported as they are.
+
 ## Families and member order
 
 A family is keyed by the chosen descriptor's `kCTFontFamilyNameAttribute`, in
@@ -122,11 +142,15 @@ not depend on whether `families` was given). A face the lookup does not name
   slant trait is non-zero for upright script faces too (Zapfino, Apple
   Chancery), so it is left raw in `platform.slant`.
 - `monospace`, `color`: symbolic bits. `symbol`: the cmap has a (3,0) subtable
-  (from the tables). `enabled`: `kCTFontEnabledAttribute` (a number or a
-  boolean). The simulations are always false: macOS has none.
+  (from the tables). `enabled`: the face is in the collection listed without the
+  disabled fonts (see "One face per PostScript name"); the descriptor's
+  `kCTFontEnabledAttribute` is 1 for a disabled font. The simulations are always
+  false: macOS has none.
 - `supportedLanguages`: `kCTFontLanguagesAttribute`.
 - `scope`, first rule that applies: `kCTFontRegistrationScopeAttribute` is the
-  process scope: process. `kCTFontPriorityAttribute` 40000 or 50000 (dynamic: a
+  process scope: process. The face is disabled: unknown, because CoreText makes
+  up the priority (60000) and the registration scope (2) of a disabled font, so
+  they say nothing about who installed it. `kCTFontPriorityAttribute` 40000 or 50000 (dynamic: a
   font an application registered for the user, with session or persistent
   scope; macOS 27 reports a session registration this way, checked by hand: no
   test registers at session scope, since that registration is visible to every

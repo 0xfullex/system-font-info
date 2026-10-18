@@ -1,7 +1,9 @@
 #include <algorithm>
 #include <map>
+#include <optional>
 #include <stdexcept>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "../../core/platform.h"
 #include "autorelease_pool.h"
@@ -36,16 +38,17 @@ struct Group {
   std::vector<CTFontDescriptorRef> descriptors;  // owned by the collection's array
 };
 
-// Disabled fonts are installed fonts too.
-Ref<CFDictionaryRef> collectionOptions() {
+// The options of the listings that include the disabled fonts, which are installed fonts too. Null means CoreText's
+// defaults, which leave them out.
+Ref<CFDictionaryRef> includingDisabledFonts() {
   const void* keys[] = {kCTFontCollectionIncludeDisabledFontsOption};
   const void* values[] = {kCFBooleanTrue};
   return Ref<CFDictionaryRef>(CFDictionaryCreate(kCFAllocatorDefault, keys, values, 1, &kCFTypeDictionaryKeyCallBacks,
                                                  &kCFTypeDictionaryValueCallBacks));
 }
 
-Ref<CFArrayRef> copyCollectionDescriptors() {
-  const Ref<CFDictionaryRef> options = collectionOptions();
+Ref<CFArrayRef> copyCollectionDescriptors(bool includeDisabled) {
+  const Ref<CFDictionaryRef> options = includeDisabled ? includingDisabledFonts() : Ref<CFDictionaryRef>();
   const Ref<CTFontCollectionRef> collection(CTFontCollectionCreateFromAvailableFonts(options.get()));
   if (!collection) throw std::runtime_error("system-font-info: CoreText cannot create the font collection");
   Ref<CFArrayRef> descriptors(CTFontCollectionCreateMatchingFontDescriptors(collection.get()));
@@ -59,6 +62,33 @@ std::string fileOf(CTFontDescriptorRef descriptor) {
 
 std::string postscriptNameOf(CTFontDescriptorRef descriptor) {
   return toUtf8(asString(copyAttribute(descriptor, kCTFontNameAttribute).get()));
+}
+
+// The faces CoreText lists when it leaves the disabled fonts out, each as PostScript name and file. A disabled font
+// still reports `kCTFontEnabledAttribute` 1, with a priority and a registration scope CoreText makes up for it, so
+// being absent from this listing is the only sign that a face is disabled.
+class EnabledFaces {
+ public:
+  // `descriptors` may be null: CoreText returns nothing when no font matches.
+  explicit EnabledFaces(CFArrayRef descriptors) {
+    for (CFIndex i = 0; descriptors && i < CFArrayGetCount(descriptors); ++i) {
+      keys_.insert(keyOf(static_cast<CTFontDescriptorRef>(CFArrayGetValueAtIndex(descriptors, i))));
+    }
+  }
+
+  bool contains(CTFontDescriptorRef descriptor) const { return keys_.count(keyOf(descriptor)) != 0; }
+
+ private:
+  static std::string keyOf(CTFontDescriptorRef descriptor) {
+    return postscriptNameOf(descriptor) + '\0' + fileOf(descriptor);
+  }
+
+  std::unordered_set<std::string> keys_;
+};
+
+// Only `enabled` and `scope` depend on a face being enabled, and finding out costs a second listing.
+bool needsEnabledState(const Request& request) {
+  return request.wants(Field::FacesEnabled) || request.wants(Field::FacesScope);
 }
 
 // Groups the descriptors by PostScript name, in the order the names first
@@ -111,7 +141,7 @@ class CollectionGroups {
  private:
   void load() {
     if (descriptors_) return;
-    descriptors_ = copyCollectionDescriptors();
+    descriptors_ = copyCollectionDescriptors(true);
     groups_ = groupByPostscriptName(descriptors_.get());
     for (size_t i = 0; i < groups_.size(); ++i) {
       if (!groups_[i].postscriptName.empty()) groupOfName_.emplace(groups_[i].postscriptName, i);
@@ -128,6 +158,7 @@ struct Seed {
   Ref<CTFontDescriptorRef> resolved;  // keeps the descriptor alive when it did not come from the collection
   CTFontDescriptorRef descriptor = nullptr;
   std::string postscriptName;
+  bool enabled = true;
   std::vector<ShadowedFile> shadowed;
 };
 
@@ -152,14 +183,15 @@ std::vector<ShadowedFile> shadowedFiles(const Group& group, CTFontDescriptorRef 
 }
 
 // Groups the resolved faces by family, in the order the families first appear. The shadowed files, which cost a
-// look at every other descriptor of a group, are found only when the request wants them.
+// look at every other descriptor of a group, are found only when the request wants them. A face is enabled unless
+// `enabledFaces`, the listing without disabled fonts of the same scope as `groups`, is given and lacks it.
 //
 // `groups` come from the whole collection, or from a family lookup, which lists one file for a PostScript name. For a
 // lookup, `collection` is the whole collection: its group of the name stands in where the lookup's is not enough, that
 // is when the request wants the shadowed files, and when resolution finds nothing and the face falls back to the first
 // descriptor of the name, which must be the one the full listing falls back to.
 std::vector<FamilySeeds> groupByFamily(const std::vector<Group>& groups, const Request& request,
-                                       CollectionGroups* collection) {
+                                       CollectionGroups* collection, const EnabledFaces* enabledFaces) {
   std::vector<FamilySeeds> families;
   std::unordered_map<std::string, size_t> familyOfName;
   for (const Group& group : groups) {
@@ -171,6 +203,7 @@ std::vector<FamilySeeds> groupByFamily(const std::vector<Group>& groups, const R
       if (const Group* inCollection = collection->find(group.postscriptName)) members = inCollection;
     }
     seed.descriptor = resolved ? resolved : members->descriptors.front();
+    seed.enabled = !enabledFaces || enabledFaces->contains(seed.descriptor);
     if (request.wants(Field::FacesPlatformShadowed)) seed.shadowed = shadowedFiles(*members, seed.descriptor);
 
     std::string family = toUtf8(asString(copyAttribute(seed.descriptor, kCTFontFamilyNameAttribute).get()));
@@ -182,8 +215,9 @@ std::vector<FamilySeeds> groupByFamily(const std::vector<Group>& groups, const R
 }
 
 // The descriptors CoreText's family lookup returns for `family`, in the order its matcher lists them, which is the
-// family's member order. Disabled fonts are included. Null when CoreText cannot make the lookup.
-Ref<CFArrayRef> lookUpFamily(const std::string& family) {
+// family's member order. Disabled fonts are included when `includeDisabled`. Null when CoreText cannot make the lookup
+// or no font matches.
+Ref<CFArrayRef> lookUpFamily(const std::string& family, bool includeDisabled) {
   const auto familyName = makeString(family);
   const void* attributeKeys[] = {kCTFontFamilyNameAttribute};
   const void* attributeValues[] = {familyName.get()};
@@ -193,7 +227,7 @@ Ref<CFArrayRef> lookUpFamily(const std::string& family) {
   const Ref<CTFontDescriptorRef> descriptor(CTFontDescriptorCreateWithAttributes(attributes.get()));
   const void* descriptorList[] = {descriptor.get()};
   const Ref<CFArrayRef> descriptors(CFArrayCreate(kCFAllocatorDefault, descriptorList, 1, &kCFTypeArrayCallBacks));
-  const Ref<CFDictionaryRef> options = collectionOptions();
+  const Ref<CFDictionaryRef> options = includeDisabled ? includingDisabledFonts() : Ref<CFDictionaryRef>();
   const Ref<CTFontCollectionRef> collection(
       CTFontCollectionCreateWithFontDescriptors(descriptors.get(), options.get()));
   if (!collection) return {};
@@ -208,7 +242,7 @@ void orderLikeCoreText(FamilySeeds& family) {
 
   // A PostScript name counts once, at its first position.
   std::vector<std::string> names;
-  if (const Ref<CFArrayRef> members = lookUpFamily(family.name)) {
+  if (const Ref<CFArrayRef> members = lookUpFamily(family.name, true)) {
     for (CFIndex i = 0; i < CFArrayGetCount(members.get()); ++i) {
       std::string name = postscriptNameOf(static_cast<CTFontDescriptorRef>(CFArrayGetValueAtIndex(members.get(), i)));
       if (!name.empty() && std::find(names.begin(), names.end(), name) == names.end()) names.push_back(std::move(name));
@@ -233,7 +267,9 @@ void orderLikeCoreText(FamilySeeds& family) {
 
 // The faces of every family of the collection.
 std::vector<FamilySeeds> familiesOfCollection(const Request& request, CollectionGroups& collection) {
-  return groupByFamily(collection.all(), request, nullptr);
+  std::optional<EnabledFaces> enabledFaces;
+  if (needsEnabledState(request)) enabledFaces.emplace(copyCollectionDescriptors(false).get());
+  return groupByFamily(collection.all(), request, nullptr, enabledFaces ? &*enabledFaces : nullptr);
 }
 
 // The faces of each requested family, from the family lookup. CoreText's lookup is case-insensitive, matches localized
@@ -253,9 +289,13 @@ std::vector<FamilySeeds> familiesOfLookups(const Request& request, CollectionGro
     if (std::find(looked.begin(), looked.end(), name) != looked.end()) continue;
     looked.push_back(name);
 
-    Ref<CFArrayRef> members = lookUpFamily(name);
+    Ref<CFArrayRef> members = lookUpFamily(name, true);
     if (!members) continue;
-    for (FamilySeeds& family : groupByFamily(groupByPostscriptName(members.get()), request, &collection)) {
+    // The same lookup without the disabled fonts: the faces it lacks are the disabled ones.
+    std::optional<EnabledFaces> enabledFaces;
+    if (needsEnabledState(request)) enabledFaces.emplace(lookUpFamily(name, false).get());
+    for (FamilySeeds& family : groupByFamily(groupByPostscriptName(members.get()), request, &collection,
+                                             enabledFaces ? &*enabledFaces : nullptr)) {
       if (!request.wantsFamily(family.name)) continue;
       // A family of another name is in this lookup's order, not in its member order; it is put in member order
       // later, unless the lookup of its own name comes by.
@@ -300,7 +340,7 @@ std::vector<Family> enumerate(const Request& request, WorkLog& work) {
     if (request.wantsAnyFace()) {
       orderLikeCoreText(seeds);
       for (const Seed& seed : seeds.seeds) {
-        family.faces.push_back(reader.read(seed.descriptor, seed.postscriptName, seed.shadowed));
+        family.faces.push_back(reader.read(seed.descriptor, seed.postscriptName, seed.enabled, seed.shadowed));
       }
     }
     if (!request.orthographies.empty()) family.languageCoverage = languageCoverageOf(seeds, request, work);
