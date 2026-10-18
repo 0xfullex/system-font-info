@@ -111,6 +111,16 @@ function normalizeFace(face: RawFace, derived: ReadonlySet<Field>, done: WeakSet
   if (face.familyNames) tidyLocalized(face.familyNames)
   if (face.supportedLanguages) tidyTags(face.supportedLanguages)
 
+  const platform = face.platform
+  if (platform?.os === 'win32') {
+    if (platform.typographicFamilyNames) tidyLocalized(platform.typographicFamilyNames)
+    if (platform.typographicStyleNames) tidyLocalized(platform.typographicStyleNames)
+    if (platform.designLanguages) tidyLocalized(platform.designLanguages)
+    if (platform.supportedLanguages) tidyLocalized(platform.supportedLanguages)
+    for (const axis of platform.resourceAxes ?? []) tidyLocalized(axis.names)
+    for (const strings of Object.values(platform.additionalInformationalStrings ?? {})) tidyLocalized(strings)
+  }
+
   if (face.axes && !done.has(face.axes)) {
     done.add(face.axes)
     normalizeAxes(face.axes)
