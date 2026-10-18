@@ -23,12 +23,21 @@ export function canonicalizeTag(tag: string): string {
   return canonical
 }
 
+/**
+ * canonicalizeTag for a language tag, the tags of the public language fields. A bare four-letter alphabetic tag
+ * ("Latn") is a script, since BCP 47 reserves four-letter primary language subtags, and is written as the script
+ * of an undetermined language ("und-Latn"). Not for the OpenType `meta` ScriptLangTags, which stay as the font wrote them.
+ */
+function canonicalizeLanguageTag(tag: string): string {
+  return canonicalizeTag(/^[A-Za-z]{4}$/.test(tag) ? `und-${tag}` : tag)
+}
+
 /** Canonicalizes the languages of `strings` and removes exact (language, value) duplicates, keeping the first. In place. */
 function tidyLocalized(strings: LocalizedString[]): void {
   const seen = new Set<string>()
   let kept = 0
   for (const entry of strings) {
-    entry.language = canonicalizeTag(entry.language)
+    entry.language = canonicalizeLanguageTag(entry.language)
     const key = `${entry.language}\u0000${entry.value}`
     if (seen.has(key)) continue
     seen.add(key)
@@ -37,12 +46,12 @@ function tidyLocalized(strings: LocalizedString[]): void {
   strings.length = kept
 }
 
-/** Canonicalizes the tags in `tags` and removes duplicates, keeping the first. In place. */
-function tidyTags(tags: string[]): void {
+/** Canonicalizes the tags in `tags` with `canonicalize` and removes duplicates, keeping the first. In place. */
+function tidyTags(tags: string[], canonicalize: (tag: string) => string): void {
   const seen = new Set<string>()
   let kept = 0
   for (const tag of tags) {
-    const canonical = canonicalizeTag(tag)
+    const canonical = canonicalize(tag)
     if (seen.has(canonical)) continue
     seen.add(canonical)
     tags[kept++] = canonical
@@ -86,10 +95,10 @@ function normalizeOpenType(opentype: Partial<OpenTypeInfo>): void {
     for (const names of Object.values(table?.featureNames ?? {})) tidyLocalized(names)
   }
 
-  // Design/supported languages are script-language tags (for example "Latn");
-  // those Intl cannot parse stay as written.
-  if (opentype.meta?.dlng) tidyTags(opentype.meta.dlng)
-  if (opentype.meta?.slng) tidyTags(opentype.meta.slng)
+  // Design/supported languages are script-language tags (for example "Latn"): the raw view keeps a bare script as
+  // written, and those Intl cannot parse stay as written too.
+  if (opentype.meta?.dlng) tidyTags(opentype.meta.dlng, canonicalizeTag)
+  if (opentype.meta?.slng) tidyTags(opentype.meta.slng, canonicalizeTag)
 }
 
 function normalizeAxes(axes: RawAxis[]): void {
@@ -109,7 +118,7 @@ function normalizeFace(face: RawFace, derived: ReadonlySet<Field>, done: WeakSet
   if (face.fullNames) tidyLocalized(face.fullNames)
   if (face.styleNames) tidyLocalized(face.styleNames)
   if (face.familyNames) tidyLocalized(face.familyNames)
-  if (face.supportedLanguages) tidyTags(face.supportedLanguages)
+  if (face.supportedLanguages) tidyTags(face.supportedLanguages, canonicalizeLanguageTag)
 
   const platform = face.platform
   if (platform?.os === 'win32') {

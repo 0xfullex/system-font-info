@@ -107,6 +107,11 @@ and chooses default strings. `additionalInformationalStrings` keeps the
 localized DirectWrite values the `name` records do not reproduce, comparing
 language tags without ASCII case when finding an existing record.
 
+`supportedLanguages` is split from the informational string and returned as
+DirectWrite gives it: a script without a language is a bare four-letter tag
+(`Latn`). The public form `und-Latn` is made in `ts/normalize.ts`, which
+shapes language tags for every platform.
+
 ## Language coverage
 
 `GetFirstMatchingFont(400, NORMAL, NORMAL)` selects the family's default

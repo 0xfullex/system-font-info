@@ -107,3 +107,28 @@ test('Darwin and Linux platform values are unchanged', () => {
     assert.deepEqual(platform, before)
   }
 })
+
+test('a bare four-letter script tag becomes und-<Script> on every language field; opentype.meta is untouched; qualified and language tags are unchanged', () => {
+  const tags = () => ['Latn', 'hans', 'zh-cn', 'Latn', 'en', 'und-Cyrl', 'Grek1']
+  const expected = ['und-Latn', 'und-Hans', 'zh-CN', 'en', 'und-Cyrl', 'Grek1']
+
+  const [family] = normalizeFamilies([{ family: 'F', faces: [{ supportedLanguages: tags() }] }])
+  assert.deepEqual(family.faces[0].supportedLanguages, expected)
+
+  const [derived] = normalizeFamilies(
+    [{ family: 'F', faces: [{ supportedLanguages: tags() }, { supportedLanguages: ['Arab', 'und-Latn'] }] }],
+    new Set(['supportedLanguages'])
+  )
+  assert.deepEqual(derived.supportedLanguages, [...expected, 'und-Arab'])
+
+  const [windows] = normalizeFamilies([
+    { family: 'F', faces: [{ platform: { os: 'win32', supportedLanguages: [{ language: 'cyrl', value: 'x' }] } }] }
+  ])
+  assert.equal(windows.faces[0].platform.supportedLanguages[0].language, 'und-Cyrl')
+
+  const [meta] = normalizeFamilies([
+    { family: 'F', faces: [{ opentype: { meta: { dlng: ['Latn', 'zh-cn'], slng: ['Cyrl'], tags: [] } } }] }
+  ])
+  assert.deepEqual(meta.faces[0].opentype.meta.dlng, ['Latn', 'zh-CN'])
+  assert.deepEqual(meta.faces[0].opentype.meta.slng, ['Cyrl'])
+})

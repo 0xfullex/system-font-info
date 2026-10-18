@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <array>
-#include <cctype>
 #include <cmath>
 #include <iomanip>
 #include <sstream>
@@ -64,11 +63,7 @@ std::vector<std::string> supportedLanguages(IDWriteFont* font) {
     }
     std::istringstream words(separated);
     std::string tag;
-    while (words >> tag) {
-      if (tag.size() == 4 && std::all_of(tag.begin(), tag.end(), [](unsigned char c) { return std::isalpha(c); }))
-        tag = "und-" + tag;
-      result.push_back(std::move(tag));
-    }
+    while (words >> tag) result.push_back(std::move(tag));
   }
   return result;
 }
