@@ -9,7 +9,8 @@ namespace {
 constexpr std::string_view kOpenTypePrefix = "faces.opentype.";
 
 const FieldInfo* findField(std::string_view name) {
-  const auto found = std::find_if(kFields.begin(), kFields.end(), [&](const FieldInfo& info) { return info.name == name; });
+  const auto found =
+      std::find_if(kFields.begin(), kFields.end(), [&](const FieldInfo& info) { return info.name == name; });
   return found == kFields.end() ? nullptr : &*found;
 }
 
@@ -62,14 +63,17 @@ Request makeRequest(const std::vector<std::string>& fieldNames, std::optional<st
     request.fields.set(size_t(info->field));
     if (info->level == Level::OpenType) {
       const auto entry = sfnt::openTypeEntryFromName(info->name.substr(kOpenTypePrefix.size()));
-      if (!entry) throw std::logic_error("system-font-info: the catalogue has the opentype field '" + name + "' that sfnt does not know");
+      if (!entry)
+        throw std::logic_error("system-font-info: the catalogue has the opentype field '" + name +
+                               "' that sfnt does not know");
       request.openTypeSelection.select(*entry);
     }
   }
   request.families = std::move(families);
   for (const std::string& name : orthographyNames) {
     const orthography::Orthography* orthography = orthography::find(name);
-    if (!orthography) throw std::invalid_argument("system-font-info: unknown orthography '" + name + "' in the native request");
+    if (!orthography)
+      throw std::invalid_argument("system-font-info: unknown orthography '" + name + "' in the native request");
     request.orthographies.push_back(orthography);
   }
   return request;
