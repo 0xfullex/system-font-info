@@ -84,19 +84,46 @@ std::vector<Group> groupByPostscriptName(CFArrayRef descriptors) {
   return groups;
 }
 
-// What the PostScript name resolves to, as a descriptor of that very name.
-// Resolution can come up empty (a disabled font is not matched) or land on a
-// descriptor of another name; the first descriptor of the group then stands.
-CTFontDescriptorRef resolve(const Group& group, Ref<CTFontDescriptorRef>& resolvedStorage) {
-  if (!group.postscriptName.empty()) {
-    const auto name = makeString(group.postscriptName);
-    const Ref<CTFontDescriptorRef> byName(CTFontDescriptorCreateWithNameAndSize(name.get(), 0));
-    resolvedStorage = Ref<CTFontDescriptorRef>(CTFontDescriptorCreateMatchingFontDescriptor(byName.get(), nullptr));
-    if (resolvedStorage && postscriptNameOf(resolvedStorage.get()) == group.postscriptName)
-      return resolvedStorage.get();
-  }
-  return group.descriptors.front();
+// What the PostScript name resolves to, as a descriptor of that very name. Null when resolution comes up empty (a
+// disabled font is not matched) or lands on a descriptor of another name.
+CTFontDescriptorRef resolveByName(const std::string& postscriptName, Ref<CTFontDescriptorRef>& resolvedStorage) {
+  if (postscriptName.empty()) return nullptr;
+  const auto name = makeString(postscriptName);
+  const Ref<CTFontDescriptorRef> byName(CTFontDescriptorCreateWithNameAndSize(name.get(), 0));
+  resolvedStorage = Ref<CTFontDescriptorRef>(CTFontDescriptorCreateMatchingFontDescriptor(byName.get(), nullptr));
+  return resolvedStorage && postscriptNameOf(resolvedStorage.get()) == postscriptName ? resolvedStorage.get() : nullptr;
 }
+
+// The collection's descriptors grouped by PostScript name, listed on first use: the full listing needs all of it, and
+// the family lookup path only the names it has to settle against the collection.
+class CollectionGroups {
+ public:
+  const std::vector<Group>& all() {
+    load();
+    return groups_;
+  }
+
+  // The group of a PostScript name; null when the collection has none.
+  const Group* find(const std::string& postscriptName) {
+    load();
+    const auto found = groupOfName_.find(postscriptName);
+    return found == groupOfName_.end() ? nullptr : &groups_[found->second];
+  }
+
+ private:
+  void load() {
+    if (descriptors_) return;
+    descriptors_ = copyCollectionDescriptors();
+    groups_ = groupByPostscriptName(descriptors_.get());
+    for (size_t i = 0; i < groups_.size(); ++i) {
+      if (!groups_[i].postscriptName.empty()) groupOfName_.emplace(groups_[i].postscriptName, i);
+    }
+  }
+
+  Ref<CFArrayRef> descriptors_;  // keeps the descriptors of the groups alive
+  std::vector<Group> groups_;
+  std::unordered_map<std::string, size_t> groupOfName_;
+};
 
 // A face that is ready to be read, with what the family-level steps decided.
 struct Seed {
@@ -128,14 +155,25 @@ std::vector<ShadowedFile> shadowedFiles(const Group& group, CTFontDescriptorRef 
 
 // Groups the resolved faces by family, in the order the families first appear. The shadowed files, which cost a
 // look at every other descriptor of a group, are found only when the request wants them.
-std::vector<FamilySeeds> groupByFamily(const std::vector<Group>& groups, const Request& request) {
+//
+// `groups` come from the whole collection, or from a family lookup, which lists one file for a PostScript name. For a
+// lookup, `collection` is the whole collection: its group of the name stands in where the lookup's is not enough, that
+// is when the request wants the shadowed files, and when resolution finds nothing and the face falls back to the first
+// descriptor of the name, which must be the one the full listing falls back to.
+std::vector<FamilySeeds> groupByFamily(const std::vector<Group>& groups, const Request& request,
+                                       CollectionGroups* collection) {
   std::vector<FamilySeeds> families;
   std::unordered_map<std::string, size_t> familyOfName;
   for (const Group& group : groups) {
     Seed seed;
-    seed.descriptor = resolve(group, seed.resolved);
     seed.postscriptName = group.postscriptName;
-    if (request.wants(Field::FacesPlatformShadowed)) seed.shadowed = shadowedFiles(group, seed.descriptor);
+    CTFontDescriptorRef resolved = resolveByName(group.postscriptName, seed.resolved);
+    const Group* members = &group;
+    if (collection && (!resolved || request.wants(Field::FacesPlatformShadowed))) {
+      if (const Group* inCollection = collection->find(group.postscriptName)) members = inCollection;
+    }
+    seed.descriptor = resolved ? resolved : members->descriptors.front();
+    if (request.wants(Field::FacesPlatformShadowed)) seed.shadowed = shadowedFiles(*members, seed.descriptor);
 
     std::string family = toUtf8(asString(copyAttribute(seed.descriptor, kCTFontFamilyNameAttribute).get()));
     const auto [entry, inserted] = familyOfName.try_emplace(family, families.size());
@@ -196,29 +234,16 @@ void orderLikeCoreText(FamilySeeds& family) {
 }
 
 // The faces of every family of the collection.
-std::vector<FamilySeeds> familiesOfCollection(const Request& request, Ref<CFArrayRef>& collection) {
-  collection = copyCollectionDescriptors();
-  return groupByFamily(groupByPostscriptName(collection.get()), request);
+std::vector<FamilySeeds> familiesOfCollection(const Request& request, CollectionGroups& collection) {
+  return groupByFamily(collection.all(), request, nullptr);
 }
 
 // The faces of each requested family, from the family lookup. The groups come out in the lookup's order, so the
 // family's faces are in member order already; the faces the full collection would add after them (those the lookup
-// does not name) are not looked for. The lookup lists one file for a PostScript name, and the other files
-// (`platform.shadowed`) only the collection knows, so a request for them also lists the collection and takes the
-// group of each name from it. `collection` and `lookups` keep the descriptors alive.
-std::vector<FamilySeeds> familiesOfLookups(const Request& request, Ref<CFArrayRef>& collection,
+// does not name) are not looked for. The lookup lists one file for a PostScript name; the collection settles the
+// names where that is not enough (see `groupByFamily`). `lookups` keeps the lookups' descriptors alive.
+std::vector<FamilySeeds> familiesOfLookups(const Request& request, CollectionGroups& collection,
                                            std::vector<Ref<CFArrayRef>>& lookups) {
-  std::vector<Group> collectionGroups;
-  std::unordered_map<std::string, size_t> collectionGroupOfName;
-  if (request.wants(Field::FacesPlatformShadowed)) {
-    collection = copyCollectionDescriptors();
-    collectionGroups = groupByPostscriptName(collection.get());
-    for (size_t i = 0; i < collectionGroups.size(); ++i) {
-      if (!collectionGroups[i].postscriptName.empty())
-        collectionGroupOfName.emplace(collectionGroups[i].postscriptName, i);
-    }
-  }
-
   std::vector<FamilySeeds> result;
   std::vector<std::string> looked;
   for (const std::string& name : *request.families) {
@@ -227,14 +252,9 @@ std::vector<FamilySeeds> familiesOfLookups(const Request& request, Ref<CFArrayRe
 
     Ref<CFArrayRef> members = lookUpFamily(name);
     if (!members) continue;
-    std::vector<Group> groups = groupByPostscriptName(members.get());
-    for (Group& group : groups) {
-      const auto inCollection = collectionGroupOfName.find(group.postscriptName);
-      if (inCollection != collectionGroupOfName.end()) group = collectionGroups[inCollection->second];
-    }
     // The lookup may return other families, and the same family may come out of the lookup of another requested
     // name: the family of this name is the one this lookup answers for.
-    for (FamilySeeds& family : groupByFamily(groups, request)) {
+    for (FamilySeeds& family : groupByFamily(groupByPostscriptName(members.get()), request, &collection)) {
       if (family.name != name) continue;
       family.ordered = true;
       result.push_back(std::move(family));
@@ -258,8 +278,8 @@ std::vector<uint32_t> languageCoverageOf(FamilySeeds& family, const Request& req
 }
 
 std::vector<Family> enumerate(const Request& request, WorkLog& work) {
-  // Keeps the descriptors the seeds point into alive.
-  Ref<CFArrayRef> collection;
+  // Keep the descriptors the seeds point into alive.
+  CollectionGroups collection;
   std::vector<Ref<CFArrayRef>> lookups;
   std::vector<FamilySeeds> families =
       request.families ? familiesOfLookups(request, collection, lookups) : familiesOfCollection(request, collection);

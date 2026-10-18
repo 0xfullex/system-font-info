@@ -98,10 +98,13 @@ each distinct requested name, the family lookup that gives the member order
 family, so the family of that name is picked out by exact comparison, and the
 groups come out in the lookup's order, which is the member order, so the lookup
 is made once. `families: []` returns before any CoreText call. The lookup lists
-one file for a PostScript name; when the request wants `platform.shadowed` the
-collection is listed too and each name's group is taken from it. A face the
-lookup does not name (the tail the full listing appends) is not found on this
-path.
+one file for a PostScript name, so the collection settles the names where that
+is not enough: it is listed (once per call, on first use) when the request wants
+`platform.shadowed`, whose files only the collection knows, and when resolution
+finds nothing for a name, so that the fallback is the collection's first
+descriptor of that name here as in the full listing (the `file` of a face does
+not depend on whether `families` was given). A face the lookup does not name
+(the tail the full listing appends) is not found on this path.
 
 ## Source of each field
 
