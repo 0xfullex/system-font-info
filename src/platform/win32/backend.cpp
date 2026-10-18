@@ -1,6 +1,4 @@
-#include <map>
 #include <set>
-#include <stdexcept>
 
 #include "../../core/platform.h"
 #include "collection.h"
@@ -44,19 +42,14 @@ std::vector<Family> enumerateFonts(const Request& request, WorkLog& work) {
     if (request.wantsAnyFace()) {
       bool hidden = false;
       for (const auto& name : names) hidden = hidden || inactive.contains(name.value);
-      std::map<std::string, win32::ComPtr<IDWriteFont>> identities;
+      std::set<std::string> identities;
       for (UINT32 member = 0; member < nativeFamily->GetFontCount(); ++member) {
         win32::ComPtr<IDWriteFont> font;
         win32::check(nativeFamily->GetFont(member, &font), "GetFont");
         auto read = reader.read(font.Get(), names, hidden);
-        const auto [first, inserted] = identities.emplace(read.identity, font);
-        if (!inserted) {
-          if (!win32::FaceReader::sameMember(first->second.Get(), font.Get()))
-            throw std::runtime_error("system-font-info: different Windows members have the same face identity in " +
-                                     family.family);
-          continue;
-        }
-        family.faces.push_back(std::move(read.face));
+        // A repeated identity is the same face listed again: the first member in order stays, even if other fields
+        // of the later one differ.
+        if (identities.insert(read.identity).second) family.faces.push_back(std::move(read.face));
       }
     }
     if (!request.orthographies.empty()) {

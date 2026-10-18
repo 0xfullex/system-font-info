@@ -97,35 +97,6 @@ std::optional<uint32_t> namedInstance(const Face& face, const sfnt::FontTables& 
 
 void appendString(std::ostream& output, const std::string& text) { output << text.size() << ':' << text; }
 
-// These are all the per-member inputs of public B fields. For an identical physical resource, coordinates, and
-// simulations, C/D/E inputs are shared; any different member metadata must fail instead of being silently dropped.
-std::string memberMetadata(IDWriteFont* font) {
-  std::ostringstream result;
-  result << font->GetWeight() << ',' << font->GetStretch() << ',' << font->GetStyle() << ',' << font->IsSymbolFont();
-  ComPtr<IDWriteFont1> font1;
-  check(font->QueryInterface(IID_PPV_ARGS(&font1)), "IDWriteFont1");
-  result << ',' << font1->IsMonospacedFont();
-  ComPtr<IDWriteFont2> font2;
-  check(font->QueryInterface(IID_PPV_ARGS(&font2)), "IDWriteFont2");
-  result << ',' << font2->IsColorFont();
-  const auto appendNames = [&](const LocalizedStrings& strings) {
-    result << '[' << strings.size() << ']';
-    for (const auto& item : strings) {
-      appendString(result, item.language);
-      appendString(result, item.value);
-    }
-  };
-  ComPtr<IDWriteLocalizedStrings> names;
-  check(font->GetFaceNames(&names), "GetFaceNames");
-  appendNames(localizedStrings(names.Get()));
-  for (int id = 1; id <= DWRITE_INFORMATIONAL_STRING_SUPPORTED_SCRIPT_LANGUAGE_TAG; ++id)
-    appendNames(informationalStrings(font, static_cast<DWRITE_INFORMATIONAL_STRING_ID>(id)));
-  const Reference reference = fontReference(font);
-  for (const auto& value : axisValues(reference.reference.Get()))
-    result << ',' << static_cast<uint32_t>(value.axisTag) << '=' << std::hexfloat << value.value;
-  return result.str();
-}
-
 }  // namespace
 
 FaceReader::FaceReader(const Request& request, WorkLog& work, Collection& collection)
@@ -329,10 +300,6 @@ ReadFace FaceReader::read(IDWriteFont* font, const LocalizedStrings& familyNames
       identity << ':' << axisTag(value.axisTag) << '=' << std::hexfloat << value.value;
   read.identity = identity.str();
   return read;
-}
-
-bool FaceReader::sameMember(IDWriteFont* left, IDWriteFont* right) {
-  return memberMetadata(left) == memberMetadata(right);
 }
 
 }  // namespace sfi::platform::win32

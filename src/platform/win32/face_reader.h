@@ -22,7 +22,6 @@ class FaceReader {
  public:
   FaceReader(const Request& request, WorkLog& work, Collection& collection);
   ReadFace read(IDWriteFont* font, const LocalizedStrings& familyNames, bool inactive);
-  static bool sameMember(IDWriteFont* left, IDWriteFont* right);
 
  private:
   struct Resource {
