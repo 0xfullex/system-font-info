@@ -114,8 +114,9 @@ Every face is read through `sfnt::readFontTables` (tag list from
 `CTFontCopyAvailableTables` in CoreText's own order, which the reader sorts;
 bytes from `CTFontCopyTable`) whatever
 `options.tables` says: the names, `fvar` and `cmap` feed fields that exist
-anyway. The option only decides whether `opentype` and `platform.metrics` are
-attached. The result is cached per font resource (file path and face index) for the length of one enumeration, so
+anyway. The `opentype` value is built from it by `sfnt::openTypeValue` with
+every entry. The option only decides whether `opentype` and `platform.metrics`
+are attached. The result is cached per font resource (file path and face index) for the length of one enumeration, so
 the named instances of a variable font share one `opentype` value and one axes
 list.
 

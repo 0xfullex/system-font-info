@@ -29,7 +29,7 @@ the interface in `../core/platform.h` and fills the structs of
 - Report what the OS says, in full: every font the OS lists, every language it
   names, every attribute it exposes. Fields the OS has no notion of stay absent
   or carry the truthful value; nothing is filled in with an invented default.
-- Read the font's own tables through `../sfnt` (`readFontTables`), feeding it
+- Read the font's own tables through `../sfnt` (`readFontTables`, `openTypeValue`), feeding it
   the bytes the OS hands out, so the `opentype` object and the names are
   identical on every platform. The platform-specific raw values go into
   `Face::platform`, a `Value` whose first key is `"os"` and whose shape is the

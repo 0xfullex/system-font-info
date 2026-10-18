@@ -298,7 +298,7 @@ describe('opentype.errors', () => {
   after(() => rmSync(directory, { recursive: true, force: true }))
 
   /** Copies SFITest-Variable.ttf with the directory entry or the data of some tables damaged. */
-  function corruptedCopy(damage) {
+  function corruptedCopy(damage, entries) {
     const bytes = Buffer.from(readFileSync(fixture('SFITest-Variable.ttf')))
     const tableCount = bytes.readUInt16BE(4)
     for (let i = 0; i < tableCount; i++) {
@@ -309,7 +309,7 @@ describe('opentype.errors', () => {
     }
     const file = join(directory, `corrupt-${Object.keys(damage).join('-').replaceAll('/', '')}.ttf`)
     writeFileSync(file, bytes)
-    return readFontFile(file, 0)
+    return readFontFile(file, 0, entries)
   }
 
   const damage = {
@@ -343,5 +343,50 @@ describe('opentype.errors', () => {
     )
     assert.equal(font.fvar.instances[0].postscriptName, undefined)
     assert.equal(font.head.unitsPerEm, 1000)
+  })
+
+  test('lists only the tables of the selected entries', () => {
+    assert.deepEqual(corruptedCopy(damage, ['head', 'maxp']).errors, ['head'])
+    assert.deepEqual(corruptedCopy(damage, ['os2', 'names']).errors, ['OS/2', 'name'].sort())
+    assert.equal('errors' in corruptedCopy(damage, ['maxp', 'cmap', 'fvar', 'layout']), false)
+    // A selected entry whose table failed is left out; the others are unaffected.
+    const font = corruptedCopy(damage, ['head', 'maxp'])
+    assert.deepEqual(Object.keys(font), ['errors', 'maxp'])
+  })
+
+  test('a malformed name table is an error only when the names are selected', () => {
+    const names = corruptedCopy({ name: damage.name }, ['names'])
+    assert.deepEqual(names, { names: [], errors: ['name'] })
+    // fvar is built from the names that could be read (none), but its own table is fine.
+    const fvar = corruptedCopy({ name: damage.name }, ['fvar'])
+    assert.deepEqual(Object.keys(fvar), ['fvar'])
+    assert.deepEqual(fvar.fvar.axes[0].names, [])
+  })
+})
+
+describe('opentype entry selection', () => {
+  test('selecting one entry gives only that entry, equal to the full one', () => {
+    for (const entry of ['tables', 'names', 'head', 'hhea', 'os2', 'post', 'maxp', 'cmap', 'fvar', 'meta', 'layout']) {
+      const selected = readFontFile(fixture('SFITest-Variable.ttf'), 0, [entry])
+      assert.deepEqual(Object.keys(selected), entry in variable ? [entry] : [], entry)
+      assert.deepEqual(selected, entry in variable ? { [entry]: variable[entry] } : {}, entry)
+    }
+  })
+
+  test('several entries come out in the order of the full object, whatever the order asked', () => {
+    const selected = readFontFile(fixture('SFITest-Variable.ttf'), 0, ['maxp', 'tables', 'head', 'maxp'])
+    assert.deepEqual(selected, { tables: variable.tables, head: variable.head, maxp: variable.maxp })
+    assert.deepEqual(Object.keys(selected), ['tables', 'head', 'maxp'])
+  })
+
+  test('an empty selection and entries whose tables are missing give an empty object', () => {
+    assert.deepEqual(readFontFile(fixture('SFITest-Variable.ttf'), 0, []), {})
+    assert.equal(symbol.tables.includes('fvar') || symbol.tables.includes('GSUB'), false)
+    assert.deepEqual(readFontFile(fixture('SFITest-Symbol.ttf'), 0, ['fvar', 'layout']), {})
+  })
+
+  test('an unknown entry or a non-array is a TypeError', () => {
+    assert.throws(() => readFontFile(fixture('SFITest-Variable.ttf'), 0, ['bogus']), TypeError)
+    assert.throws(() => readFontFile(fixture('SFITest-Variable.ttf'), 0, 'head'), TypeError)
   })
 })

@@ -22,7 +22,7 @@ and both libraries are orders of magnitude larger than that.
 | `fvar.cpp` | `fvar` parsing and its `opentype.fvar` value. |
 | `layout.cpp` | GSUB / GPOS script, language system and feature lists, feature UI names. |
 | `opentype_tables.cpp` | head, hhea/vhea, OS/2, post, maxp, cmap, meta. |
-| `font_tables.cpp` | `readFontTables`: fetches the tables and assembles the `opentype` value. |
+| `font_tables.cpp` | `readFontTables` (the table directory, `name`, `fvar`, `cmap`) and `openTypeValue` (the selected `opentype` entries); the one table of which entry is made of which tables. |
 | `file.cpp` | `FontFile`: sfnt and collection directories, table bytes on demand, face lookup by PostScript name. |
 | `language_tables.{h,cpp}` | Generated LCID and Mac language code to BCP 47 tables. |
 
@@ -84,8 +84,9 @@ Table order is kept.
 
 ## Values
 
-`readFontTables` builds the `opentype` value described by `OpenTypeInfo` in
-`ts/types.ts`. Numbers are as stored; the interpretations are:
+`openTypeValue` builds the `opentype` value described by `OpenTypeInfo` in
+`ts/types.ts`, for the entries of an `OpenTypeSelection` (`OpenTypeSelection::all()`
+is every entry). Numbers are as stored; the interpretations are:
 
 - Versions (`head`, `hhea`, `vhea`, `post`, `maxp`) are Version16Dot16: major
   plus the top hex digit of the minor word as tenths (`0x00011000` is 1.1).
@@ -111,13 +112,24 @@ Table order is kept.
 
 ## Invariants
 
+- A face is read in two steps. `readFontTables` reads what the cross-platform
+  fields need (the table directory, `name`, `fvar`, and `cmap` for the symbol
+  flag) and builds no `opentype` value; `openTypeValue` then builds only the
+  selected entries, reusing what the first step parsed and fetching the other
+  tables itself. The entries are `tables`, `names`, `head`, `hhea`, `vhea`,
+  `os2`, `post`, `maxp`, `cmap`, `fvar`, `meta` and `layout` (GSUB and GPOS);
+  `font_tables.cpp` maps each to its tables.
 - `readFontTables` takes the tag list in any order and with repeats; it sorts
   and de-duplicates it, so `opentype.tables` is ascending whatever the caller
   passes.
+- An entry is present when it is selected and its table is present and
+  readable, except `tables` and `names`, which are present whenever selected.
+  `opentype` is `{}` when no selected table exists and none failed.
 - Malformed data throws `ParseError` from the parsing functions; nothing reads
-  out of bounds. `readFontTables` never throws for table content: a table that
-  is present but cannot be fetched or parsed is left out and its tag is listed
-  in `opentype.errors` (ascending). A malformed `name` table gives empty
+  out of bounds. Neither step throws for table content: a table that is
+  present but cannot be fetched or parsed is left out, and its tag is listed in
+  `opentype.errors` (ascending) when an entry made of it is selected; the
+  failure of a table nobody selected is not reported. A malformed `name` table gives empty
   `names` and an error entry, and `fvar` / layout names are then empty too.
 - `FontFile::open` returns nullopt for anything that is not an sfnt (`0x00010000`,
   `OTTO`, `true`, `typ1`) or a `ttcf` collection of any version. A face of a

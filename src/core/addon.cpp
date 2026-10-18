@@ -110,7 +110,8 @@ Napi::Value unregisterFont(const Napi::CallbackInfo& info) {
 }
 
 // Reads one face of a font file through the same table reader the platform
-// backends use, and returns its `opentype` object.
+// backends use, and returns its `opentype` object. The optional third argument
+// lists the entries to build (`tables`, `names`, `head`, ...); all by default.
 Napi::Value readFontFile(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
   std::string path = pathArgument(info, "readFontFile");
@@ -128,10 +129,25 @@ Napi::Value readFontFile(const Napi::CallbackInfo& info) {
   }
   size_t index = static_cast<size_t>(requested);
 
+  sfnt::OpenTypeSelection selection = sfnt::OpenTypeSelection::all();
+  if (info.Length() > 2 && !info[2].IsUndefined()) {
+    if (!info[2].IsArray()) throw Napi::TypeError::New(env, "readFontFile: entries must be an array of entry names");
+    selection = {};
+    const Napi::Array names = info[2].As<Napi::Array>();
+    for (uint32_t i = 0; i < names.Length(); ++i) {
+      const Napi::Value name = names.Get(i);
+      const auto entry =
+          name.IsString() ? sfnt::openTypeEntryFromName(name.As<Napi::String>().Utf8Value()) : std::nullopt;
+      if (!entry)
+        throw Napi::TypeError::New(env, "readFontFile: unknown opentype entry " + name.ToString().Utf8Value());
+      selection.select(*entry);
+    }
+  }
+
   try {
-    sfnt::FontTables tables = sfnt::readFontTables(
-        file->tableTags(index), [&](uint32_t tag) { return file->table(index, tag); }, platform::decodeLegacyText);
-    return sharedToJs(env, tables.opentype);
+    const sfnt::TableFetcher fetch = [&](uint32_t tag) { return file->table(index, tag); };
+    const sfnt::FontTables tables = sfnt::readFontTables(file->tableTags(index), fetch, platform::decodeLegacyText);
+    return sharedToJs(env, sfnt::openTypeValue(tables, selection, fetch));
   } catch (const std::exception& e) {
     throw Napi::Error::New(env, std::string("readFontFile: ") + e.what());
   }

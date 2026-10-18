@@ -19,4 +19,4 @@ The platform-independent model and the JS boundary. No file here calls an OS fon
 - **Nothing runs on the JS thread that can block.** `enumerateFonts` runs in an `AsyncWorker`. Conversion happens on the JS thread, family by family inside a handle scope, with persistent references for the shared-object memo.
 - **No state between calls.** The addon keeps no per-environment or process-wide data: a `getFonts` call is an `AsyncWorker` that owns everything it creates, and nothing it computes outlives the call.
 - **Errors.** Backends throw `std::exception`; `getFonts` rejects with an `Error` carrying the message. Argument errors throw `TypeError` / `RangeError` synchronously.
-- `__testing.readFontFile` runs the same table reader a backend uses, over a file, and is for tests only.
+- `__testing.readFontFile(path, faceIndex, entries?)` runs the same table reader a backend uses, over a file, and is for tests only. `entries` is a list of `opentype` entry names to build; every entry when omitted.

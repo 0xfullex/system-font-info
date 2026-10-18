@@ -1,11 +1,14 @@
 #pragma once
 
+#include <bitset>
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <set>
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "../core/model.h"
@@ -120,20 +123,74 @@ Fvar parseFvar(std::span<const uint8_t> table);
 // Returns one table's bytes, or nullopt when the font has no such table.
 using TableFetcher = std::function<std::optional<std::vector<uint8_t>>(uint32_t tag)>;
 
+// What the cross-platform fields need from a face's tables (step one of
+// reading a face; `openTypeValue` is step two).
 struct FontTables {
   std::vector<uint32_t> tags;     // tables present, ascending
   std::vector<NameRecord> names;  // empty when there is no usable name table
   std::optional<Fvar> fvar;
   bool symbolCmap = false;  // cmap has a (3,0) subtable
   bool hasCff2 = false;
-  Value::Shared opentype;  // the `opentype` object of a face (see ts/types.ts OpenTypeInfo)
+  // The `opentype.cmap` value, parsed along with `symbolCmap` so that
+  // `openTypeValue` does not read the table again.
+  std::optional<Value> cmapValue;
+  // Tables that are present but could not be fetched or parsed, among those
+  // this struct reads (`name`, `fvar`, `cmap`).
+  std::set<uint32_t> failed;
 };
 
-// Reads and parses the standard tables listed in OpenTypeInfo. A table that
-// is present but malformed is left out of `opentype` and its tag is listed in
-// `opentype.errors`; this function itself does not throw for table content.
+// Reads the table directory and the tables the cross-platform fields are made
+// of: `name`, `fvar`, and `cmap` (for `symbolCmap`). It does not build the
+// `opentype` value. The tag list may come in any order and with repeats. A
+// table that is present but malformed is left out and recorded in `failed`;
+// this function does not throw for table content.
 FontTables readFontTables(const std::vector<uint32_t>& tags, const TableFetcher& fetch,
                           const LegacyDecoder& decodeLegacy);
+
+// The entries of the `opentype` object (ts/types.ts OpenTypeInfo), without
+// `errors`, which only reports the tables of selected entries.
+enum class OpenTypeEntry {
+  Tables,
+  Names,
+  Head,
+  Hhea,
+  Vhea,
+  Os2,
+  Post,
+  Maxp,
+  Cmap,
+  Fvar,
+  Meta,
+  Layout,
+  Count_  // not an entry
+};
+
+// The entry called `name` ("tables", "names", "head", ..., "layout"), or nullopt.
+std::optional<OpenTypeEntry> openTypeEntryFromName(std::string_view name);
+
+struct OpenTypeSelection {
+  std::bitset<size_t(OpenTypeEntry::Count_)> entries;
+
+  static OpenTypeSelection all() {
+    OpenTypeSelection selection;
+    selection.entries.set();
+    return selection;
+  }
+  OpenTypeSelection& select(OpenTypeEntry entry) {
+    entries.set(size_t(entry));
+    return *this;
+  }
+  bool has(OpenTypeEntry entry) const { return entries.test(size_t(entry)); }
+};
+
+// Builds the `opentype` object with the selected entries only. An entry is
+// present when it is selected and its table is present and readable (`tables`
+// and `names` whenever they are selected). `errors` lists, ascending, the
+// tables of selected entries that are present but could not be fetched or
+// parsed; those entries are left out. The tables the selection needs besides
+// those `readFontTables` read come from `fetch`. `tables` must come from
+// `readFontTables` with the same font. Does not throw for table content.
+Value::Shared openTypeValue(const FontTables& tables, const OpenTypeSelection& selection, const TableFetcher& fetch);
 
 // ---- font files -----------------------------------------------------------
 

@@ -110,6 +110,7 @@ std::shared_ptr<const FaceReader::Resource> FaceReader::loadResource(const Table
 
   auto resource = std::make_shared<Resource>();
   resource->tables = sfnt::readFontTables(source.tags, source.fetch, decodeLegacyText);
+  resource->opentype = sfnt::openTypeValue(resource->tables, sfnt::OpenTypeSelection::all(), source.fetch);
   const auto axes = copyAttribute(descriptor, kCTFontVariationAxesAttribute);
   resource->axes = makeAxes(asArray(axes.get()), resource->tables);
   if (key) resources_.emplace(*key, resource);
@@ -144,7 +145,7 @@ Face FaceReader::read(CTFontDescriptorRef descriptor, const std::vector<Shadowed
   if (!path.empty()) face.file = FileLocation{path, source.index};
   const auto resource = loadResource(source, descriptor, face.file);
   const sfnt::FontTables& tables = resource->tables;
-  if (options_.tables && !source.tags.empty()) face.opentype = tables.opentype;
+  if (options_.tables && !source.tags.empty()) face.opentype = resource->opentype;
 
   // ---- classification
   const Traits traits = readTraits(descriptor);

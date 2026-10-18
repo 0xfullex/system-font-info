@@ -34,7 +34,8 @@ class FaceReader {
   // all named instances of one variable font).
   struct Resource {
     sfnt::FontTables tables;
-    SharedAxes axes;  // null when the font has no variation axes
+    Value::Shared opentype;  // every entry; shared by the faces of the resource
+    SharedAxes axes;         // null when the font has no variation axes
   };
 
   // The `name` tables of every face of a collection file, for finding a face's
