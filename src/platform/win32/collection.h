@@ -15,7 +15,9 @@ struct Source {
   std::optional<std::string> name;
 };
 
-// One call's WSS collection. Resource joins deliberately ignore simulations: synthesized members use their base source.
+// One call's WSS collection. Its font sets are the collection's own (`IDWriteFontCollection1::GetFontSet`), never a
+// second system query, so every member the collection lists has an entry in them even if fonts change mid-call.
+// Resource joins deliberately ignore simulations: synthesized members use their base source.
 class Collection {
  public:
   explicit Collection(const Request& request);
@@ -26,14 +28,16 @@ class Collection {
   bool processFont(const std::string& path) const;
 
  private:
+  IDWriteFontSet1* systemSet();
   void loadResources();
   void loadSources();
 
   const Request& request_;
   ComPtr<IDWriteFactory6> factory_;
   ComPtr<IDWriteFontCollection> collection_;
-  ComPtr<IDWriteFontSet1> systemSet_;
-  ComPtr<IDWriteFontSet1> memberSet_;
+  ComPtr<IDWriteFontCollection1> system_;
+  ComPtr<IDWriteFontSet1> systemSet_;  // The system collection's own font set, fetched on first use.
+  ComPtr<IDWriteFontSet1> memberSet_;  // The set of `collection_`: the system set, or that set plus the test fonts.
   std::set<std::wstring> processPaths_;
   bool resourcesLoaded_ = false;
   bool sourcesLoaded_ = false;

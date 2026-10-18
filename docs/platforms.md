@@ -270,7 +270,7 @@ The group of each field is in [the matrix of Source groups](#the-group-of-every-
 | `enabled` | Always true: DirectWrite has no disabled state. |
 | `simulations` | `IDWriteFont::GetSimulations` bits. |
 | `supportedLanguages` | Informational string `DWRITE_INFORMATIONAL_STRING_SUPPORTED_SCRIPT_LANGUAGE_TAG`, split into tags; a script alone becomes `und-` and the script (`Hans` is `und-Hans`). |
-| `scope` | `IDWriteFontSet3::GetFontSourceType` of the member's entry in the collection's font set (a simulated member takes its base font's entry): per-machine is `system`, per-user `user`, anything else (an app package, for example) `unknown`. |
+| `scope` | `IDWriteFontSet3::GetFontSourceType` of the member's entry in the font set the system collection itself gives (`IDWriteFontCollection1::GetFontSet`, so the set and the members listed are one snapshot even if a font is removed during the call; a simulated member takes its base font's entry): per-machine is `system`, per-user `user`, anything else (an app package, for example) `unknown`. |
 | `format` | The table directory: `CFF2` is `cff2`, `CFF` is `cff`, `glyf` is `truetype`; without those, `DWRITE_FONT_FACE_TYPE` Type 1 is `type1` and bitmap is `bitmap`; anything else `unknown`. A collection is a container, not a format. |
 | `file.path` | `IDWriteFont3::GetFontFaceReference`, `IDWriteFontFaceReference::GetFontFile`, and the path from `IDWriteLocalFontFileLoader::GetFilePathFromKey`. |
 | `file.index` | `IDWriteFontFaceReference::GetFontFaceIndex`. |
@@ -297,7 +297,7 @@ The definitions are in [api.md](api.md#windows-win32native).
 | --- | --- |
 | `weight`, `width`, `slant` | The raw `IDWriteFont` values (`GetWeight`, `GetStretch`, `GetStyle`). |
 | `typographicFamilyNames`, `typographicStyleNames`, `designLanguages`, `supportedLanguages` | Informational strings. |
-| `sourceType`, `sourceName` | `IDWriteFontSet3::GetFontSourceType` and `GetFontSourceName` of the face's entry in the whole system font set. |
+| `sourceType`, `sourceName` | `IDWriteFontSet3::GetFontSourceType` and `GetFontSourceName` of the face's entry in the whole font set of the system collection. |
 | `axisValues` | `IDWriteFontFaceReference1::GetFontAxisValues`. |
 | `inactiveFamilyPreference` | One registry read per call of `HKCU\Software\Microsoft\Windows NT\CurrentVersion\Font Management\Inactive Fonts`, then family-name membership lookup (A). The key was absent in the normal-user measurement on 2026-10-18; a hidden-family match was not exercised. |
 | `resourceAxes` | The axes of the font resource (`IDWriteFontResource`). |

@@ -9,17 +9,15 @@ namespace sfi::platform::win32 {
 Collection::Collection(const Request& request) : request_(request), factory_(createFactory()) {
   // This overload is the WSS collection and explicitly disables the update check. Factory6's overload has no
   // checkForUpdates parameter: its first BOOL controls downloadable fonts instead.
-  ComPtr<IDWriteFontCollection1> system;
-  check(static_cast<IDWriteFactory3*>(factory_.Get())->GetSystemFontCollection(FALSE, &system, FALSE),
+  check(static_cast<IDWriteFactory3*>(factory_.Get())->GetSystemFontCollection(FALSE, &system_, FALSE),
         "GetSystemFontCollection");
-  check(system.As(&collection_), "IDWriteFontCollection");
+  check(system_.As(&collection_), "IDWriteFontCollection");
 
   const auto registered = registeredFonts();
   if (registered.empty()) return;
-  check(factory_->GetSystemFontSet(FALSE, &systemSet_), "GetSystemFontSet");
   ComPtr<IDWriteFontSetBuilder2> builder;
   check(factory_->CreateFontSetBuilder(&builder), "CreateFontSetBuilder");
-  check(builder->AddFontSet(systemSet_.Get()), "AddFontSet");
+  check(builder->AddFontSet(systemSet()), "AddFontSet");
   for (const auto& path : registered) {
     check(builder->AddFontFile(path.c_str()), "AddFontFile");
     processPaths_.insert(path);
@@ -32,6 +30,15 @@ Collection::Collection(const Request& request) : request_(request), factory_(cre
       factory_->CreateFontCollectionFromFontSet(combined.Get(), DWRITE_FONT_FAMILY_MODEL_WEIGHT_STRETCH_STYLE, &custom),
       "CreateFontCollectionFromFontSet");
   check(custom.As(&collection_), "IDWriteFontCollection");
+}
+
+IDWriteFontSet1* Collection::systemSet() {
+  if (!systemSet_) {
+    ComPtr<IDWriteFontSet> set;
+    check(system_->GetFontSet(&set), "GetFontSet");
+    check(set.As(&systemSet_), "IDWriteFontSet1");
+  }
+  return systemSet_.Get();
 }
 
 bool Collection::processFont(const std::string& path) const {
@@ -47,8 +54,7 @@ bool Collection::processFont(const std::string& path) const {
 void Collection::loadResources() {
   if (resourcesLoaded_) return;
   resourcesLoaded_ = true;
-  if (!systemSet_) check(factory_->GetSystemFontSet(FALSE, &systemSet_), "GetSystemFontSet");
-  if (!memberSet_) memberSet_ = systemSet_;
+  if (!memberSet_) memberSet_ = systemSet();
   for (UINT32 index = 0; index < memberSet_->GetFontCount(); ++index) {
     ComPtr<IDWriteFontFaceReference1> reference;
     check(memberSet_->GetFontFaceReference(index, &reference), "GetFontFaceReference(set)");
@@ -76,12 +82,12 @@ bool Collection::variable(const ResourceKey& key) {
 void Collection::loadSources() {
   if (sourcesLoaded_) return;
   sourcesLoaded_ = true;
-  if (!systemSet_) check(factory_->GetSystemFontSet(FALSE, &systemSet_), "GetSystemFontSet");
+  IDWriteFontSet1* const set = systemSet();
   ComPtr<IDWriteFontSet3> set3;
   checkRequiredInterface(systemSet_.As(&set3), "IDWriteFontSet3");
-  for (UINT32 index = 0; index < systemSet_->GetFontCount(); ++index) {
+  for (UINT32 index = 0; index < set->GetFontCount(); ++index) {
     ComPtr<IDWriteFontFaceReference1> reference;
-    check(systemSet_->GetFontFaceReference(index, &reference), "GetFontFaceReference(source)");
+    check(set->GetFontFaceReference(index, &reference), "GetFontFaceReference(source)");
     const auto described = describeReference(reference.Get());
     Source source;
     source.type = static_cast<uint32_t>(set3->GetFontSourceType(index));

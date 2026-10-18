@@ -28,6 +28,10 @@ with downloadable fonts excluded and `checkForUpdates = FALSE`. The
 `IDWriteFactory3::GetSystemFontCollection` overload fixes the WSS model and
 exposes that update-check parameter. The `IDWriteFactory6` overload has a
 different signature: its BOOL controls downloadable fonts, not update checks.
+Resource classification and source metadata come from that collection's own
+font set (`IDWriteFontCollection1::GetFontSet`), never from a second system
+query: a font removed between two queries would otherwise leave a listed member
+without a font-set entry and fail the call.
 No factory, collection, source index, font object or parsed data is kept by
 the backend after the call. DirectWrite may retain its own shared state.
 
