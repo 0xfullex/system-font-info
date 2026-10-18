@@ -9,7 +9,7 @@
 // Node.js the tests run on), that its calls resolve there, and, on Linux, which fontconfig the process holds. Chromium
 // carries its own copy of fontconfig, but exports none of its symbols, so the addon must bind the system library that
 // GTK and Pango use; the check reads /proc/self/maps and fails if the process maps two libfontconfig files, or one that
-// is not the system's.
+// is not the system's. Every check runs after `app.whenReady()`, when the process is in the state an app's code sees.
 import assert from 'node:assert/strict'
 import { readFileSync, realpathSync } from 'node:fs'
 import { createRequire } from 'node:module'
@@ -41,6 +41,8 @@ function checkLinuxFontconfig() {
 }
 
 async function smoke() {
+  // The process is checked as an app's code sees it, once the app is ready, not in the middle of Electron's startup.
+  await app.whenReady()
   console.log(`electron ${process.versions.electron}, node ${process.versions.node}, node-api ${process.versions.napi}`)
   console.log(`${process.platform} ${process.arch}`)
   const require = createRequire(path.join(path.resolve(projectDirectory), 'package.json'))
