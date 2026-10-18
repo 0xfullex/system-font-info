@@ -8,6 +8,7 @@ The native addon: C++20, Node-API through node-addon-api, built by node-gyp (`bi
 | --- | --- |
 | `core/` | The platform-independent model, the interface a backend implements, and everything that touches JS (module init, `getFonts`, test hooks, conversion to JS values). |
 | `sfnt/` | A platform-independent reader for the standard OpenType tables, and the generated language-ID tables. Backends feed it table bytes, so all platforms report the font's own metadata identically. |
+| `orthography/` | The orthographies of fontconfig's fc-lang (the code points each language needs), compiled into the addon, and the lookup and counting functions over them. The three backends share them. |
 | `platform/darwin`, `platform/win32`, `platform/linux` | One backend per OS. `binding.gyp` compiles exactly one of them. |
 
 `scripts/gyp-sources.js` lists the sources of a directory for `binding.gyp`, so adding a `.cpp` file needs no build-file change.

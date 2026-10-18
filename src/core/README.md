@@ -10,7 +10,7 @@ The platform-independent model and the JS boundary. No file here calls an OS fon
 | `model.h` | `Family`, `Face` and their parts: the one result shape every backend fills. |
 | `platform.h` | The interface each backend implements. |
 | `to_js.h`, `to_js.cpp` | Converts a `std::vector<Family>` and `Value` trees to JS values. |
-| `addon.cpp` | `NODE_API_MODULE` entry: `getFonts` and the `__testing` hooks. |
+| `addon.cpp` | `NODE_API_MODULE` entry: `getFonts`, `orthographies` (fc-lang name to code point count) and the `__testing` hooks. |
 
 ## Invariants
 

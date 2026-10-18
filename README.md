@@ -94,4 +94,4 @@ To make `git blame` skip the commit that formatted the whole tree, run `git conf
 
 ## License
 
-MIT
+MIT. The language orthographies built into the addon are derived from [fontconfig](https://gitlab.freedesktop.org/fontconfig/fontconfig)'s `fc-lang` files; its notice ships with the package as `third_party/fontconfig/COPYING`.

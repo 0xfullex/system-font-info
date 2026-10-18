@@ -9,7 +9,7 @@
         "NAPI_VERSION=8"
       ],
       "sources": [
-        "<!@(node scripts/gyp-sources.js src/core src/sfnt)"
+        "<!@(node scripts/gyp-sources.js src/core src/orthography src/sfnt)"
       ],
       "cflags_cc": [
         "-std=c++20",

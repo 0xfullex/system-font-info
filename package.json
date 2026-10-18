@@ -22,7 +22,8 @@
     "docs/",
     "prebuilds/",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "third_party/fontconfig/COPYING"
   ],
   "gypfile": false,
   "os": [
@@ -43,6 +44,7 @@
     "lint": "biome lint --error-on-warnings",
     "format": "biome format --write && node scripts/clang-format.mjs --fix",
     "format:check": "biome format && node scripts/clang-format.mjs --check",
+    "generate:orthographies": "node scripts/gen-orthographies.mjs",
     "copy-prebuild": "node scripts/copy-prebuild.mjs",
     "pretest": "npm run build:ts"
   },

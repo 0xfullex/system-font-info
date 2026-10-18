@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "../orthography/orthography.h"
 #include "../sfnt/sfnt.h"
 #include "model.h"
 #include "platform.h"
@@ -159,6 +160,12 @@ Napi::Value readFontFile(const Napi::CallbackInfo& info) {
 
 Napi::Object initModule(Napi::Env env, Napi::Object exports) {
   exports.Set("getFonts", Napi::Function::New(env, getFonts, "getFonts"));
+
+  Napi::Object orthographies = Napi::Object::New(env);
+  for (const orthography::Orthography& entry : orthography::all()) {
+    orthographies.Set(std::string(entry.name), Napi::Number::New(env, entry.codePointCount));
+  }
+  exports.Set("orthographies", orthographies);
 
   Napi::Object testing = Napi::Object::New(env);
   testing.Set("registerFont", Napi::Function::New(env, registerFont, "registerFont"));
