@@ -1,1 +1,9 @@
 * text=auto eol=lf
+
+# Never normalized or diffed as text, whatever the content heuristics say.
+*.ttf binary
+*.ttc binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.gz binary
