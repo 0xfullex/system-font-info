@@ -292,6 +292,62 @@ describe('Linux fontconfig backend', { skip }, () => {
     }
   })
 
+  test('a font file that cannot be read never fails the call', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'sfi-unreadable-'))
+    try {
+      mkdirSync(join(directory, 'fonts'))
+      const variable = readFileSync(files[0])
+      const woff = toWoff(variable)
+      writeFileSync(join(directory, 'fonts', 'plain.ttf'), variable)
+      writeFileSync(join(directory, 'fonts', 'wrapped.woff'), woff)
+      writeFileSync(
+        join(directory, 'fonts.conf'),
+        `<?xml version="1.0"?><!DOCTYPE fontconfig SYSTEM "fonts.dtd"><fontconfig><dir>${join(directory, 'fonts')}</dir><cachedir>${join(directory, 'cache')}</cachedir></fontconfig>`
+      )
+      // The second call finds both fonts in the cache fontconfig wrote during the first, though the files no longer hold fonts.
+      const script = `import { writeFileSync } from 'node:fs';
+        import { getFamilies } from ${JSON.stringify(new URL('../dist/index.js', import.meta.url).href)};
+        const options = { preset: 'full', families: ['SFITest Variable'] };
+        const before = await getFamilies(options);
+        writeFileSync(${JSON.stringify(join(directory, 'fonts', 'plain.ttf'))}, Buffer.alloc(${variable.length}));
+        writeFileSync(${JSON.stringify(join(directory, 'fonts', 'wrapped.woff'))}, Buffer.concat([Buffer.from('wOFF'), Buffer.alloc(${woff.length - 4})]));
+        process.stdout.write(JSON.stringify({ before, after: await getFamilies(options) }));`
+      const childEnv = { ...process.env, FONTCONFIG_FILE: join(directory, 'fonts.conf') }
+      const projection = `import { getFamilies } from ${JSON.stringify(new URL('../dist/index.js', import.meta.url).href)};
+        process.stdout.write(JSON.stringify(await getFamilies({ fields: ['faces.postscriptName'], families: ['SFITest Variable'] })));`
+      const child = spawnSync(process.execPath, ['--input-type=module', '-e', script], { encoding: 'utf8', env: childEnv })
+      assert.equal(child.status, 0, child.stderr)
+      const { before, after } = JSON.parse(child.stdout)
+      assert.equal(before[0].faces.length, 6)
+      assert.ok(before[0].faces.every((face) => face.opentype && face.axes))
+      // Each corrupted variable font keeps one face, its default instance, so that no two faces share an identity.
+      assert.deepEqual(
+        after[0].faces.map((face) => face.postscriptName),
+        ['SFITestVariable-Regular', 'SFITestVariable-Regular']
+      )
+      assert.deepEqual(
+        after[0].faces.map((face) => face.file.path.split('/').pop()),
+        before[0].faces.map((face) => face.file.path.split('/').pop()).filter((name, i, names) => names.indexOf(name) === i)
+      )
+      assert.equal(new Set(after[0].faces.map((face) => JSON.stringify([face.file, face.coordinates, face.simulations]))).size, 2)
+      for (const face of after[0].faces) {
+        assert.equal(face.variable, true)
+        assert.equal(face.opentype, undefined)
+        assert.equal(face.axes, undefined)
+        assert.equal(face.coordinates, undefined)
+        assert.equal(face.namedInstanceIndex, undefined)
+      }
+      assert.deepEqual(
+        JSON.parse(
+          spawnSync(process.execPath, ['--input-type=module', '-e', projection], { encoding: 'utf8', env: childEnv }).stdout
+        )[0].faces.map((face) => face.postscriptName),
+        ['SFITestVariable-Regular', 'SFITestVariable-Regular']
+      )
+    } finally {
+      rmSync(directory, { recursive: true })
+    }
+  })
+
   test('registration keeps no state outside the process', () => {
     assert.deepEqual(
       readdirSync(tmpdir()).filter((entry) => entry.startsWith('system-font-info-test-')),

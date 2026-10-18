@@ -137,7 +137,9 @@ std::vector<Family> enumerateFonts(const Request& request, WorkLog& work) {
     }
   }
   require(seen.size() == candidates.size(), "locating listed fonts in config sets");
-  FaceReader reader(request, work, variableResources);
+  std::vector<FcPattern*> listedPatterns;
+  for (const auto& member : ordered) listedPatterns.push_back(member.listed);
+  FaceReader reader(request, work, variableResources, listedPatterns);
   std::vector<Family> result;
   std::map<std::string, size_t> familyPositions;
   std::vector<std::vector<FcPattern*>> originalMembers;
@@ -151,7 +153,8 @@ std::vector<Family> enumerateFonts(const Request& request, WorkLog& work) {
     }
     const size_t index = position->second;
     originalMembers[index].push_back(member.original);
-    if (request.wantsAnyFace()) result[index].faces.push_back(reader.read(member.listed, member.inApplicationSet));
+    if (request.wantsAnyFace() && reader.lists(member.listed))
+      result[index].faces.push_back(reader.read(member.listed, member.inApplicationSet));
   }
   if (!request.orthographies.empty()) {
     for (size_t i = 0; i < result.size(); ++i)

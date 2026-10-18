@@ -74,7 +74,20 @@ Legacy names use iconv without approximate substitutions. The converter maps
 all `LegacyEncoding` enumerators explicitly; a Mac encoding the system lacks
 returns `nullopt`, so the shared reader preserves its bytes.
 
-## Concurrency
+## Unreadable files and concurrency
+
+A file the backend cannot read (it cannot be opened, is not a font the sfnt
+reader or FreeType understands, or its variation table is unusable) never
+fails the call. The resource has no tables: `opentype`, `axes` and the
+coordinates and named-instance fields that need the file are absent for its
+faces, while everything fontconfig reports stays. A table that cannot be
+fetched or parsed from a readable file is recorded by the sfnt layer in
+`opentype.errors`. A variable resource whose `fvar`
+cannot be read gives its named instances no coordinates, and the identity
+(`file.path`, `file.index`, `coordinates`, `simulations`) could not tell them
+apart; so the resource lists one face, its default instance (no named-instance
+bits in `FC_INDEX`, else the first in member order), and omits its other named
+instances. `FaceReader::lists` is the one place that rule lives.
 
 On a fontconfig older than 2.14 (`FcGetVersion() < 21400`), which had data
 races in loading a configuration and handling patterns, `enumerateFonts`

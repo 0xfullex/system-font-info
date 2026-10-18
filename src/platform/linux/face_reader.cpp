@@ -88,6 +88,8 @@ struct FreeTypeFace {
 };
 }  // namespace
 
+// A file that cannot be read gives the resource no tables and no `opentype` value: the fields that need the file stay
+// absent and the call goes on, since one unreadable file must not fail the listing of every other font.
 const FaceReader::Resource& FaceReader::readResource(const Identity& id) {
   auto [entry, inserted] = resources_.try_emplace(id);
   if (!inserted) return entry->second;
@@ -103,12 +105,12 @@ const FaceReader::Resource& FaceReader::readResource(const Identity& id) {
     fetch = [&](uint32_t tag) { return file->table(id.index, tag); };
   } else if (isWebFont(id.path)) {
     library = std::make_unique<FreeTypeLibrary>();
-    require(FT_New_Face(library->value, id.path.c_str(), id.index, &face.value) == 0, "FT_New_Face");
+    if (FT_New_Face(library->value, id.path.c_str(), id.index, &face.value) != 0) return result;
     FT_ULong count = 0;
-    require(FT_Sfnt_Table_Info(face.value, 0, nullptr, &count) == 0, "FT_Sfnt_Table_Info");
+    if (FT_Sfnt_Table_Info(face.value, 0, nullptr, &count) != 0) return result;
     for (FT_ULong i = 0; i < count; ++i) {
       FT_ULong tag = 0, length = 0;
-      require(FT_Sfnt_Table_Info(face.value, i, &tag, &length) == 0, "FT_Sfnt_Table_Info");
+      if (FT_Sfnt_Table_Info(face.value, i, &tag, &length) != 0) return result;
       tags.push_back(uint32_t(tag));
     }
     fetch = [&](uint32_t tag) -> std::optional<std::vector<uint8_t>> {
@@ -135,6 +137,26 @@ const FaceReader::Resource& FaceReader::readResource(const Identity& id) {
     result.axes = std::move(axes);
   }
   return result;
+}
+
+FaceReader::FaceReader(const Request& request, WorkLog& work, const std::set<Identity>& variableResources,
+                       const std::vector<FcPattern*>& members)
+    : request_(request), work_(work), variableResources_(variableResources) {
+  for (auto member : members) {
+    const Identity id = identity(member);
+    if (!variableResources_.contains(resource(id))) continue;
+    auto [kept, added] = keptWithoutFvar_.try_emplace(resource(id), member);
+    if (!added && (id.index >> 16) == 0 && (identity(kept->second).index >> 16) != 0) kept->second = member;
+  }
+}
+
+bool FaceReader::lists(FcPattern* pattern) {
+  const Identity id = resource(identity(pattern));
+  // The coordinates are part of every face's identity; a request without them has no identity to keep unique, and
+  // reading the resource for it would be work no requested field needs.
+  if (!request_.wants(Field::FacesCoordinates) || !variableResources_.contains(id)) return true;
+  if (readResource(id).tables.fvar) return true;
+  return keptWithoutFvar_.at(id) == pattern;
 }
 
 Face FaceReader::read(FcPattern* pattern, bool inApplicationSet) {
@@ -176,11 +198,11 @@ Face FaceReader::read(FcPattern* pattern, bool inApplicationSet) {
     const auto& data = readResource(resource(id));
     face.opentype = data.opentype;
     if (needsCff2 && data.tables.hasCff2) face.format = Format::Cff2;
-    if (face.variable && (needsVariations || request_.wants(Field::FacesAxes))) {
-      require(data.tables.fvar.has_value(), "reading a variable font's fvar");
+    // Without a readable `fvar` that matches the face's index, a variable face has no axes and no coordinates.
+    const uint32_t packedInstance = id.index >> 16;
+    if (face.variable && (needsVariations || request_.wants(Field::FacesAxes)) && data.tables.fvar &&
+        packedInstance <= data.tables.fvar->instances.size()) {
       const auto& fvar = *data.tables.fvar;
-      const uint32_t packedInstance = id.index >> 16;
-      require(packedInstance <= fvar.instances.size(), "reading FC_INDEX named instance");
       std::vector<double> coordinates;
       if (packedInstance) {
         coordinates = fvar.instances[packedInstance - 1].coordinates;
