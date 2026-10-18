@@ -2,7 +2,7 @@
 // observed by the pure normalization tests. This suite exercises that OS seam.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, before, describe, test } from 'node:test'
@@ -272,6 +272,23 @@ describe('Linux fontconfig backend', { skip }, () => {
       })
     } finally {
       rmSync(directory, { recursive: true })
+    }
+  })
+
+  test('the default face does not depend on the process locale', () => {
+    const script = `import { getFamilies } from ${JSON.stringify(new URL('../dist/index.js', import.meta.url).href)};
+      process.stdout.write(JSON.stringify(await getFamilies({ fields: [], languageCoverage: ['zh-cn', 'zh-tw', 'ja', 'ko', 'en', 'ru'] })));`
+    const run = (env) => {
+      const child = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+        encoding: 'utf8',
+        env: { ...process.env, ...env }
+      })
+      assert.equal(child.status, 0, child.stderr)
+      return child.stdout
+    }
+    const baseline = run({ FC_LANG: 'en', LC_ALL: 'C' })
+    for (const env of [{ FC_LANG: 'ja' }, { FC_LANG: '', LC_ALL: 'ja_JP.UTF-8' }, { FC_LANG: '', LC_ALL: '', LANG: 'zh_CN.UTF-8' }]) {
+      assert.equal(run(env), baseline, JSON.stringify(env))
     }
   })
 

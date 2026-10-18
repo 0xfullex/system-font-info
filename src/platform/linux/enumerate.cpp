@@ -1,4 +1,5 @@
 #include <map>
+#include <mutex>
 #include <set>
 
 #include "../../core/platform.h"
@@ -42,6 +43,11 @@ void languageCoverage(FcConfig* config, const std::string& family, const std::ve
   require(FcPatternAddInteger(matchQuery.get(), FC_WIDTH, FC_WIDTH_NORMAL), "adding FC_WIDTH");
   require(FcPatternAddInteger(matchQuery.get(), FC_SLANT, FC_SLANT_ROMAN), "adding FC_SLANT");
   require(FcConfigSubstitute(config, matchQuery.get(), FcMatchPattern), "FcConfigSubstitute");
+  // FcConfigSubstitute adds a weak language taken from FC_LANG, LC_ALL, LC_CTYPE or LANG, even to a query that has
+  // one, and the matcher ranks the language before slant, weight and width: the default face would depend on the
+  // process's locale. The query's language is replaced by a fixed one; FcDefaultSubstitute then adds none.
+  FcPatternDel(matchQuery.get(), FC_LANG);
+  require(FcPatternAddString(matchQuery.get(), FC_LANG, reinterpret_cast<const FcChar8*>("en")), "adding FC_LANG");
   FcDefaultSubstitute(matchQuery.get());
   FontSet members(FcFontSetCreate());
   require(bool(members), "FcFontSetCreate");
@@ -55,18 +61,31 @@ void languageCoverage(FcConfig* config, const std::string& family, const std::ve
   FcFontSet* sets[] = {members.get()};
   FcResult status;
   Pattern matched(FcFontSetMatch(config, sets, 1, matchQuery.get(), &status));
-  // The set contains this family's fixed patterns only, so aliases cannot select another family.
-  FcCharSet* characters = charset(matched ? matched.get() : originals.front());
+  // The set contains this family's fixed patterns only, so aliases cannot select another family, and a set that is
+  // not empty matches unless memory runs out.
+  require(bool(matched), "FcFontSetMatch");
+  FcCharSet* characters = charset(matched.get());
   ++work.characterSets;
   for (auto orthography : request.orthographies) {
     result.languageCoverage.push_back(orthography::countCovered(
         *orthography, [&](uint32_t codePoint) { return FcCharSetHasChar(characters, codePoint) != FcFalse; }));
   }
 }
+
+// Calls run on worker threads, so two can overlap. fontconfig before 2.14 had data races in loading a configuration
+// and handling patterns that overlapping calls could hit even though each owns its configuration; on those versions
+// the calls take turns.
+std::unique_lock<std::mutex> serializeOnOldFontconfig() {
+  static std::mutex mutex;
+  std::unique_lock<std::mutex> lock(mutex, std::defer_lock);
+  if (FcGetVersion() < 21400) lock.lock();
+  return lock;
+}
 }  // namespace
 
 std::vector<Family> enumerateFonts(const Request& request, WorkLog& work) {
   if (request.families && request.families->empty()) return {};
+  const auto turn = serializeOnOldFontconfig();
   Config config(FcInitLoadConfigAndFonts());
   require(bool(config), "FcInitLoadConfigAndFonts");
   addTestingFonts(config.get());

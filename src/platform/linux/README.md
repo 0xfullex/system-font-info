@@ -42,7 +42,11 @@ originals carry match properties that `FcFontList` does not copy; matching the
 projected patterns would let object selection change the default face.
 `FcConfigSubstitute` and `FcDefaultSubstitute` prepare the query, and
 `FcFontSetMatch` selects a member. Its charset is counted against the package's
-built-in orthographies. If matching fails, the first member stands in.
+built-in orthographies. A match that fails (the set is not empty, so only memory
+exhaustion can) fails the call. `FcConfigSubstitute` adds a weak query language
+from `FC_LANG`, `LC_ALL`, `LC_CTYPE` or `LANG`, and the matcher ranks language
+before slant, weight and width; so the query's language is replaced by `en`
+after the substitution, and the default face is the same in every locale.
 
 ## Work and sharing
 
@@ -69,6 +73,13 @@ at the operation that performs the work.
 Legacy names use iconv without approximate substitutions. The converter maps
 all `LegacyEncoding` enumerators explicitly; a Mac encoding the system lacks
 returns `nullopt`, so the shared reader preserves its bytes.
+
+## Concurrency
+
+On a fontconfig older than 2.14 (`FcGetVersion() < 21400`), which had data
+races in loading a configuration and handling patterns, `enumerateFonts`
+holds a process-wide mutex for the whole call, so overlapping calls take
+turns. Newer versions run concurrently.
 
 ## Test hooks
 
