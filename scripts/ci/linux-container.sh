@@ -14,7 +14,8 @@
 # no tests, because the release workflow tests the assembled prebuilds on their own. The fonts are not needed then.
 #
 # The repository is mounted read-only and its sources are copied inside the container, so the checkout is never
-# written to and a host's node_modules and build output (possibly for another platform) never leak in. The tests run as root.
+# written to and a host's node_modules, build output (possibly for another platform) and worktrees never leak in. The
+# container runs as root; what it writes to --prebuild-out is chowned to the user who ran the script.
 set -euo pipefail
 
 # Inside the container this script is run again with --inside; see the end of the file.
@@ -41,7 +42,7 @@ run_inside() {
   echo "::endgroup::"
 
   mkdir /work
-  tar -C /source --exclude=./.git --exclude=./node_modules --exclude=./build --exclude=./dist --exclude=./prebuilds -cf - . |
+  tar -C /source --exclude=./.git --exclude=./.worktrees --exclude=./node_modules --exclude=./build --exclude=./dist --exclude=./prebuilds -cf - . |
     tar -C /work -xf -
   cd /work
 
@@ -50,6 +51,8 @@ run_inside() {
   if [ -n "${PREBUILD_OUT:-}" ]; then
     npm run copy-prebuild -- --strip
     cp -R prebuilds/. "${PREBUILD_OUT}/"
+    # The container runs as root; the files belong to the user who started the script, not to root.
+    chown -R "${HOST_UID}:${HOST_GID}" "${PREBUILD_OUT}"
   else
     npm test
   fi
@@ -86,7 +89,7 @@ if [ "${1:-}" = "--inside" ]; then
   exit
 fi
 
-# The directory is mounted into the container, which writes the prebuild there as root.
+# The directory is mounted into the container, which writes the prebuild there as root and hands it back to this user.
 prebuild_out=""
 if [ "${1:-}" = "--prebuild-out" ]; then
   [ "$#" -ge 2 ] || { echo "--prebuild-out needs a directory" >&2; exit 2; }
@@ -104,6 +107,6 @@ repository=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 # The container runs the very file the host started, from the read-only mount.
 docker run --rm \
   --volume "${repository}:/source:ro" \
-  ${prebuild_out:+--volume "${prebuild_out}:/prebuild-out" --env PREBUILD_OUT=/prebuild-out} \
+  ${prebuild_out:+--volume "${prebuild_out}:/prebuild-out" --env PREBUILD_OUT=/prebuild-out --env "HOST_UID=$(id -u)" --env "HOST_GID=$(id -g)"} \
   "${image}" \
   bash /source/scripts/ci/linux-container.sh --inside "$@"
