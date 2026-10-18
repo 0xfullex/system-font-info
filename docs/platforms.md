@@ -330,7 +330,7 @@ The group of each field is in [the matrix of Source groups](#the-group-of-every-
 | `familyNames` | The union of the faces' `familyNames`. |
 | `supportedLanguages`, `variable`, `enabled` (family) | Aggregates of the faces' values. |
 | `languageCoverage` | Default face: `FcFontSetMatch` over the family's original fixed-coordinate configuration patterns for regular weight, normal width and roman slant, after `FcConfigSubstitute` and `FcDefaultSubstitute`; its `FC_CHARSET` against the orthography. Matching within the family keeps an alias rule from substituting another family. Using original patterns preserves match properties that `FcFontList` leaves out, so requesting languages does not change the default face. |
-| `postscriptName` | `FC_POSTSCRIPT_NAME`. |
+| `postscriptName` | `FC_POSTSCRIPT_NAME`. For a named instance, fontconfig 2.17 with FreeType 2.14 gives the name of the instance's `fvar` record; fontconfig 2.13.1 with FreeType 2.9.1 gave one derived from the coordinates (`SFITestVariable_100wght`). |
 | `fullNames` | `FC_FULLNAME` with `FC_FULLNAMELANG`. A named instance: composed from the `name` and `fvar` tables as on macOS. |
 | `styleNames` | `FC_STYLE` with `FC_STYLELANG`. A named instance: its `fvar` subfamily name. |
 | `familyNames` (face) | Every `FC_FAMILY` value with its `FC_FAMILYLANG`, aliases included. |
@@ -351,7 +351,7 @@ The group of each field is in [the matrix of Source groups](#the-group-of-every-
 | `axes` | `fvar`. |
 | `coordinates` | A named instance: its `fvar` instance's coordinates; the default instance: the `fvar` defaults. A static face has none. |
 | `namedInstanceIndex` | The first `fvar` instance whose coordinates equal `coordinates`. fontconfig does not list a named instance whose coordinates equal the default instance's: it lists that face once, with the high 16 bits of `FC_INDEX` zero, so `FC_INDEX` alone cannot give the default face its index. |
-| `opentype` | An sfnt file is read directly by the table parser. A WOFF or WOFF2 file is read through FreeType (`FT_Sfnt_Table_Info` for the tag list, `FT_Load_Sfnt_Table` for the bytes). A Type 1 or bitmap font has none. |
+| `opentype` | An sfnt file is read directly by the table parser. A file the table parser cannot open whose first four bytes are `wOFF` or `wOF2` is read through FreeType (`FT_Sfnt_Table_Info` for the tag list, `FT_Load_Sfnt_Table` for the bytes); the signature decides, because `FC_FONT_WRAPPER` exists only from fontconfig 2.15. A Type 1 or bitmap font has none. |
 | `coverage` | `FC_CHARSET`. |
 
 Semantics specific to Linux:

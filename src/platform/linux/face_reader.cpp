@@ -4,7 +4,10 @@
 #include FT_FREETYPE_H
 #include FT_TRUETYPE_TABLES_H
 
+#include <array>
+#include <fstream>
 #include <memory>
+#include <string_view>
 
 #include "traits.h"
 
@@ -62,6 +65,16 @@ Value platformValue(FcPattern* pattern) {
   return result;
 }
 
+// WOFF and WOFF2 wrap an sfnt that the table parser cannot read. The signature is the file's own statement of what it
+// is; fontconfig's FC_FONT_WRAPPER says the same only from version 2.15.
+bool isWebFont(const std::string& path) {
+  std::array<char, 4> signature{};
+  std::ifstream file(path, std::ios::binary);
+  if (!file.read(signature.data(), signature.size())) return false;
+  const std::string_view tag(signature.data(), signature.size());
+  return tag == "wOFF" || tag == "wOF2";
+}
+
 struct FreeTypeLibrary {
   FT_Library value = nullptr;
   FreeTypeLibrary() { require(FT_Init_FreeType(&value) == 0, "FT_Init_FreeType"); }
@@ -75,7 +88,7 @@ struct FreeTypeFace {
 };
 }  // namespace
 
-const FaceReader::Resource& FaceReader::readResource(const Identity& id, const std::string& wrapper) {
+const FaceReader::Resource& FaceReader::readResource(const Identity& id) {
   auto [entry, inserted] = resources_.try_emplace(id);
   if (!inserted) return entry->second;
   auto& result = entry->second;
@@ -88,7 +101,7 @@ const FaceReader::Resource& FaceReader::readResource(const Identity& id, const s
   if (file && id.index < file->faceCount()) {
     tags = file->tableTags(id.index);
     fetch = [&](uint32_t tag) { return file->table(id.index, tag); };
-  } else if (wrapper == "WOFF" || wrapper == "WOFF2") {
+  } else if (isWebFont(id.path)) {
     library = std::make_unique<FreeTypeLibrary>();
     require(FT_New_Face(library->value, id.path.c_str(), id.index, &face.value) == 0, "FT_New_Face");
     FT_ULong count = 0;
@@ -160,7 +173,7 @@ Face FaceReader::read(FcPattern* pattern, bool inApplicationSet) {
                         request_.wants(Field::FacesFullNames) || request_.wants(Field::FacesStyleNames));
   const bool needsCff2 = face.format == Format::Cff && request_.wants(Field::FacesFormat);
   if (request_.needs(Group::C) || request_.wantsAnyOpenType() || needsVariations || needsCff2) {
-    const auto& data = readResource(resource(id), string(pattern, FC_FONT_WRAPPER).value_or(""));
+    const auto& data = readResource(resource(id));
     face.opentype = data.opentype;
     if (needsCff2 && data.tables.hasCff2) face.format = Format::Cff2;
     if (face.variable && (needsVariations || request_.wants(Field::FacesAxes))) {

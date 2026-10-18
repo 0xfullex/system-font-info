@@ -3,7 +3,11 @@
 The Linux backend uses fontconfig for enumeration and attributes, the shared
 sfnt reader for font tables, and FreeType for WOFF / WOFF2 table access. Read
 `../README.md` first for the backend contract. Building requires fontconfig
-2.15 or newer for the `FC_FONT_WRAPPER` attribute, plus FreeType and pkg-config.
+2.13 and FreeType 2.9 or newer (the versions of Ubuntu 22.04 and manylinux_2_28
+are the floor) and pkg-config; `binding.gyp` checks them. `fc.h` defines the
+object names `FC_FONT_WRAPPER` (2.15), `FC_ORDER` and `FC_FONT_HAS_HINT` (2.14)
+when the headers lack them, so a binary built against 2.13 still reports those
+platform fields on a newer runtime and leaves them absent on an older one.
 
 ## Files
 
@@ -44,8 +48,10 @@ built-in orthographies. If matching fails, the first member stands in.
 
 Scalar attributes cost no table reads. A resource is opened only for a field
 that needs C or D work, or for a variable face's coordinates / names. An sfnt
-or collection is read through `sfnt::FontFile`; only WOFF / WOFF2 use
-`FT_Sfnt_Table_Info` and `FT_Load_Sfnt_Table`. Type 1 and bitmap faces have no
+or collection is read through `sfnt::FontFile`; a file that fails to open
+there but starts with the `wOFF` or `wOF2` signature is a WOFF / WOFF2 file
+and is read with `FT_Sfnt_Table_Info` and `FT_Load_Sfnt_Table`. The signature
+decides, not `FC_FONT_WRAPPER`, which a fontconfig older than 2.15 does not set. Type 1 and bitmap faces have no
 OpenType object. The first read of a resource builds `sfnt::FontTables`, and
 `sfnt::openTypeValue` builds only `Request::openTypeSelection`.
 

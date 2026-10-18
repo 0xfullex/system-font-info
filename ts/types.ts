@@ -385,15 +385,15 @@ export interface LinuxNative {
   spacing?: number
   /** FC_FONTFORMAT, FreeType's format name (TrueType, CFF, Type 1, PCF, ...). */
   format?: string
-  /** FC_FONT_WRAPPER: the container (SFNT, WOFF, WOFF2, CFF). */
+  /** FC_FONT_WRAPPER: the container (SFNT, WOFF, WOFF2, CFF). Needs fontconfig 2.15 at run time. */
   fontWrapper?: string
   /** FC_FOUNDRY */
   foundry?: string
   /** FC_DECORATIVE */
   decorative?: boolean
-  /** FC_FONT_HAS_HINT */
+  /** FC_FONT_HAS_HINT. Needs fontconfig 2.14 at run time. */
   fontHasHint?: boolean
-  /** FC_ORDER: the position of the font's directory in the configuration. */
+  /** FC_ORDER: the position of the font's directory in the configuration. Needs fontconfig 2.14 at run time. */
   order?: number
   /** FC_OUTLINE */
   outline?: boolean

@@ -71,10 +71,10 @@
               "<!@(node scripts/gyp-sources.js src/platform/linux)"
             ],
             "cflags": [
-              "<!@(pkg-config --cflags 'fontconfig >= 2.15' freetype2)"
+              "<!@(pkg-config --cflags 'fontconfig >= 2.13' 'freetype2 >= 22.0.16')"
             ],
             "libraries": [
-              "<!@(pkg-config --libs 'fontconfig >= 2.15' freetype2)"
+              "<!@(pkg-config --libs 'fontconfig >= 2.13' 'freetype2 >= 22.0.16')"
             ]
           }
         ]

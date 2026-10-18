@@ -9,6 +9,19 @@
 #include <stdexcept>
 #include <string>
 
+// The oldest supported fontconfig is 2.13, whose headers lack these object names. They are plain strings: on a
+// runtime that predates an object fontconfig registers the unknown name on first use and no pattern holds a value
+// for it, so the platform field is absent rather than the build failing.
+#ifndef FC_FONT_WRAPPER  // fontconfig 2.15
+#define FC_FONT_WRAPPER "fontwrapper"
+#endif
+#ifndef FC_ORDER  // fontconfig 2.14
+#define FC_ORDER "order"
+#endif
+#ifndef FC_FONT_HAS_HINT  // fontconfig 2.14
+#define FC_FONT_HAS_HINT "fonthashint"
+#endif
+
 namespace sfi::platform::linux_backend {
 
 template <typename T, auto Destroy>

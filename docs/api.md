@@ -532,11 +532,11 @@ The localized strings follow the process language, which on macOS is set when th
 | `index` | `number` | `FC_INDEX` as fontconfig gives it: the face index in its file in the low 16 bits, the 1-based named instance number in the high 16 bits (0 for a face that is not a named instance). |
 | `spacing` | `number` (optional) | `FC_SPACING`: 0 proportional, 90 dual-width, 100 monospace, 110 character cell. Absent when fontconfig gives none, which it does for most proportional fonts. |
 | `format` | `string` (optional) | `FC_FONTFORMAT`, FreeType's format name (`TrueType`, `CFF`, `Type 1`, `PCF`, ...). |
-| `fontWrapper` | `string` (optional) | `FC_FONT_WRAPPER`: the container (`SFNT`, `WOFF`, `WOFF2`, `CFF`). |
+| `fontWrapper` | `string` (optional) | `FC_FONT_WRAPPER`: the container (`SFNT`, `WOFF`, `WOFF2`, `CFF`). Needs fontconfig 2.15 at run time; absent on older versions. |
 | `foundry` | `string` (optional) | `FC_FOUNDRY`: the foundry name fontconfig derives from the font's vendor ID or notices. |
 | `decorative` | `boolean` (optional) | `FC_DECORATIVE`: fontconfig classifies the style as decorative. |
-| `fontHasHint` | `boolean` (optional) | `FC_FONT_HAS_HINT`: the font contains hinting instructions. |
-| `order` | `number` (optional) | `FC_ORDER`: the position of the font's directory in the configuration, which the matcher uses to rank otherwise equal fonts. |
+| `fontHasHint` | `boolean` (optional) | `FC_FONT_HAS_HINT`: the font contains hinting instructions. Needs fontconfig 2.14 at run time; absent on older versions. |
+| `order` | `number` (optional) | `FC_ORDER`: the position of the font's directory in the configuration, which the matcher uses to rank otherwise equal fonts. Needs fontconfig 2.14 at run time; absent on older versions. |
 | `outline` | `boolean` (optional) | `FC_OUTLINE`: the glyphs are outlines. |
 | `scalable` | `boolean` (optional) | `FC_SCALABLE`: the glyphs can be scaled (true for outline and for scalable color bitmap fonts). |
 | `antialias` | `boolean` (optional) | `FC_ANTIALIAS`, when the font or the configuration sets it. |

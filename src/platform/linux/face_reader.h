@@ -23,7 +23,7 @@ class FaceReader {
     Value::Shared opentype;
     SharedAxes axes;
   };
-  const Resource& readResource(const Identity& id, const std::string& wrapper);
+  const Resource& readResource(const Identity& id);
 
   const Request& request_;
   WorkLog& work_;

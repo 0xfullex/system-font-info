@@ -2,8 +2,9 @@
 // observed by the pure normalization tests. This suite exercises that OS seam.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { readdirSync, readFileSync, realpathSync } from 'node:fs'
+import { mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { after, before, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
@@ -14,6 +15,35 @@ const skip = process.platform !== 'linux' && 'Linux only'
 const fixture = (name) => fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url))
 const files = ['SFITest-Variable.ttf', 'SFITest-Collection.ttc', 'SFITest-Symbol.ttf', 'SFITest-Legacy.ttf'].map(fixture)
 const names = ['SFITest Collection', 'SFITest Legacy', 'SFITest Symbol', 'SFITest Variable']
+
+// Wraps an sfnt in a WOFF 1.0 container with every table stored uncompressed, which the format allows.
+function toWoff(sfnt) {
+  const count = sfnt.readUInt16BE(4)
+  const tables = Array.from({ length: count }, (_, i) => {
+    const at = 12 + i * 16
+    return { at, offset: sfnt.readUInt32BE(at + 8), length: sfnt.readUInt32BE(at + 12) }
+  })
+  const padded = (length) => (length + 3) & ~3
+  const dataStart = 44 + count * 20
+  const header = Buffer.alloc(dataStart)
+  let end = dataStart
+  const bodies = tables.map((table, i) => {
+    const entry = 44 + i * 20
+    sfnt.copy(header, entry, table.at, table.at + 4)
+    header.writeUInt32BE(end, entry + 4)
+    header.writeUInt32BE(table.length, entry + 8)
+    header.writeUInt32BE(table.length, entry + 12)
+    sfnt.copy(header, entry + 16, table.at + 4, table.at + 8)
+    end += padded(table.length)
+    return Buffer.concat([sfnt.subarray(table.offset, table.offset + table.length), Buffer.alloc(padded(table.length) - table.length)])
+  })
+  header.write('wOFF', 0, 'latin1')
+  sfnt.copy(header, 4, 0, 4)
+  header.writeUInt32BE(end, 8)
+  header.writeUInt16BE(count, 12)
+  header.writeUInt32BE(12 + count * 16 + tables.reduce((sum, table) => sum + padded(table.length), 0), 16)
+  return Buffer.concat([header, ...bodies])
+}
 
 function readOrthography(name) {
   const directory = new URL('../third_party/fontconfig/fc-lang/', import.meta.url)
@@ -80,11 +110,13 @@ describe('Linux fontconfig backend', { skip }, () => {
       faces.map((face) => face.coordinates.wght).sort((a, b) => a - b),
       [100, 400, 700]
     )
-    assert.deepEqual(faces.map((face) => face.postscriptName).sort(), [
-      'SFITestVariable-Bold',
-      'SFITestVariable-Regular',
-      'SFITestVariable-Thin'
-    ])
+    // A named instance's PostScript name is fontconfig's: the fvar record's name with newer versions, and with
+    // fontconfig 2.13 on FreeType 2.9 one derived from the coordinates.
+    const recorded = { 100: 'Thin', 400: 'Regular', 700: 'Bold' }
+    for (const face of faces) {
+      const wght = face.coordinates.wght
+      assert.ok([`SFITestVariable-${recorded[wght]}`, `SFITestVariable_${wght}wght`].includes(face.postscriptName), face.postscriptName)
+    }
     for (const face of faces) {
       assert.equal(face.variable, true)
       assert.equal(face.file.index, 0)
@@ -216,6 +248,31 @@ describe('Linux fontconfig backend', { skip }, () => {
     const child = spawnSync(process.execPath, ['--input-type=module', '-e', script], { encoding: 'utf8' })
     assert.equal(child.status, 0, child.stderr)
     assert.deepEqual(JSON.parse(child.stdout), [])
+  })
+
+  test('reads the tables of a WOFF file by its signature, whatever fontconfig reports as its wrapper', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'sfi-woff-'))
+    try {
+      const woff = join(directory, 'variable.woff')
+      writeFileSync(woff, toWoff(readFileSync(files[0])))
+      const script = `import { getFamilies } from ${JSON.stringify(new URL('../dist/index.js', import.meta.url).href)};
+        import { loadNative } from ${JSON.stringify(new URL('../dist/native.js', import.meta.url).href)};
+        loadNative().__testing.registerFont(${JSON.stringify(woff)});
+        process.stdout.write(JSON.stringify(await getFamilies({ preset: 'full', families: ['SFITest Variable'] })));`
+      const child = spawnSync(process.execPath, ['--input-type=module', '-e', script], { encoding: 'utf8' })
+      assert.equal(child.status, 0, child.stderr)
+      const wrapped = JSON.parse(child.stdout)[0].faces
+      const plain = family('SFITest Variable').faces
+      assert.equal(wrapped.length, plain.length)
+      wrapped.forEach((face, i) => {
+        assert.ok(face.opentype.tables.includes('fvar'))
+        for (const key of ['opentype', 'axes', 'coordinates', 'namedInstanceIndex', 'styleNames', 'fullNames']) {
+          assert.deepEqual(face[key], plain[i][key], key)
+        }
+      })
+    } finally {
+      rmSync(directory, { recursive: true })
+    }
   })
 
   test('registration keeps no state outside the process', () => {
