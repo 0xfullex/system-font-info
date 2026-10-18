@@ -15,13 +15,12 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { FIELD_CATALOGUE } from '../dist/field-catalogue.js'
-import { closureOf, groupsOf } from '../dist/field-closure.js'
+import { closureOf, groupsOf, PRESETS, presetFields } from '../dist/field-closure.js'
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 // In the order of the generated `Platform` enumerators and of the columns of the matrix.
 const PLATFORMS = ['darwin', 'win32', 'linux']
 const GROUPS = ['A', 'B', 'C', 'D', 'E']
-const PRESETS = ['names', 'styles', 'details', 'full']
 
 const arguments_ = process.argv.slice(2)
 const check = arguments_.includes('--check')
@@ -243,10 +242,7 @@ function presetGroupsTable() {
   const render = ({ always, conditional }) =>
     [always.join(', '), ...conditional.map(({ group, for: condition }) => `${group} for ${condition}`)].join('; ')
   const rows = [['`fields: []` (`family` only)', []]]
-  PRESETS.forEach((preset, index) => {
-    const fields = FIELD_CATALOGUE.filter((spec) => spec.preset !== null && PRESETS.indexOf(spec.preset) <= index).map((spec) => spec.name)
-    rows.push([`\`${preset}\``, fields])
-  })
+  for (const preset of PRESETS) rows.push([`\`${preset}\``, presetFields(preset)])
   const lines = ['| Selection | macOS | Windows | Linux |', '| --- | --- | --- | --- |']
   for (const [label, fields] of rows) {
     const cells = PLATFORMS.map((platform) => render(groupsOf(closureOf(fields, platform), platform)))

@@ -1,16 +1,8 @@
-import { FIELD_CATALOGUE, type FieldSpec } from './field-catalogue'
+import { specOf } from './field-closure'
 import type { Field, FontFamily } from './types'
 
 // Removes what a call fetched only to compute something else. The closure holds the selected fields, the face
 // identity and the inputs of derived fields; the caller gets the selected fields and the identity.
-
-const SPEC_BY_NAME: ReadonlyMap<Field, FieldSpec> = new Map(FIELD_CATALOGUE.map((spec) => [spec.name, spec]))
-
-const specOf = (field: Field): FieldSpec => {
-  const spec = SPEC_BY_NAME.get(field)
-  if (spec === undefined) throw new Error(`${field} is not in the field catalogue`)
-  return spec
-}
 
 const withoutKeys = (target: object, keys: readonly string[]) => {
   for (const key of keys) delete (target as Record<string, unknown>)[key]

@@ -11,7 +11,7 @@ import { after, before, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 import { FIELD_CATALOGUE } from '../dist/field-catalogue.js'
-import { closureOf, groupsOf } from '../dist/field-closure.js'
+import { closureOf, groupsOf, PRESETS, presetFields } from '../dist/field-closure.js'
 import { loadNative } from '../dist/native.js'
 
 const platform = process.platform
@@ -28,12 +28,8 @@ const FAMILIES = [
 /** The counter of each group that is counted. */
 const COUNTERS = { C: 'fontResources', D: 'tableEntries', E: 'characterSets' }
 
-const PRESET_RANK = { names: 0, styles: 1, details: 2, full: 3 }
-const presetFields = (preset) =>
-  FIELD_CATALOGUE.filter((spec) => spec.preset !== null && PRESET_RANK[spec.preset] <= PRESET_RANK[preset]).map((spec) => spec.name)
-
 const SELECTIONS = [
-  ...Object.keys(PRESET_RANK).map((preset) => [`preset '${preset}'`, presetFields(preset)]),
+  ...PRESETS.map((preset) => [`preset '${preset}'`, presetFields(preset)]),
   ['fields: []', []],
   ...FIELD_CATALOGUE.map((spec) => [`field '${spec.name}'`, [spec.name]])
 ]

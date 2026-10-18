@@ -1,14 +1,25 @@
 // What a selection of fields makes a platform fetch, computed from the field catalogue. It is the one home of the
-// request closure rules: the JS layer builds the native request from `closureOf`, and `scripts/gen-fields.mjs` uses
-// the same functions to generate the "groups each preset reaches" table of docs/platforms.md.
+// request closure rules, of the lookup of a field's catalogue entry and of what a preset contains: the JS layer builds
+// the native request from `closureOf` and `presetFields`, and `scripts/gen-fields.mjs` uses the same functions to
+// generate the "groups each preset reaches" table of docs/platforms.md.
 
 import { FIELD_CATALOGUE, type FieldSpec, type Group, type Platform } from './field-catalogue'
-import type { Field } from './types'
+import type { Field, Preset } from './types'
 
 const SPECS: readonly FieldSpec[] = FIELD_CATALOGUE
 const SPEC_BY_NAME: ReadonlyMap<Field, FieldSpec> = new Map(SPECS.map((spec) => [spec.name, spec]))
 
-const specOf = (field: Field): FieldSpec => {
+/** Smallest first: each preset contains the one before it. */
+export const PRESETS: readonly Preset[] = ['names', 'styles', 'details', 'full']
+
+/** The fields of `preset`: those whose smallest preset is `preset` or an earlier one. */
+export function presetFields(preset: Preset): Field[] {
+  const rank = PRESETS.indexOf(preset)
+  return SPECS.filter((spec) => spec.preset !== null && PRESETS.indexOf(spec.preset) <= rank).map((spec) => spec.name)
+}
+
+/** The catalogue entry of `field`; throws for a name that is not in the catalogue. */
+export const specOf = (field: Field): FieldSpec => {
   const spec = SPEC_BY_NAME.get(field)
   if (spec === undefined) throw new Error(`${field} is not in the field catalogue`)
   return spec

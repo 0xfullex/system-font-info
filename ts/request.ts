@@ -1,15 +1,12 @@
-import { FIELD_CATALOGUE, type FieldSpec, type Platform } from './field-catalogue'
-import { closureOf } from './field-closure'
+import { FIELD_CATALOGUE, type Platform } from './field-catalogue'
+import { closureOf, PRESETS, presetFields } from './field-closure'
 import type { Field, Preset } from './types'
 
 // Validates the options of getFamilies / getFamily and turns them into what a call fetches. It never touches the
 // native addon; every error here is a TypeError, and the RangeError for an unresolvable `languageCoverage` tag is
 // raised later (language-coverage.ts), because resolving needs the addon's orthography names.
 
-const SPECS: readonly FieldSpec[] = FIELD_CATALOGUE
-const FIELD_NAMES: ReadonlySet<string> = new Set(SPECS.map((spec) => spec.name))
-/** Smallest first: each preset contains the one before it. */
-const PRESETS: readonly Preset[] = ['names', 'styles', 'details', 'full']
+const FIELD_NAMES: ReadonlySet<string> = new Set(FIELD_CATALOGUE.map((spec) => spec.name))
 
 /** What a validated call needs. */
 export interface BuiltRequest {
@@ -36,11 +33,6 @@ const isStringArray = (value: unknown): value is readonly string[] =>
   Array.isArray(value) && value.every((item) => typeof item === 'string')
 
 const isPreset = (value: unknown): value is Preset => PRESETS.includes(value as Preset)
-
-function presetFields(preset: Preset): Field[] {
-  const rank = PRESETS.indexOf(preset)
-  return SPECS.filter((spec) => spec.preset !== null && PRESETS.indexOf(spec.preset) <= rank).map((spec) => spec.name)
-}
 
 /**
  * Validates `options` as docs/api.md's error table lists and computes the selection and its closure.
