@@ -17,9 +17,9 @@ struct Range {
 };
 
 struct Orthography {
-  std::string_view name;           // The fc-lang name, such as "zh-cn": lower case, words joined by '-'.
-  std::span<const Range> ranges;   // Ascending, non-overlapping and non-adjacent.
-  uint32_t codePointCount;         // The number of code points in `ranges`.
+  std::string_view name;          // The fc-lang name, such as "zh-cn": lower case, words joined by '-'.
+  std::span<const Range> ranges;  // Ascending, non-overlapping and non-adjacent.
+  uint32_t codePointCount;        // The number of code points in `ranges`.
 };
 
 // The orthography of that exact name, or nullptr.
