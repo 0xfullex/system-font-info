@@ -90,25 +90,23 @@ counts each costly operation where it occurs.
   increments `tableEntries` by the number of selected entries. A failed
   table fetch returns no bytes to the shared reader, which records the
   failure only for selected entries. Instances and simulations share one
-  `opentype` object and one `axes` array per resource.
-  The value is built even when no table directory could be read (a reference
-  that is not a local file, or a file the shared reader cannot parse):
-it is then made from an empty table list,
-    so a requested `opentype` key is never missing.- **E **reads `IDWriteFont1::GetUnicodeRanges`,
-    with no explicit face creation.
-  `faces.coverage` costs one character - set read per visited member;
-`languageCoverage` costs one per family, regardless of language count.Ranges are inclusive, ascending,
-    and adjacent ranges are joined.
+  `opentype` object and one `axes` array per resource. The value is built even
+  when no table directory could be read (a reference that is not a local file,
+  or a file the shared reader cannot parse): it is then made from an empty
+  table list, so a requested `opentype` key is never missing.
+- **E** reads `IDWriteFont1::GetUnicodeRanges`, with no explicit face creation.
+  `faces.coverage` costs one character-set read per visited member;
+  `languageCoverage` costs one per family, regardless of language count.
+  Ranges are inclusive, ascending, and adjacent ranges are joined.
 
-        Variable coordinates contain only `fvar` axes,
-    in axis order;
-standard axes DirectWrite injects stay in `platform.axisValues` and `resourceAxes`.The first named instance within 1 /
-    65536 on every axis supplies
-`namedInstanceIndex`.Names come from DirectWrite as it names each member;
-the shared JS layer canonicalizes language tags,
-    merges localized duplicates and chooses default strings. `additionalInformationalStrings` keeps the localized
-        DirectWrite values the `name` records do not reproduce,
-    comparing language tags without ASCII case when finding an existing record.
+Variable coordinates contain only `fvar` axes, in axis order; standard axes
+DirectWrite injects stay in `platform.axisValues` and `resourceAxes`.
+The first named instance within 1/65536 on every axis supplies
+`namedInstanceIndex`. Names come from DirectWrite as it names each member;
+the shared JS layer canonicalizes language tags, merges localized duplicates
+and chooses default strings. `additionalInformationalStrings` keeps the
+localized DirectWrite values the `name` records do not reproduce, comparing
+language tags without ASCII case when finding an existing record.
 
 `supportedLanguages` is split from the informational string and returned as DirectWrite gives it: a script without a language is a bare four-letter tag
 (`Latn`). The public form `und-Latn` is made in `ts/normalize.ts`, which
