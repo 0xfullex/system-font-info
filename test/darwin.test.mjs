@@ -214,12 +214,12 @@ describe('disabled fonts', { skip }, () => {
   const orthographies = ['en', 'zh-cn']
   const testFamilies = async () =>
     (await getFamilies({ fields, languageCoverage: orthographies })).filter((entry) => entry.family.startsWith('SFITest'))
-  let before
+  let beforeDisabling
 
   beforeEach(async () => {
     registerFont(disabledFile)
     registerFont(enabledFile)
-    before = await testFamilies()
+    beforeDisabling = await testFamilies()
   })
   afterEach(() => {
     // CoreText refuses to unregister a disabled font.
@@ -230,26 +230,26 @@ describe('disabled fonts', { skip }, () => {
 
   test('are listed with enabled false, scope process and the member order they had', async () => {
     setFontEnabled(disabledFile, false)
-    const after = await testFamilies()
-    const collection = after.find((entry) => entry.family === 'SFITest Collection')
+    const disabled = await testFamilies()
+    const collection = disabled.find((entry) => entry.family === 'SFITest Collection')
     assert.deepEqual(
       collection.faces.map((face) => face.postscriptName),
-      before.find((entry) => entry.family === 'SFITest Collection').faces.map((face) => face.postscriptName)
+      beforeDisabling.find((entry) => entry.family === 'SFITest Collection').faces.map((face) => face.postscriptName)
     )
     assert.equal(collection.faces.length, 2)
     assert.ok(collection.faces.every((face) => face.enabled === false && face.scope === 'process'))
     // The family is enabled when some face is, and nothing else changes.
     assert.equal(collection.enabled, false)
-    const variable = after.find((entry) => entry.family === 'SFITest Variable')
+    const variable = disabled.find((entry) => entry.family === 'SFITest Variable')
     assert.equal(variable.enabled, true)
     assert.ok(variable.faces.every((face) => face.enabled === true && face.scope === 'process'))
     assert.deepEqual(
-      after.map((entry) => entry.family),
-      before.map((entry) => entry.family)
+      disabled.map((entry) => entry.family),
+      beforeDisabling.map((entry) => entry.family)
     )
   })
 
-  test('keep the raw priority and registration scope CoreText makes up for them', async () => {
+  test('pass the raw priority and registration scope through, as CoreText reports them for a disabled font', async () => {
     setFontEnabled(disabledFile, false)
     const [family] = await getFamilies({
       fields: ['faces.platform.priority', 'faces.platform.registrationScope'],
@@ -261,7 +261,7 @@ describe('disabled fonts', { skip }, () => {
   test('are enabled again once they are enabled', async () => {
     setFontEnabled(disabledFile, false)
     setFontEnabled(disabledFile, true)
-    assert.deepEqual(await testFamilies(), before)
+    assert.deepEqual(await testFamilies(), beforeDisabling)
   })
 
   test('are reported alike by the whole listing and the families option', async () => {
@@ -277,11 +277,11 @@ describe('disabled fonts', { skip }, () => {
 
   test('give a family with no enabled face the language coverage of its first face', async () => {
     setFontEnabled(disabledFile, false)
-    const after = await testFamilies()
+    const disabled = await testFamilies()
     const coverage = (entries) => entries.find((entry) => entry.family === 'SFITest Collection').languageCoverage
     // Every face of a test family maps the same characters and the family lists its regular face first.
-    assert.deepEqual(coverage(after), coverage(before))
-    assert.ok(coverage(after).some((entry) => entry.covered > 0))
+    assert.deepEqual(coverage(disabled), coverage(beforeDisabling))
+    assert.ok(coverage(disabled).some((entry) => entry.covered > 0))
   })
 })
 
