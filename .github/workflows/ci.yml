@@ -1,0 +1,141 @@
+name: CI
+
+# `origin` is the CI trigger, not a review gate: every push to every branch runs the checks and the tests of every target.
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The Node.js major every target is tested with; `node-versions` covers the other supported majors.
+  NODE_MAJOR: 24
+  # The packages the Linux container installs before building: the headers the addon is built against, and the
+  # fonts and fontconfig the tests need (a container has no system fonts, and the tests assert that fonts are listed).
+  LINUX_PACKAGES: fontconfig-devel freetype-devel fontconfig dejavu-sans-fonts google-noto-sans-cjk-ttc-fonts
+
+jobs:
+  # Checks that do not depend on the platform run once.
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      # actions/setup-node v7.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: ${{ env.NODE_MAJOR }}
+          cache: npm
+      # The major version is pinned by scripts/clang-format.mjs.
+      - name: Install clang-format
+        run: pipx install clang-format==20.1.8
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+      - name: Check the generated files
+        run: |
+          npm run build:ts
+          node scripts/gen-fields.mjs --check
+          node scripts/gen-orthographies.mjs --check
+
+  # The target table (ts/targets.ts) is the only list of targets; the test matrix is made from it.
+  targets:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      # actions/setup-node v7.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: ${{ env.NODE_MAJOR }}
+          cache: npm
+      - run: npm ci
+      - run: npm run build:ts
+      - id: matrix
+        run: echo "matrix=$(node scripts/targets.mjs --matrix)" >> "$GITHUB_OUTPUT"
+
+  # Each target is built and tested natively on its own runner, never cross-compiled.
+  test:
+    needs: targets
+    name: test (${{ matrix.id }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.targets.outputs.matrix) }}
+    steps:
+      # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      # Linux targets are built in a manylinux container, as the release build is, so the addon is tested against the
+      # oldest glibc, fontconfig and FreeType it supports. It is not run through a job-level `container:` because the
+      # runner injects its own Node.js into that container. The script installs Node.js itself.
+      - name: Build and test in a manylinux container
+        if: matrix.platform == 'linux'
+        run: >
+          scripts/ci/linux-container.sh
+          quay.io/pypa/manylinux_2_28_${{ matrix.arch == 'x64' && 'x86_64' || 'aarch64' }}
+          "$NODE_MAJOR" $LINUX_PACKAGES
+
+      - name: Set up Node.js
+        if: matrix.platform != 'linux'
+        id: node
+        # actions/setup-node v7.1.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: ${{ env.NODE_MAJOR }}
+          cache: npm
+      - name: Cache the Node.js headers node-gyp downloads
+        if: matrix.platform != 'linux'
+        # actions/cache v6.1.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ${{ runner.temp }}/node-gyp
+          key: node-gyp-${{ matrix.id }}-${{ steps.node.outputs.node-version }}
+      - name: Show the Windows toolchain and CJK fonts
+        if: matrix.platform == 'win32'
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          & $vswhere -all -prerelease -property displayName
+          & $vswhere -all -prerelease -property installationVersion
+          Get-ChildItem "$env:windir\Fonts" | Where-Object Name -Match '^(msyh|msjh|yugoth|meiryo|malgun|simsun|simhei)' | Select-Object Name
+      - name: Build
+        if: matrix.platform != 'linux'
+        run: |
+          npm ci
+          npm run build
+        env:
+          npm_config_devdir: ${{ runner.temp }}/node-gyp
+      - name: Test
+        if: matrix.platform != 'linux' && matrix.tests
+        run: npm test
+      # A target whose tests are off is still built and loaded, so a broken build or loader shows.
+      - name: Load the addon
+        if: matrix.platform != 'linux' && !matrix.tests
+        run: node -e "require('./dist/index.js').getFamilies({ fields: [] }).then((families) => console.log(families.length, 'families'))"
+
+  # The addon is a Node-API binary, so other Node.js versions differ only in the JavaScript layer: one platform is enough.
+  node-versions:
+    name: test (Node.js ${{ matrix.node }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 26]
+    steps:
+      # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Build and test in a manylinux container
+        run: scripts/ci/linux-container.sh quay.io/pypa/manylinux_2_28_x86_64 ${{ matrix.node }} $LINUX_PACKAGES

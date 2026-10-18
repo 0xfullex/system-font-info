@@ -107,6 +107,17 @@ TypeScript and JavaScript are formatted and linted by [Biome](https://biomejs.de
 
 To make `git blame` skip the commit that formatted the whole tree, run `git config blame.ignoreRevsFile .git-blame-ignore-revs` once per clone.
 
+### Continuous integration
+
+`.github/workflows/ci.yml` runs on every push to every branch (and on demand). One job runs the platform-independent checks: typecheck, lint, format check and the generators' `--check`. The test matrix is made from the target table (`node scripts/targets.mjs --matrix`): each target builds the addon and runs `npm test` on its own runner, never cross-compiled. Linux targets build and test inside a `manylinux_2_28` container; `scripts/ci/linux-container.sh` is the one script that does it, so a Linux failure can be reproduced anywhere Docker runs:
+
+```sh
+scripts/ci/linux-container.sh quay.io/pypa/manylinux_2_28_x86_64 24 \
+  fontconfig-devel freetype-devel fontconfig dejavu-sans-fonts google-noto-sans-cjk-ttc-fonts
+```
+
+The arguments are the image, the Node.js major version and the packages to install: the headers to build against and the fonts the tests need, since a container has none. The workflow's `LINUX_PACKAGES` is the list CI uses.
+
 ## License
 
 MIT. The language orthographies built into the addon are derived from [fontconfig](https://gitlab.freedesktop.org/fontconfig/fontconfig)'s `fc-lang` files; its notice ships with the package as `third_party/fontconfig/COPYING`.
