@@ -39,7 +39,7 @@
     "build:ts": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.json",
     "build": "npm run build:native && npm run build:ts",
     "test": "node --test",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p test/types/tsconfig.json --noEmit",
     "lint": "biome lint --error-on-warnings",
     "format": "biome format --write && node scripts/clang-format.mjs --fix",
     "format:check": "biome format && node scripts/clang-format.mjs --check",

@@ -1,12 +1,12 @@
 # ts
 
-The JS half of the package, compiled by `tsc` to `../dist` (CommonJS, with declarations; `npm run build:ts` empties it first, so output of deleted sources never ships). `types.ts` is the public type contract and is never edited as a side effect of other work.
+The JS half of the package, compiled by `tsc` to `../dist` (CommonJS, with declarations; `npm run build:ts` empties it first, so output of deleted sources never ships). `types.ts` is the public type contract and is never edited as a side effect of other work. `../test/types/` holds its type-level tests (a separate TypeScript project, compiled by `npm run typecheck`).
 
 ## Files
 
 | File | Role |
 | --- | --- |
-| `types.ts` | Public types: `FontFamily`, `FontFace`, `OpenTypeInfo`, the platform-native shapes. |
+| `types.ts` | Public types: the complete shapes (`FontFamily`, `FontFace`, `LanguageCoverage`, `OpenTypeInfo` and its tables, `DarwinNative`, `Win32Native`, `LinuxNative`) and the selection types (`Preset`, `Field`, `GetFamiliesOptions`, `GetFamilyOptions`, `SelectedFamily`, `SelectedFace`) that compute a result type from the options. The selection types sit between `// #region selection-types` and `// #endregion`; that text is the "Result typing" code block of `docs/api.md`, and the two stay identical. |
 | `native.ts` | The raw shapes the addon returns (`RawFamily`, `RawFace`, `RawAxis`), the binding interface, and the loader. |
 | `normalize.ts` | `normalizeFamilies`: raw native result to the public `FontFamily[]`. |
 | `pick-name.ts` | `pickName`: choose a localized string for an ordered list of locales. |

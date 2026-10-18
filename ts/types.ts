@@ -2,7 +2,7 @@
 // shape. Where a platform has no such information, an optional field is
 // absent or a boolean carries the truthful value (for example macOS never
 // synthesizes faces, so `simulations` is always false there); nothing is
-// filled in with an invented default.
+// filled in with an invented default. docs/api.md defines every type here.
 
 /** One string in one language. */
 export interface LocalizedString {
@@ -11,39 +11,47 @@ export interface LocalizedString {
   value: string
 }
 
-export interface GetFontsOptions {
-  /** Read the standard OpenType tables of every face into `FontFace.opentype`. Default true. */
-  tables?: boolean
-  /** Include `FontFace.coverage`. Default false: the ranges are large. */
-  coverage?: boolean
+/** One entry per requested `languageCoverage` tag, in request order. */
+export interface LanguageCoverage {
+  /** The requested tag, canonicalized (Intl.getCanonicalLocales). */
+  language: string
+  /** The fc-lang name of the orthography the tag was counted against, such as "zh-cn". */
+  orthography: string
+  /** The number of code points in the orthography. */
+  required: number
+  /** How many of those code points the family's default face maps to a glyph. */
+  covered: number
 }
 
+/** The complete shape of a family; a call returns the part of it that its options select (`SelectedFamily`). */
 export interface FontFamily {
-  /** The name the platform matcher groups faces by; what goes into CSS `font-family`. */
+  /** The name the platform matcher groups faces by; what goes into CSS `font-family`. Unique among the families of a result. */
   family: string
   /** Union of the faces' `familyNames`, source order, exact duplicates merged. */
   familyNames: LocalizedString[]
-  /** Union of the faces' `languages`, first-seen order. */
-  languages: string[]
+  /** Union of the faces' `supportedLanguages`, first-seen order. */
+  supportedLanguages: string[]
   /** Any face is variable. */
   variable: boolean
   /** Any face is enabled. */
   enabled: boolean
+  /** Present only when the `languageCoverage` option is given. */
+  languageCoverage?: LanguageCoverage[]
   /** In the platform's own member order (the order a browser on that platform walks them). */
   faces: FontFace[]
 }
 
 /**
- * One face of a font family.
+ * The complete shape of one face of a font family; a call returns the part of it that its options select (`SelectedFace`).
  *
  * The identity of a face is `(file.path, file.index, coordinates, simulations)`. Every face the platform
  * enumerates is returned; none is merged, so two faces differ in at least one of those four fields. A part
  * a face does not have (`file`, `file.index`, `coordinates`) counts as absent in the comparison.
  */
 export interface FontFace {
-  // ---- identity, as the platform reports this face (instance-aware for variable fonts)
+  // ---- names
 
-  /** What CSS `local()` resolves. "" when the face has none. Not unique and not a key: on Windows several coordinates of one variable font can share a name, and a font installed as two files gives two faces with one name. See the identity of a face in `FontFace`. */
+  /** What CSS `local()` resolves. "" when the face has none. Not unique and not a key: on Windows several coordinates of one variable font can share a name, and a font installed as two files gives two faces with one name. */
   postscriptName: string
   /** Default string of `fullNames`: en-US, else any en-*, else language "", else the first. */
   fullName: string
@@ -54,7 +62,7 @@ export interface FontFace {
   /** Every family name, in every language, the platform matcher associates with this face. */
   familyNames: LocalizedString[]
 
-  // ---- normalized, same scale on every platform
+  // ---- classification, same scale on every platform
 
   /** CSS font-weight, 1-1000. */
   weight: number
@@ -62,18 +70,22 @@ export interface FontFace {
   width: number
   style: 'normal' | 'italic' | 'oblique'
   monospace: boolean
-  /** The face has color glyphs (COLR, sbix, CBDT or SVG). */
+  /** The platform reports color glyphs (COLR, sbix, CBDT or SVG). */
   color: boolean
-  /** The cmap has a symbol-encoded (3,0) subtable. */
+  /** The operating system treats the face as a symbol font. */
   symbol: boolean
+
+  // ---- state and origin
+
   /** False when the user disabled the font (macOS Font Book). True where the platform has no such state. */
   enabled: boolean
   /** Styles the platform synthesizes for this face (Windows); false on other platforms. */
   simulations: { bold: boolean; oblique: boolean }
-  /** BCP 47 tags the platform says the face supports. macOS: declared by the font (kCTFontLanguagesAttribute). Windows: DirectWrite's supported script/language tags. Linux: fontconfig's FC_LANG, computed from character coverage. */
-  languages: string[]
-  /** Who installed or registered the font. */
+  /** BCP 47 tags of the languages or scripts the platform says the face supports. */
+  supportedLanguages: string[]
+  /** Whom the font is available to, by where it was registered. */
   scope: 'system' | 'user' | 'process' | 'unknown'
+  /** The format of the glyph outlines. */
   format: 'truetype' | 'cff' | 'cff2' | 'type1' | 'bitmap' | 'unknown'
   /** Absent for fonts that do not come from a file. */
   file?: {
@@ -88,19 +100,19 @@ export interface FontFace {
   variable: boolean
   /** Present when variable. */
   axes?: VariationAxis[]
-  /** This face's value on every axis; present when variable. */
+  /** This face's value on every axis, keyed by axis tag; present when variable. */
   coordinates?: Record<string, number>
-  /** Index into `opentype.fvar.instances` this face corresponds to; absent when it is not a named instance. */
-  namedInstance?: number
+  /** Index into `opentype.fvar.instances` of the first instance whose coordinates equal this face's; absent when there is none. */
+  namedInstanceIndex?: number
 
   // ---- the font's own tables, and coverage
 
-  /** Present when `tables` is on and the face is an sfnt. */
+  /** The selected entries of the font's OpenType tables; present when some `faces.opentype.*` entry is selected and the face is an sfnt. */
   opentype?: OpenTypeInfo
-  /** Inclusive code point ranges, ascending. Present when `coverage` is on. */
+  /** Inclusive code point ranges, ascending. Present when `faces.coverage` is selected. */
   coverage?: Array<[number, number]>
 
-  /** Raw platform values and platform-only information. */
+  /** Raw platform values and platform-only information, discriminated by `os`. */
   platform: DarwinNative | Win32Native | LinuxNative
 }
 
@@ -277,7 +289,7 @@ export interface DarwinNative {
   slant?: number
   /** kCTFontSymbolicTrait, including the class bits. */
   symbolicTraits?: number
-  /** kCTFontFormatAttribute */
+  /** kCTFontFormatAttribute (CTFontFormat: 0 unrecognized, 1 OpenType PostScript, 2 OpenType TrueType, 3 TrueType, 4 PostScript, 5 bitmap). */
   format?: number
   /** kCTFontPriorityAttribute (system 10000 ... process 60000) */
   priority?: number
@@ -305,7 +317,7 @@ export interface DarwinNative {
     openTypeTag?: string
     selectors: Array<{ id: number; name: string; default: boolean; openTypeTag?: string; openTypeValue?: number }>
   }>
-  /** CTFont metrics in font units. Present when `tables` is on (it needs a CTFont). */
+  /** CTFont metrics in font units. */
   metrics?: {
     ascent: number
     descent: number
@@ -320,34 +332,135 @@ export interface DarwinNative {
     /** [x, y, width, height] */
     boundingBox: [number, number, number, number]
   }
-  /** Other font files the font collection lists under this PostScript name. Resolving the name (what CSS local() and family matching do) never reaches them. */
+  /** Other font files the font collection lists under this face's PostScript name. Resolving the name (what CSS local() and family matching do) never reaches them, so they are not faces. */
   shadowed?: Array<{ path: string; variable: boolean }>
 }
 
-/** Not final: the Windows backend is not implemented yet. */
+/** DirectWrite's raw values. Not final: the Windows backend is not implemented yet. */
 export interface Win32Native {
   os: 'win32'
-  /** DWRITE_FONT_WEIGHT */
+  /** DWRITE_FONT_WEIGHT (IDWriteFont::GetWeight), 1-999 */
   weight: number
-  /** DWRITE_FONT_STRETCH, 1-9 */
+  /** DWRITE_FONT_STRETCH (IDWriteFont::GetStretch), 1-9 */
   width: number
-  /** DWRITE_FONT_STYLE: 0 normal, 1 oblique, 2 italic */
+  /** DWRITE_FONT_STYLE (IDWriteFont::GetStyle): 0 normal, 1 oblique, 2 italic */
   slant: number
-  /** DWRITE_FONT_SIMULATIONS bits */
-  simulations: number
   /** DWRITE_FONT_FACE_TYPE */
-  faceType: number
+  format: number
+  /** DWRITE_INFORMATIONAL_STRING_TYPOGRAPHIC_FAMILY_NAMES */
+  typographicFamilyNames: LocalizedString[]
+  /** DWRITE_INFORMATIONAL_STRING_TYPOGRAPHIC_SUBFAMILY_NAMES */
+  typographicStyleNames: LocalizedString[]
+  /** DWRITE_INFORMATIONAL_STRING_DESIGN_SCRIPT_LANGUAGE_TAG, unsplit. */
+  designLanguages: LocalizedString[]
+  /** DWRITE_INFORMATIONAL_STRING_SUPPORTED_SCRIPT_LANGUAGE_TAG, unsplit: the raw value of `supportedLanguages`. */
+  supportedLanguages: LocalizedString[]
+  /** The face's family name is listed under HKCU\Software\Microsoft\Windows NT\CurrentVersion\Font Management\Inactive Fonts. A per-user preference recorded by name, which can be stale; DirectWrite lists the font regardless. */
+  inactiveFamilyPreference: boolean
+  /** DWRITE_FONT_SOURCE_TYPE of the face's entry in the system font set (IDWriteFontSet3::GetFontSourceType). */
+  sourceType?: number
+  /** The name of that source (IDWriteFontSet3::GetFontSourceName), when it has one. */
+  sourceName?: string
+  /** IDWriteFontFaceReference1::GetFontAxisValues: every axis value DirectWrite gives the face. */
+  axisValues?: Array<{ tag: string; value: number }>
+  /** The axes of the font resource (IDWriteFontResource), DirectWrite's view, which can include axes `fvar` does not define. */
+  resourceAxes?: Array<{ tag: string; min: number; max: number; default: number; attributes: number; names: LocalizedString[] }>
+  /** The informational strings DirectWrite returns that the font's `name` table does not reproduce, keyed by the DWRITE_INFORMATIONAL_STRING_ID value as a decimal string. */
+  additionalInformationalStrings: Record<string, LocalizedString[]>
 }
 
-/** Not final: the Linux backend is not implemented yet. */
+/** fontconfig's raw values. Not final: the Linux backend is not implemented yet. */
 export interface LinuxNative {
   os: 'linux'
   /** FC_WEIGHT, 0-215 */
   weight: number
   /** FC_WIDTH, 50-200 */
   width: number
-  /** FC_SLANT: 0, 100, 110 */
+  /** FC_SLANT: 0 roman, 100 italic, 110 oblique */
   slant: number
-  /** Raw FC_INDEX (named instance in the high 16 bits). */
+  /** FC_INDEX: the face index in its file in the low 16 bits, the 1-based named instance number in the high 16 bits. */
   index: number
+  /** FC_SPACING: 0 proportional, 90 dual-width, 100 monospace, 110 character cell. Absent when fontconfig gives none. */
+  spacing?: number
+  /** FC_FONTFORMAT, FreeType's format name (TrueType, CFF, Type 1, PCF, ...). */
+  format?: string
+  /** FC_FONT_WRAPPER: the container (SFNT, WOFF, WOFF2, CFF). */
+  fontWrapper?: string
+  /** FC_FOUNDRY */
+  foundry?: string
+  /** FC_DECORATIVE */
+  decorative?: boolean
+  /** FC_FONT_HAS_HINT */
+  fontHasHint?: boolean
+  /** FC_ORDER: the position of the font's directory in the configuration. */
+  order?: number
+  /** FC_OUTLINE */
+  outline?: boolean
+  /** FC_SCALABLE */
+  scalable?: boolean
+  /** FC_ANTIALIAS, when the font or the configuration sets it. */
+  antialias?: boolean
+  /** FC_PIXEL_SIZE: the strike size of a bitmap font, when set. */
+  pixelSize?: number
 }
+
+// ---- field selection -----------------------------------------------------------
+// The text between the region markers is copied verbatim into docs/api.md ("Result typing").
+
+// #region selection-types
+export type Preset = 'names' | 'styles' | 'details' | 'full'
+
+export type FamilyField = 'familyNames' | 'supportedLanguages' | 'variable' | 'enabled'
+export type OpenTypeEntry = 'tables' | 'names' | 'head' | 'hhea' | 'vhea' | 'os2' | 'post' | 'maxp' | 'cmap' | 'fvar' | 'meta' | 'layout'
+export type PlatformNative = DarwinNative | Win32Native | LinuxNative
+export type PlatformField = Exclude<keyof DarwinNative | keyof Win32Native | keyof LinuxNative, 'os'>
+type FaceKey = Exclude<keyof FontFace, 'opentype' | 'platform'>
+export type FaceField = `faces.${FaceKey}` | `faces.opentype.${OpenTypeEntry}` | `faces.platform.${PlatformField}`
+export type Field = FamilyField | FaceField
+
+type NamesFields = 'familyNames'
+type StylesFields =
+  | NamesFields
+  | 'supportedLanguages'
+  | 'enabled'
+  | `faces.${'postscriptName' | 'fullName' | 'fullNames' | 'styleName' | 'styleNames' | 'familyNames'}`
+  | `faces.${'weight' | 'width' | 'style' | 'monospace' | 'color' | 'symbol'}`
+  | `faces.${'enabled' | 'simulations' | 'supportedLanguages' | 'scope' | 'file' | 'coordinates'}`
+type DetailsFields =
+  | StylesFields
+  | 'variable'
+  | `faces.${'variable' | 'format' | 'axes' | 'namedInstanceIndex'}`
+  | `faces.platform.${PlatformField}`
+type FullFields = DetailsFields | `faces.opentype.${OpenTypeEntry}`
+export interface PresetFields {
+  names: NamesFields
+  styles: StylesFields
+  details: DetailsFields
+  full: FullFields
+}
+
+type Selection = { fields: readonly Field[]; preset?: Preset } | { fields?: readonly Field[]; preset: Preset }
+export type GetFamiliesOptions = Selection & { families?: readonly string[]; languageCoverage?: readonly string[] }
+export type GetFamilyOptions = Selection & { families?: never; languageCoverage?: readonly string[] }
+
+type SelectedFields<O> =
+  | (O extends { fields: readonly (infer F)[] } ? F : never)
+  | (O extends { preset: infer P extends Preset } ? PresetFields[P] : never)
+
+type Identity = 'file' | 'coordinates' | 'simulations'
+type FaceKeysOf<F> = F extends `faces.${infer K extends FaceKey}` ? K : never
+type OpenTypeEntriesOf<F> = F extends `faces.opentype.${infer E extends OpenTypeEntry}` ? E : never
+type PlatformFieldsOf<F> = F extends `faces.platform.${infer K extends PlatformField}` ? K : never
+type PickPlatform<K, N = PlatformNative> = N extends PlatformNative ? Pick<N, 'os' | (K & keyof N)> : never
+
+export type SelectedFace<F> = Pick<FontFace, Identity | Exclude<FaceKeysOf<F>, 'coverage'>> &
+  ('coverage' extends FaceKeysOf<F> ? Required<Pick<FontFace, 'coverage'>> : unknown) &
+  ([OpenTypeEntriesOf<F>] extends [never] ? unknown : { opentype?: Pick<OpenTypeInfo, OpenTypeEntriesOf<F> | 'errors'> }) &
+  ([PlatformFieldsOf<F>] extends [never] ? unknown : { platform: PickPlatform<PlatformFieldsOf<F>> })
+
+export type SelectedFamily<O> = Pick<FontFamily, 'family' | (SelectedFields<O> & FamilyField)> &
+  ([Extract<SelectedFields<O>, `faces.${string}`>] extends [never]
+    ? unknown
+    : { faces: Array<SelectedFace<Extract<SelectedFields<O>, `faces.${string}`>>> }) &
+  (O extends { languageCoverage: readonly string[] } ? Required<Pick<FontFamily, 'languageCoverage'>> : unknown)
+// #endregion

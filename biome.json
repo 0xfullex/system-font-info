@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["ts/**/*.ts", "test/**/*.mjs", "scripts/**/*.{js,mjs}", "*.{js,mjs,cjs,ts}"]
+    "includes": ["ts/**/*.ts", "test/**/*.{mjs,ts}", "scripts/**/*.{js,mjs}", "*.{js,mjs,cjs,ts}"]
   },
   "formatter": {
     "indentStyle": "space",

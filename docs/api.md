@@ -119,9 +119,13 @@ type StylesFields =
   | `faces.${'postscriptName' | 'fullName' | 'fullNames' | 'styleName' | 'styleNames' | 'familyNames'}`
   | `faces.${'weight' | 'width' | 'style' | 'monospace' | 'color' | 'symbol'}`
   | `faces.${'enabled' | 'simulations' | 'supportedLanguages' | 'scope' | 'file' | 'coordinates'}`
-type DetailsFields = StylesFields | 'variable' | `faces.${'variable' | 'format' | 'axes' | 'namedInstanceIndex'}` | `faces.platform.${PlatformField}`
+type DetailsFields =
+  | StylesFields
+  | 'variable'
+  | `faces.${'variable' | 'format' | 'axes' | 'namedInstanceIndex'}`
+  | `faces.platform.${PlatformField}`
 type FullFields = DetailsFields | `faces.opentype.${OpenTypeEntry}`
-interface PresetFields {
+export interface PresetFields {
   names: NamesFields
   styles: StylesFields
   details: DetailsFields
@@ -142,7 +146,8 @@ type OpenTypeEntriesOf<F> = F extends `faces.opentype.${infer E extends OpenType
 type PlatformFieldsOf<F> = F extends `faces.platform.${infer K extends PlatformField}` ? K : never
 type PickPlatform<K, N = PlatformNative> = N extends PlatformNative ? Pick<N, 'os' | (K & keyof N)> : never
 
-export type SelectedFace<F> = Pick<FontFace, Identity | FaceKeysOf<F>> &
+export type SelectedFace<F> = Pick<FontFace, Identity | Exclude<FaceKeysOf<F>, 'coverage'>> &
+  ('coverage' extends FaceKeysOf<F> ? Required<Pick<FontFace, 'coverage'>> : unknown) &
   ([OpenTypeEntriesOf<F>] extends [never] ? unknown : { opentype?: Pick<OpenTypeInfo, OpenTypeEntriesOf<F> | 'errors'> }) &
   ([PlatformFieldsOf<F>] extends [never] ? unknown : { platform: PickPlatform<PlatformFieldsOf<F>> })
 
@@ -150,10 +155,12 @@ export type SelectedFamily<O> = Pick<FontFamily, 'family' | (SelectedFields<O> &
   ([Extract<SelectedFields<O>, `faces.${string}`>] extends [never]
     ? unknown
     : { faces: Array<SelectedFace<Extract<SelectedFields<O>, `faces.${string}`>>> }) &
-  (O extends { languageCoverage: readonly string[] } ? Pick<FontFamily, 'languageCoverage'> : unknown)
+  (O extends { languageCoverage: readonly string[] } ? Required<Pick<FontFamily, 'languageCoverage'>> : unknown)
 ```
 
 For example, `getFamilies({ fields: ['faces.weight', 'faces.platform.features'] })` is typed `Promise<Array<{ family: string; faces: Array<{ file?: …; coordinates?: …; simulations: …; weight: number; platform: { os: 'darwin'; features?: … } | { os: 'win32' } | { os: 'linux' } }> }>>`: the platform object is a union discriminated by `os`, and a platform field exists only on the member of the platform that defines it. When `fields` is a variable of type `Field[]` rather than a literal, the type falls back to every field.
+
+`languageCoverage` (on the family) and `faces.coverage` are optional in the complete shapes because they are in no preset, but in a result type they are always present once asked for: the `languageCoverage` option adds a required `languageCoverage`, and selecting `faces.coverage` adds a required `coverage` to every face. Fields that can be absent for a given family or face (`file`, `axes`, `coordinates`, `namedInstanceIndex`, `opentype` entries) stay optional.
 
 ## Always included
 
