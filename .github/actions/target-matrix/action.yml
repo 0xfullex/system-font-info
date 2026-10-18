@@ -1,0 +1,30 @@
+name: Target matrix
+description: >
+  The target table (ts/targets.ts) as a job matrix. The table is the only list of targets, so the workflows that build,
+  test or install per target all read their matrix from here. The repository must be checked out first.
+
+inputs:
+  node-major:
+    description: The Node.js major version to run the table's script with.
+    required: true
+
+outputs:
+  matrix:
+    description: 'The matrix, {"include": [{"id", "platform", "arch", "runner", "tests", …}, …]}.'
+    value: ${{ steps.matrix.outputs.matrix }}
+
+runs:
+  using: composite
+  steps:
+    # actions/setup-node v7.1.0
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+      with:
+        node-version: ${{ inputs.node-major }}
+        cache: npm
+    - run: npm ci
+      shell: bash
+    - run: npm run build:ts
+      shell: bash
+    - id: matrix
+      run: echo "matrix=$(node scripts/targets.mjs --matrix)" >> "$GITHUB_OUTPUT"
+      shell: bash

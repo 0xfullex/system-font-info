@@ -116,7 +116,9 @@ scripts/ci/linux-container.sh quay.io/pypa/manylinux_2_28_x86_64 24 \
   fontconfig-devel freetype-devel fontconfig dejavu-sans-fonts google-noto-sans-cjk-ttc-fonts
 ```
 
-The arguments are the image, the Node.js major version and the packages to install: the headers to build against and the fonts the tests need, since a container has none. The workflow's `LINUX_PACKAGES` is the list CI uses.
+The arguments are the image, the Node.js major version and the packages to install: the headers to build against and the fonts the tests need, since a container has none. The workflow's `LINUX_PACKAGES` is the list CI uses. `--prebuild-out <directory>` before the image builds a release instead: the stripped addon goes to `<directory>/<target id>/`, and no tests run.
+
+The steps the CI and release workflows share live in two local actions, `.github/actions/target-matrix` (the matrix from the target table) and `.github/actions/build-addon` (build one target natively); `scripts/ci/README.md` lists the scripts.
 
 ## License
 

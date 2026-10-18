@@ -54,17 +54,14 @@ jobs:
     steps:
       # actions/checkout v7.0.1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      # actions/setup-node v7.1.0
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
-        with:
-          node-version: ${{ env.NODE_MAJOR }}
-          cache: npm
-      - run: npm ci
-      - run: npm run build:ts
       - id: matrix
-        run: echo "matrix=$(node scripts/targets.mjs --matrix)" >> "$GITHUB_OUTPUT"
+        uses: ./.github/actions/target-matrix
+        with:
+          node-major: ${{ env.NODE_MAJOR }}
 
-  # Each target is built and tested natively on its own runner, never cross-compiled.
+  # Each target is built and tested natively on its own runner, never cross-compiled. Linux targets build and test in
+  # a manylinux container, as the release build does, so the addon is tested against the oldest glibc, fontconfig and
+  # FreeType it supports.
   test:
     needs: targets
     name: test (${{ matrix.id }})
@@ -76,47 +73,15 @@ jobs:
     steps:
       # actions/checkout v7.0.1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-
-      # Linux targets are built in a manylinux container, as the release build is, so the addon is tested against the
-      # oldest glibc, fontconfig and FreeType it supports. It is not run through a job-level `container:` because the
-      # runner injects its own Node.js into that container. The script installs Node.js itself.
-      - name: Build and test in a manylinux container
-        if: matrix.platform == 'linux'
-        run: >
-          scripts/ci/linux-container.sh
-          quay.io/pypa/manylinux_2_28_${{ matrix.arch == 'x64' && 'x86_64' || 'aarch64' }}
-          "$NODE_MAJOR" $LINUX_PACKAGES
-
-      - name: Set up Node.js
-        if: matrix.platform != 'linux'
-        id: node
-        # actions/setup-node v7.1.0
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+      - uses: ./.github/actions/build-addon
         with:
-          node-version: ${{ env.NODE_MAJOR }}
-          cache: npm
-      - name: Cache the Node.js headers node-gyp downloads
-        if: matrix.platform != 'linux'
-        # actions/cache v6.1.0
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        with:
-          path: ${{ runner.temp }}/node-gyp
-          key: node-gyp-${{ matrix.id }}-${{ steps.node.outputs.node-version }}
-      - name: Show the Windows toolchain and CJK fonts
-        if: matrix.platform == 'win32'
-        shell: pwsh
-        run: |
-          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          & $vswhere -all -prerelease -property displayName
-          & $vswhere -all -prerelease -property installationVersion
-          Get-ChildItem "$env:windir\Fonts" | Where-Object Name -Match '^(msyh|msjh|yugoth|meiryo|malgun|simsun|simhei)' | Select-Object Name
-      - name: Build
-        if: matrix.platform != 'linux'
-        run: |
-          npm ci
-          npm run build
-        env:
-          npm_config_devdir: ${{ runner.temp }}/node-gyp
+          id: ${{ matrix.id }}
+          platform: ${{ matrix.platform }}
+          arch: ${{ matrix.arch }}
+          node-major: ${{ env.NODE_MAJOR }}
+          linux-packages: ${{ env.LINUX_PACKAGES }}
+
+      # Linux ran the tests in the container.
       - name: Test
         if: matrix.platform != 'linux' && matrix.tests
         run: npm test

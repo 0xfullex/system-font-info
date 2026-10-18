@@ -1,0 +1,74 @@
+name: Build the addon
+description: >
+  Builds the addon of one target natively, never cross-compiled: in a manylinux container on Linux (the same
+  script a developer runs), with the runner's toolchain elsewhere. On Linux the container also runs the tests unless
+  linux-options asks for a release build. The repository must be checked out first.
+
+inputs:
+  id:
+    description: The target's id (ts/targets.ts).
+    required: true
+  platform:
+    description: The target's platform, darwin, win32 or linux.
+    required: true
+  arch:
+    description: The target's architecture, x64 or arm64.
+    required: true
+  node-major:
+    description: The Node.js major version to build and test with.
+    required: true
+  linux-packages:
+    description: The packages the Linux container installs before building.
+    required: true
+  linux-options:
+    description: Options of scripts/ci/linux-container.sh, before the image.
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    # Linux targets are built in a manylinux container, so the addon is built against the oldest glibc, fontconfig and
+    # FreeType it supports. It is not run through a job-level `container:` because the runner injects its own Node.js
+    # into that container. The script installs Node.js itself.
+    - name: Build in a manylinux container
+      if: inputs.platform == 'linux'
+      shell: bash
+      env:
+        IMAGE: quay.io/pypa/manylinux_2_28_${{ inputs.arch == 'x64' && 'x86_64' || 'aarch64' }}
+        NODE_MAJOR: ${{ inputs.node-major }}
+        PACKAGES: ${{ inputs.linux-packages }}
+        OPTIONS: ${{ inputs.linux-options }}
+      # The options and the packages are lists of words.
+      run: scripts/ci/linux-container.sh $OPTIONS "$IMAGE" "$NODE_MAJOR" $PACKAGES
+
+    - name: Set up Node.js
+      if: inputs.platform != 'linux'
+      id: node
+      # actions/setup-node v7.1.0
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+      with:
+        node-version: ${{ inputs.node-major }}
+        cache: npm
+    - name: Cache the Node.js headers node-gyp downloads
+      if: inputs.platform != 'linux'
+      # actions/cache v6.1.0
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+      with:
+        path: ${{ runner.temp }}/node-gyp
+        key: node-gyp-${{ inputs.id }}-${{ steps.node.outputs.node-version }}
+    - name: Show the Windows toolchain and CJK fonts
+      if: inputs.platform == 'win32'
+      shell: pwsh
+      run: |
+        $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+        & $vswhere -all -prerelease -property displayName
+        & $vswhere -all -prerelease -property installationVersion
+        Get-ChildItem "$env:windir\Fonts" | Where-Object Name -Match '^(msyh|msjh|yugoth|meiryo|malgun|simsun|simhei)' | Select-Object Name
+    - name: Build
+      if: inputs.platform != 'linux'
+      shell: bash
+      run: |
+        npm ci
+        npm run build
+      env:
+        npm_config_devdir: ${{ runner.temp }}/node-gyp

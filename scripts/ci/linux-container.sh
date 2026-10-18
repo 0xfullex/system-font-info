@@ -2,12 +2,16 @@
 # Builds the addon and runs the test suite inside a Linux container, the way CI does for the Linux targets, so a
 # failure there can be reproduced on a developer machine with the same command.
 #
-#   scripts/ci/linux-container.sh <image> <node-major> <package>...
+#   scripts/ci/linux-container.sh [--prebuild-out <directory>] <image> <node-major> <package>...
 #
 #   <image>       the container image, e.g. quay.io/pypa/manylinux_2_28_x86_64 (the image decides the glibc the
 #                 addon is built against and the architecture it is built for).
 #   <node-major>  the Node.js major version to install, e.g. 24: the newest release of that line from nodejs.org.
 #   <package>     the packages dnf installs first: the headers to build against and the fonts the tests need.
+#
+# By default the script builds the addon and runs the tests. With --prebuild-out it builds a release instead: it
+# strips the addon, writes it to <directory>/<target id>/system-font-info.node (the layout of `prebuilds/`) and runs
+# no tests, because the release workflow tests the assembled prebuilds on their own. The fonts are not needed then.
 #
 # The repository is mounted read-only and its sources are copied inside the container, so the checkout is never
 # written to and a host's node_modules and build output (possibly for another platform) never leak in. The tests run as root.
@@ -43,7 +47,12 @@ run_inside() {
 
   npm ci
   npm run build
-  npm test
+  if [ -n "${PREBUILD_OUT:-}" ]; then
+    npm run copy-prebuild -- --strip
+    cp -R prebuilds/. "${PREBUILD_OUT}/"
+  else
+    npm test
+  fi
 }
 
 # Installs the newest Node.js of a major line from the official tarball, after checking it against SHASUMS256.txt.
@@ -77,8 +86,16 @@ if [ "${1:-}" = "--inside" ]; then
   exit
 fi
 
+# The directory is mounted into the container, which writes the prebuild there as root.
+prebuild_out=""
+if [ "${1:-}" = "--prebuild-out" ]; then
+  [ "$#" -ge 2 ] || { echo "--prebuild-out needs a directory" >&2; exit 2; }
+  mkdir -p "$2"
+  prebuild_out=$(cd "$2" && pwd)
+  shift 2
+fi
 if [ "$#" -lt 3 ]; then
-  echo "usage: $0 <image> <node-major> <package>..." >&2
+  echo "usage: $0 [--prebuild-out <directory>] <image> <node-major> <package>..." >&2
   exit 2
 fi
 image=$1
@@ -87,5 +104,6 @@ repository=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 # The container runs the very file the host started, from the read-only mount.
 docker run --rm \
   --volume "${repository}:/source:ro" \
+  ${prebuild_out:+--volume "${prebuild_out}:/prebuild-out" --env PREBUILD_OUT=/prebuild-out} \
   "${image}" \
   bash /source/scripts/ci/linux-container.sh --inside "$@"
