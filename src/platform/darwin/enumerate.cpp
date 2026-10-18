@@ -113,13 +113,22 @@ std::vector<Group> groupByPostscriptName(CFArrayRef descriptors) {
 }
 
 // What the PostScript name resolves to, as a descriptor of that very name. Null when resolution comes up empty (a
-// disabled font is not matched) or lands on a descriptor of another name.
+// disabled font is not matched) or lands on a descriptor of another name. CoreText's matcher caches its answers, and a
+// process that does not service the main run loop never has them invalidated, so the answer can name a file that is
+// gone or disabled now: the caller must check it against the listing of this call (`listsFileOf`).
 CTFontDescriptorRef resolveByName(const std::string& postscriptName, Ref<CTFontDescriptorRef>& resolvedStorage) {
   if (postscriptName.empty()) return nullptr;
   const auto name = makeString(postscriptName);
   const Ref<CTFontDescriptorRef> byName(CTFontDescriptorCreateWithNameAndSize(name.get(), 0));
   resolvedStorage = Ref<CTFontDescriptorRef>(CTFontDescriptorCreateMatchingFontDescriptor(byName.get(), nullptr));
   return resolvedStorage && postscriptNameOf(resolvedStorage.get()) == postscriptName ? resolvedStorage.get() : nullptr;
+}
+
+// Whether one of the group's descriptors lists the file of `descriptor`.
+bool listsFileOf(const Group& group, CTFontDescriptorRef descriptor) {
+  const std::string file = fileOf(descriptor);
+  return std::any_of(group.descriptors.begin(), group.descriptors.end(),
+                     [&](CTFontDescriptorRef listed) { return fileOf(listed) == file; });
 }
 
 // The collection's descriptors grouped by PostScript name, listed on first use: the full listing needs all of it, and
@@ -188,8 +197,13 @@ std::vector<ShadowedFile> shadowedFiles(const Group& group, CTFontDescriptorRef 
 //
 // `groups` come from the whole collection, or from a family lookup, which lists one file for a PostScript name. For a
 // lookup, `collection` is the whole collection: its group of the name stands in where the lookup's is not enough, that
-// is when the request wants the shadowed files, and when resolution finds nothing and the face falls back to the first
-// descriptor of the name, which must be the one the full listing falls back to.
+// is when the request wants the shadowed files, and when resolution finds nothing or a file the lookup does not list
+// and the face falls back to the first descriptor of the name, which must be the one the full listing falls back to.
+//
+// What the name resolves to is used only if the listing of this call has its file: a file removed or disabled since the
+// matcher cached its answer is not a face of the result, whatever the matcher still says. The check is made against the
+// lookup's group first, which is cheap and enough whenever it lists the file, and against the collection's group when
+// it does not (the lookup lists one file for a name, the resolution may name another).
 std::vector<FamilySeeds> groupByFamily(const std::vector<Group>& groups, const Request& request,
                                        CollectionGroups* collection, const EnabledFaces* enabledFaces) {
   std::vector<FamilySeeds> families;
@@ -198,11 +212,13 @@ std::vector<FamilySeeds> groupByFamily(const std::vector<Group>& groups, const R
     Seed seed;
     seed.postscriptName = group.postscriptName;
     CTFontDescriptorRef resolved = resolveByName(group.postscriptName, seed.resolved);
+    bool listed = resolved && listsFileOf(group, resolved);
     const Group* members = &group;
-    if (collection && (!resolved || request.wants(Field::FacesPlatformShadowed))) {
+    if (collection && (!listed || request.wants(Field::FacesPlatformShadowed))) {
       if (const Group* inCollection = collection->find(group.postscriptName)) members = inCollection;
+      if (resolved && members != &group) listed = listsFileOf(*members, resolved);
     }
-    seed.descriptor = resolved ? resolved : members->descriptors.front();
+    seed.descriptor = listed ? resolved : members->descriptors.front();
     seed.enabled = !enabledFaces || enabledFaces->contains(seed.descriptor);
     if (request.wants(Field::FacesPlatformShadowed)) seed.shadowed = shadowedFiles(*members, seed.descriptor);
 

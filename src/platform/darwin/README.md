@@ -80,6 +80,22 @@ the first collection descriptor of that name is used. The files of the other
 descriptors go to `platform.shadowed` (`path`, `variable`); a descriptor that
 names the chosen file again is the same font and is merged without a trace.
 
+CoreText's matcher caches its answers in the process, and their invalidation
+runs on the main dispatch queue, which a process that does not run the main run
+loop (plain Node, a `worker_threads` worker) never services. Such a process
+keeps getting a file that was removed or disabled since, and the face and its
+`shadowed` files would come from a file that is not listed any more. So the
+resolution is used only when its file is among those the listing of this call
+has for that name (`listsFileOf` in `enumerate.cpp`); otherwise the first
+descriptor of that listing is used, as when resolution finds nothing, and
+`shadowed` is computed from the listing's files. With `request.families` the
+check is made against the family lookup's group, and against the whole
+collection's group only when the lookup does not list the file (it can list
+just one file for a name). The check cannot tell which of several listed files
+a fresh process would resolve to, so with two files that both exist the
+cached answer stands; the attributes of the resolved descriptor,
+`platform.priority` among them, are the matcher's cached ones too.
+
 ## Disabled fonts
 
 A disabled font is listed, but CoreText does not mark it: its descriptor reports
@@ -123,9 +139,9 @@ once. `families: []` returns before any CoreText call. The lookup lists
 one file for a PostScript name, so the collection settles the names where that
 is not enough: it is listed (once per call, on first use) when the request wants
 `platform.shadowed`, whose files only the collection knows, and when resolution
-finds nothing for a name, so that the fallback is the collection's first
-descriptor of that name here as in the full listing (the `file` of a face does
-not depend on whether `families` was given). A face the lookup does not name
+finds nothing for a name or names a file the lookup does not list, so that the
+fallback is the collection's first descriptor of that name here as in the full
+listing (the `file` of a face does not depend on whether `families` was given). A face the lookup does not name
 (the tail the full listing appends) is not found on this path.
 
 ## Source of each field
