@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "../../core/model.h"
+#include "../../core/request.h"
 #include "../../sfnt/sfnt.h"
 #include "cf.h"
 
@@ -25,7 +26,7 @@ struct ShadowedFile {
 // collection file), so one instance serves a whole enumeration.
 class FaceReader {
  public:
-  explicit FaceReader(const EnumerateOptions& options) : options_(options) {}
+  FaceReader(const Request& request, WorkLog& work) : request_(request), work_(work) {}
 
   Face read(CTFontDescriptorRef descriptor, const std::vector<ShadowedFile>& shadowed);
 
@@ -34,7 +35,7 @@ class FaceReader {
   // all named instances of one variable font).
   struct Resource {
     sfnt::FontTables tables;
-    Value::Shared opentype;  // every entry; shared by the faces of the resource
+    Value::Shared opentype;  // the requested entries; shared by the faces of the resource
     SharedAxes axes;         // null when the font has no variation axes
   };
 
@@ -60,7 +61,8 @@ class FaceReader {
   FileFaces& fileFaces(const std::string& path);
   std::optional<Value> featuresOf(CTFontRef font, const std::optional<FileLocation>& file);
 
-  EnumerateOptions options_;
+  const Request& request_;
+  WorkLog& work_;
   std::map<std::string, FileFaces> files_;
   std::map<std::pair<std::string, uint32_t>, std::shared_ptr<const Resource>> resources_;
   // CTFontCopyFeatures per font resource: it is the most expensive call per

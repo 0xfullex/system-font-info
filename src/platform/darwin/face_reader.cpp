@@ -110,7 +110,8 @@ std::shared_ptr<const FaceReader::Resource> FaceReader::loadResource(const Table
 
   auto resource = std::make_shared<Resource>();
   resource->tables = sfnt::readFontTables(source.tags, source.fetch, decodeLegacyText);
-  resource->opentype = sfnt::openTypeValue(resource->tables, sfnt::OpenTypeSelection::all(), source.fetch);
+  resource->opentype = sfnt::openTypeValue(resource->tables, request_.openTypeSelection, source.fetch);
+  work_.tableEntries += static_cast<uint32_t>(request_.openTypeSelection.entries.count());
   const auto axes = copyAttribute(descriptor, kCTFontVariationAxesAttribute);
   resource->axes = makeAxes(asArray(axes.get()), resource->tables);
   if (key) resources_.emplace(*key, resource);
@@ -131,6 +132,7 @@ Face FaceReader::read(CTFontDescriptorRef descriptor, const std::vector<Shadowed
 
   const Ref<CTFontRef> font(CTFontCreateWithFontDescriptor(descriptor, 0, nullptr));
   if (!font) throw std::runtime_error("system-font-info: CoreText cannot create the font " + face.postscriptName);
+  ++work_.fontResources;
 
   // CoreText can create another font than the descriptor names (it substitutes
   // one when it cannot use the file). Whatever is read from that CTFont then
@@ -145,7 +147,7 @@ Face FaceReader::read(CTFontDescriptorRef descriptor, const std::vector<Shadowed
   if (!path.empty()) face.file = FileLocation{path, source.index};
   const auto resource = loadResource(source, descriptor, face.file);
   const sfnt::FontTables& tables = resource->tables;
-  if (options_.tables && !source.tags.empty()) face.opentype = resource->opentype;
+  if (request_.wantsAnyOpenType() && !source.tags.empty()) face.opentype = resource->opentype;
 
   // ---- classification
   const Traits traits = readTraits(descriptor);
@@ -159,7 +161,7 @@ Face FaceReader::read(CTFontDescriptorRef descriptor, const std::vector<Shadowed
   face.enabled = booleanValue(copyAttribute(descriptor, kCTFontEnabledAttribute).get()).value_or(true);
   if (const auto languages = copyAttribute(descriptor, kCTFontLanguagesAttribute); asArray(languages.get())) {
     for (CFIndex i = 0; i < CFArrayGetCount(asArray(languages.get())); ++i) {
-      face.languages.push_back(toUtf8(asString(CFArrayGetValueAtIndex(asArray(languages.get()), i))));
+      face.supportedLanguages.push_back(toUtf8(asString(CFArrayGetValueAtIndex(asArray(languages.get()), i))));
     }
   }
   face.scope = scopeOf(integerValue(copyAttribute(descriptor, kCTFontPriorityAttribute).get()),
@@ -173,26 +175,30 @@ Face FaceReader::read(CTFontDescriptorRef descriptor, const std::vector<Shadowed
     const Ref<CFTypeRef> variation = substituted ? copyAttribute(descriptor, kCTFontVariationAttribute)
                                                  : Ref<CFTypeRef>(CTFontCopyVariation(font.get()));
     face.coordinates = coordinatesOf(asDictionary(variation.get()), *resource->axes);
-    face.namedInstance = namedInstanceOf(face.coordinates, tables.fvar);
+    face.namedInstanceIndex = namedInstanceOf(face.coordinates, tables.fvar);
   }
 
   // ---- names
   face.familyNames = sfnt::localizedNameWithFallback(tables.names, 16, 1);
   face.styleNames = sfnt::localizedNameWithFallback(tables.names, 17, 2);
   face.fullNames = sfnt::localizedName(tables.names, 4);
-  if (face.namedInstance) {
-    face.styleNames = sfnt::localizedName(tables.names, tables.fvar->instances[*face.namedInstance].subfamilyNameId);
+  if (face.namedInstanceIndex) {
+    face.styleNames =
+        sfnt::localizedName(tables.names, tables.fvar->instances[*face.namedInstanceIndex].subfamilyNameId);
     // A named instance has no full-name record of its own; its names are composed from the family and its subfamily
     // name.
-    face.fullNames = sfnt::instanceFullNames(tables.names, tables.fvar->instances[*face.namedInstance]);
+    face.fullNames = sfnt::instanceFullNames(tables.names, tables.fvar->instances[*face.namedInstanceIndex]);
   }
 
-  if (options_.coverage) face.coverage = coverageRanges(descriptor);
+  if (request_.wants(Field::FacesCoverage)) {
+    face.coverage = coverageRanges(descriptor);
+    ++work_.characterSets;
+  }
 
   // Only a CTFont provides the features and the metrics.
   const std::optional<Value> features = substituted ? std::nullopt : featuresOf(font.get(), face.file);
   face.platform = makePlatformValue({descriptor, substituted ? nullptr : font.get(), features ? &*features : nullptr,
-                                     traits, options_.tables, shadowed});
+                                     traits, request_.wants(Field::FacesPlatformMetrics), shadowed});
   return face;
 }
 

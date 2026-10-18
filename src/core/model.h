@@ -66,7 +66,7 @@ struct Face {
   bool enabled = true;
   bool simulatedBold = false;
   bool simulatedOblique = false;
-  std::vector<std::string> languages;
+  std::vector<std::string> supportedLanguages;
   Scope scope = Scope::Unknown;
   Format format = Format::Unknown;
   std::optional<FileLocation> file;
@@ -75,23 +75,26 @@ struct Face {
   SharedAxes axes;  // non-null iff variable
   // Every axis of `axes`, in axis order; non-empty iff variable.
   std::vector<std::pair<std::string, double>> coordinates;
-  std::optional<uint32_t> namedInstance;
+  std::optional<uint32_t> namedInstanceIndex;
 
-  Value::Shared opentype;  // null when tables were not requested or the face is not an sfnt
-  // Inclusive code point ranges, ascending; set only when coverage was requested.
+  // Only the entries of the request (Request::openTypeSelection); null when none was requested or the face is not an
+  // sfnt.
+  Value::Shared opentype;
+  // Inclusive code point ranges, ascending; set only when the request wants `faces.coverage`.
   std::optional<std::vector<std::pair<uint32_t, uint32_t>>> coverage;
 
   Value platform = Value::object();  // first key is "os"
 };
 
 struct Family {
-  std::string family;       // the name the platform matcher groups by
+  std::string family;  // the name the platform matcher groups by
+  // The family's names as the platform gives them. Filled only by a backend whose platform source for `familyNames` is
+  // native (docs/platforms.md); on the others the JS layer derives the names from the faces.
+  LocalizedStrings familyNames;
   std::vector<Face> faces;  // in the platform's member order
-};
-
-struct EnumerateOptions {
-  bool tables = true;
-  bool coverage = false;
+  // How many code points of each requested orthography the family's default face covers, in the order of
+  // `Request::orthographies`; empty when the request names none.
+  std::vector<uint32_t> languageCoverage;
 };
 
 }  // namespace sfi

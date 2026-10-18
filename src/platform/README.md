@@ -8,11 +8,25 @@ the interface in `../core/platform.h` and fills the structs of
 
 ## The contract
 
-- `enumerateFonts(options)` lists every installed font as `Family` / `Face`
-  structs. It runs on a worker thread, never the JS thread, and throws a
+- `enumerateFonts(request, work)` lists the installed fonts as `Family` /
+  `Face` structs. It runs on a worker thread, never the JS thread, and throws a
   `std::exception` when the OS font service fails. It reflects the fonts
   installed at the moment of the call: a backend keeps nothing between two
   calls, no cache, no handle to the OS font service, no thread.
+  - It returns only the families for which `request.wantsFamily` is true, and
+    every one of them with all its faces, whatever the request.
+  - It fills what the request wants: `request.wants(field)`,
+    `wantsAnyOpenType()` (the `opentype` entries are built from
+    `request.openTypeSelection`), `request.orthographies` (the family's
+    `languageCoverage`, in that order). A field the platform derives is never
+    requested. `request.needs(group)` and `mayNeed(group)` say which groups of
+    OS work (`docs/platforms.md`, "Source groups") the request calls for; work
+    of a group it does not need is wasted, and what it needs is the defect to
+    avoid skipping. The output is cut to the request by `core/to_js.cpp`, not
+    by the backend, so extra work costs time but never changes a result.
+  - It adds to `work` each costly unit of work as it does it: a font object or
+    file opened for a face (`fontResources`), an `opentype` entry built
+    (`tableEntries`), a character set fetched and walked (`characterSets`).
 - `decodeLegacyText(encoding, bytes)` converts bytes in a legacy character
   encoding (`sfnt::LegacyEncoding`: Mac script encodings, Windows multi-byte
   code pages) to UTF-8 with the OS's own converter. It is only the converter:
@@ -26,8 +40,8 @@ the interface in `../core/platform.h` and fills the structs of
 
 ## What a backend must do
 
-- Report what the OS says, in full: every font the OS lists, every language it
-  names, every attribute it exposes. Fields the OS has no notion of stay absent
+- Report what the OS says, in full: every font the OS lists (of the requested
+  families), every language it names, every attribute it exposes. Fields the OS has no notion of stay absent
   or carry the truthful value; nothing is filled in with an invented default.
 - Read the font's own tables through `../sfnt` (`readFontTables`, `openTypeValue`), feeding it
   the bytes the OS hands out, so the `opentype` object and the names are
@@ -43,7 +57,9 @@ the interface in `../core/platform.h` and fills the structs of
 ## What a backend must not do
 
 - Filter, trim or hide fonts, even ones that look private or broken. Only exact
-  duplicates (the same font listed twice by the OS) may be merged.
+  duplicates (the same font listed twice by the OS) may be merged. Selecting
+  families by name is the one filter, and it is `request.wantsFamily`'s.
+- Cut the output to the request: `core/to_js.cpp` does, once, for all platforms.
 - Canonicalize language tags, merge or de-duplicate names across records, pick
   default strings, compute family-level aggregates or sort. The JS layer owns
   all of that, so the rules live in one place.

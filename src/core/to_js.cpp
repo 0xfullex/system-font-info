@@ -1,5 +1,8 @@
 #include "to_js.h"
 
+#include <set>
+#include <string>
+#include <string_view>
 #include <type_traits>
 #include <unordered_map>
 #include <variant>
@@ -56,7 +59,15 @@ const char* formatName(Format format) {
 // invalidate the shared objects created in an earlier family.
 class Converter {
  public:
-  explicit Converter(Napi::Env env) : env_(env) {}
+  // `request` is null for a subtree converted on its own (`sharedToJs`); only `families` and what it calls need it.
+  explicit Converter(Napi::Env env, const Request* request = nullptr) : env_(env), request_(request) {
+    if (!request_) return;
+    for (const FieldInfo& info : kFields) {
+      if (info.level == Level::Platform && request_->wants(info.field)) {
+        platformKeys_.emplace(info.name.substr(kPlatformPrefix.size()));
+      }
+    }
+  }
 
   Napi::Array families(const std::vector<Family>& families) {
     auto result = Napi::Array::New(env_, families.size());
@@ -143,46 +154,63 @@ class Converter {
     return array;
   }
 
-  Napi::Object face(const Face& f) {
+  // `os` and the requested platform fields of the backend's `platform` value, in its order.
+  Napi::Value platform(const Value& platformValue) {
     auto out = Napi::Object::New(env_);
-    out.Set("postscriptName", Napi::String::New(env_, f.postscriptName));
-    out.Set("fullNames", localized(f.fullNames));
-    out.Set("styleNames", localized(f.styleNames));
-    out.Set("familyNames", localized(f.familyNames));
-    out.Set("weight", Napi::Number::New(env_, f.weight));
-    out.Set("width", Napi::Number::New(env_, f.width));
-    out.Set("style", Napi::String::New(env_, styleName(f.style)));
-    out.Set("monospace", Napi::Boolean::New(env_, f.monospace));
-    out.Set("color", Napi::Boolean::New(env_, f.color));
-    out.Set("symbol", Napi::Boolean::New(env_, f.symbol));
-    out.Set("enabled", Napi::Boolean::New(env_, f.enabled));
+    const auto* members = std::get_if<Value::Object>(&platformValue.data());
+    if (!members) return out;
+    for (const auto& [key, member] : *members) {
+      if (key == "os" || platformKeys_.contains(key)) out.Set(key, value(member));
+    }
+    return out;
+  }
 
-    auto simulations = Napi::Object::New(env_);
-    simulations.Set("bold", Napi::Boolean::New(env_, f.simulatedBold));
-    simulations.Set("oblique", Napi::Boolean::New(env_, f.simulatedOblique));
-    out.Set("simulations", simulations);
+  Napi::Object face(const Face& f) {
+    const Request& request = *request_;
+    auto out = Napi::Object::New(env_);
+    if (request.wants(Field::FacesPostscriptName)) out.Set("postscriptName", Napi::String::New(env_, f.postscriptName));
+    if (request.wants(Field::FacesFullNames)) out.Set("fullNames", localized(f.fullNames));
+    if (request.wants(Field::FacesStyleNames)) out.Set("styleNames", localized(f.styleNames));
+    if (request.wants(Field::FacesFamilyNames)) out.Set("familyNames", localized(f.familyNames));
+    if (request.wants(Field::FacesWeight)) out.Set("weight", Napi::Number::New(env_, f.weight));
+    if (request.wants(Field::FacesWidth)) out.Set("width", Napi::Number::New(env_, f.width));
+    if (request.wants(Field::FacesStyle)) out.Set("style", Napi::String::New(env_, styleName(f.style)));
+    if (request.wants(Field::FacesMonospace)) out.Set("monospace", Napi::Boolean::New(env_, f.monospace));
+    if (request.wants(Field::FacesColor)) out.Set("color", Napi::Boolean::New(env_, f.color));
+    if (request.wants(Field::FacesSymbol)) out.Set("symbol", Napi::Boolean::New(env_, f.symbol));
+    if (request.wants(Field::FacesEnabled)) out.Set("enabled", Napi::Boolean::New(env_, f.enabled));
 
-    out.Set("languages", stringArray(f.languages));
-    out.Set("scope", Napi::String::New(env_, scopeName(f.scope)));
-    out.Set("format", Napi::String::New(env_, formatName(f.format)));
-    if (f.file) {
+    if (request.wants(Field::FacesSimulations)) {
+      auto simulations = Napi::Object::New(env_);
+      simulations.Set("bold", Napi::Boolean::New(env_, f.simulatedBold));
+      simulations.Set("oblique", Napi::Boolean::New(env_, f.simulatedOblique));
+      out.Set("simulations", simulations);
+    }
+
+    if (request.wants(Field::FacesSupportedLanguages)) out.Set("supportedLanguages", stringArray(f.supportedLanguages));
+    if (request.wants(Field::FacesScope)) out.Set("scope", Napi::String::New(env_, scopeName(f.scope)));
+    if (request.wants(Field::FacesFormat)) out.Set("format", Napi::String::New(env_, formatName(f.format)));
+    if (request.wants(Field::FacesFile) && f.file) {
       auto file = Napi::Object::New(env_);
       file.Set("path", Napi::String::New(env_, f.file->path));
       if (f.file->index) file.Set("index", Napi::Number::New(env_, *f.file->index));
       out.Set("file", file);
     }
 
-    out.Set("variable", Napi::Boolean::New(env_, f.variable));
-    if (f.axes) out.Set("axes", axes(f.axes));
-    if (!f.coordinates.empty()) {
+    if (request.wants(Field::FacesVariable)) out.Set("variable", Napi::Boolean::New(env_, f.variable));
+    if (request.wants(Field::FacesAxes) && f.axes) out.Set("axes", axes(f.axes));
+    if (request.wants(Field::FacesCoordinates) && !f.coordinates.empty()) {
       auto coordinates = Napi::Object::New(env_);
       for (const auto& [tag, coordinate] : f.coordinates) coordinates.Set(tag, Napi::Number::New(env_, coordinate));
       out.Set("coordinates", coordinates);
     }
-    if (f.namedInstance) out.Set("namedInstance", Napi::Number::New(env_, *f.namedInstance));
+    if (request.wants(Field::FacesNamedInstanceIndex) && f.namedInstanceIndex) {
+      out.Set("namedInstanceIndex", Napi::Number::New(env_, *f.namedInstanceIndex));
+    }
 
-    if (f.opentype) out.Set("opentype", shared(f.opentype));
-    if (f.coverage) {
+    // The backend builds only the entries of the request (Request::openTypeSelection), so the object is whole as it is.
+    if (request.wantsAnyOpenType() && f.opentype) out.Set("opentype", shared(f.opentype));
+    if (request.wants(Field::FacesCoverage) && f.coverage) {
       auto ranges = Napi::Array::New(env_, f.coverage->size());
       for (size_t i = 0; i < f.coverage->size(); ++i) {
         auto range = Napi::Array::New(env_, 2);
@@ -193,28 +221,43 @@ class Converter {
       out.Set("coverage", ranges);
     }
 
-    out.Set("platform", value(f.platform));
+    if (request.platformObject) out.Set("platform", platform(f.platform));
     return out;
   }
 
   Napi::Object family(const Family& f) {
+    const Request& request = *request_;
     auto out = Napi::Object::New(env_);
     out.Set("family", Napi::String::New(env_, f.family));
-    auto faces = Napi::Array::New(env_, f.faces.size());
-    for (size_t i = 0; i < f.faces.size(); ++i) faces.Set(static_cast<uint32_t>(i), face(f.faces[i]));
-    out.Set("faces", faces);
+    if (request.wants(Field::FamilyNames)) out.Set("familyNames", localized(f.familyNames));
+    if (request.wantsAnyFace()) {
+      auto faces = Napi::Array::New(env_, f.faces.size());
+      for (size_t i = 0; i < f.faces.size(); ++i) faces.Set(static_cast<uint32_t>(i), face(f.faces[i]));
+      out.Set("faces", faces);
+    }
+    if (!request.orthographies.empty()) {
+      auto counts = Napi::Array::New(env_, f.languageCoverage.size());
+      for (size_t i = 0; i < f.languageCoverage.size(); ++i) {
+        counts.Set(static_cast<uint32_t>(i), Napi::Number::New(env_, f.languageCoverage[i]));
+      }
+      out.Set("languageCoverage", counts);
+    }
     return out;
   }
 
+  static constexpr std::string_view kPlatformPrefix = "faces.platform.";
+
   Napi::Env env_;
+  const Request* request_;
+  std::set<std::string, std::less<>> platformKeys_;  // the requested `faces.platform.*` fields, without the prefix
   std::unordered_map<const Value*, Napi::Reference<Napi::Object>> sharedObjects_;
   std::unordered_map<const std::vector<VariationAxis>*, Napi::Reference<Napi::Object>> sharedAxes_;
 };
 
 }  // namespace
 
-Napi::Array familiesToJs(Napi::Env env, const std::vector<Family>& families) {
-  return Converter(env).families(families);
+Napi::Array familiesToJs(Napi::Env env, const std::vector<Family>& families, const Request& request) {
+  return Converter(env, &request).families(families);
 }
 
 Napi::Value sharedToJs(Napi::Env env, const Value::Shared& shared) { return Converter(env).shared(shared); }

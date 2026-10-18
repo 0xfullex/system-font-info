@@ -2,52 +2,74 @@
 
 #include <cmath>
 #include <exception>
+#include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "../orthography/orthography.h"
 #include "../sfnt/sfnt.h"
 #include "model.h"
 #include "platform.h"
+#include "request.h"
 #include "to_js.h"
 
 namespace sfi {
 namespace {
 
-// ---- getFonts -------------------------------------------------------------
+// ---- getFamilies ------------------------------------------------------------
 
-EnumerateOptions parseEnumerateOptions(const Napi::CallbackInfo& info) {
-  EnumerateOptions options;
-  if (info.Length() == 0 || info[0].IsUndefined() || info[0].IsNull()) return options;
-  if (!info[0].IsObject()) throw Napi::TypeError::New(info.Env(), "getFonts: options must be an object");
-  Napi::Object object = info[0].As<Napi::Object>();
-  for (auto [key, target] : {std::pair<const char*, bool*>{"tables", &options.tables},
-                             std::pair<const char*, bool*>{"coverage", &options.coverage}}) {
-    Napi::Value value = object.Get(key);
-    if (value.IsUndefined()) continue;
-    if (!value.IsBoolean()) {
-      throw Napi::TypeError::New(info.Env(), std::string("getFonts: options.") + key + " must be a boolean");
+// The request is an internal contract with the JS layer, which has validated the caller's options already (see
+// ts/native.ts), so anything malformed here is a defect, reported as a plain Error.
+std::vector<std::string> stringArrayMember(Napi::Env env, const Napi::Object& object, const char* key) {
+  const Napi::Value value = object.Get(key);
+  if (!value.IsArray())
+    throw Napi::Error::New(env, std::string("system-font-info: request.") + key + " must be an array");
+  const Napi::Array array = value.As<Napi::Array>();
+  std::vector<std::string> strings;
+  strings.reserve(array.Length());
+  for (uint32_t i = 0; i < array.Length(); ++i) {
+    const Napi::Value item = array.Get(i);
+    if (!item.IsString()) {
+      throw Napi::Error::New(env, std::string("system-font-info: request.") + key + " must hold strings only");
     }
-    *target = value.As<Napi::Boolean>().Value();
+    strings.push_back(item.As<Napi::String>().Utf8Value());
   }
-  return options;
+  return strings;
+}
+
+Request parseRequest(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() < 1 || !info[0].IsObject())
+    throw Napi::Error::New(env, "system-font-info: the request must be an object");
+  const Napi::Object object = info[0].As<Napi::Object>();
+  std::optional<std::vector<std::string>> families;
+  if (!object.Get("families").IsUndefined()) families = stringArrayMember(env, object, "families");
+  try {
+    return makeRequest(stringArrayMember(env, object, "fields"), std::move(families),
+                       stringArrayMember(env, object, "orthographies"));
+  } catch (const std::exception& e) {
+    throw Napi::Error::New(env, e.what());
+  }
 }
 
 // Enumerates on a worker thread; the result is converted and the promise
-// settled back on the JS thread.
-class GetFontsWorker : public Napi::AsyncWorker {
+// settled back on the JS thread. With `withWork` the promise resolves to
+// `{ families, work }`, `work` being what the call did (test hook).
+class GetFamiliesWorker : public Napi::AsyncWorker {
  public:
-  GetFontsWorker(Napi::Env env, EnumerateOptions options)
-      : Napi::AsyncWorker(env, "system-font-info:getFonts"),
+  GetFamiliesWorker(Napi::Env env, Request request, bool withWork)
+      : Napi::AsyncWorker(env, "system-font-info:getFamilies"),
         deferred_(Napi::Promise::Deferred::New(env)),
-        options_(options) {}
+        request_(std::move(request)),
+        withWork_(withWork) {}
 
   Napi::Promise promise() const { return deferred_.Promise(); }
 
  protected:
   void Execute() override {
     try {
-      families_ = platform::enumerateFonts(options_);
+      families_ = platform::enumerateFonts(request_, work_);
     } catch (const std::exception& e) {
       SetError(e.what());
     } catch (...) {
@@ -58,8 +80,19 @@ class GetFontsWorker : public Napi::AsyncWorker {
   void OnOK() override {
     Napi::Env env = Env();
     try {
-      Napi::Array result = familiesToJs(env, families_);
+      Napi::Array families = familiesToJs(env, families_, request_);
       families_.clear();
+      if (!withWork_) {
+        deferred_.Resolve(families);
+        return;
+      }
+      Napi::Object work = Napi::Object::New(env);
+      work.Set("fontResources", Napi::Number::New(env, work_.fontResources));
+      work.Set("tableEntries", Napi::Number::New(env, work_.tableEntries));
+      work.Set("characterSets", Napi::Number::New(env, work_.characterSets));
+      Napi::Object result = Napi::Object::New(env);
+      result.Set("families", families);
+      result.Set("work", work);
       deferred_.Resolve(result);
     } catch (const Napi::Error& e) {
       deferred_.Reject(e.Value());
@@ -70,16 +103,22 @@ class GetFontsWorker : public Napi::AsyncWorker {
 
  private:
   Napi::Promise::Deferred deferred_;
-  EnumerateOptions options_;
+  Request request_;
+  bool withWork_;
+  WorkLog work_;
   std::vector<Family> families_;
 };
 
-Napi::Value getFonts(const Napi::CallbackInfo& info) {
-  auto* worker = new GetFontsWorker(info.Env(), parseEnumerateOptions(info));
+Napi::Value queueGetFamilies(const Napi::CallbackInfo& info, bool withWork) {
+  auto* worker = new GetFamiliesWorker(info.Env(), parseRequest(info), withWork);
   Napi::Promise promise = worker->promise();
   worker->Queue();  // the worker deletes itself after OnOK / OnError
   return promise;
 }
+
+Napi::Value getFamilies(const Napi::CallbackInfo& info) { return queueGetFamilies(info, false); }
+
+Napi::Value getFamiliesWithWork(const Napi::CallbackInfo& info) { return queueGetFamilies(info, true); }
 
 // ---- test hooks -------------------------------------------------------------
 
@@ -159,7 +198,7 @@ Napi::Value readFontFile(const Napi::CallbackInfo& info) {
 // ---- module -----------------------------------------------------------------
 
 Napi::Object initModule(Napi::Env env, Napi::Object exports) {
-  exports.Set("getFonts", Napi::Function::New(env, getFonts, "getFonts"));
+  exports.Set("getFamilies", Napi::Function::New(env, getFamilies, "getFamilies"));
 
   Napi::Object orthographies = Napi::Object::New(env);
   for (const orthography::Orthography& entry : orthography::all()) {
@@ -170,6 +209,7 @@ Napi::Object initModule(Napi::Env env, Napi::Object exports) {
   Napi::Object testing = Napi::Object::New(env);
   testing.Set("registerFont", Napi::Function::New(env, registerFont, "registerFont"));
   testing.Set("unregisterFont", Napi::Function::New(env, unregisterFont, "unregisterFont"));
+  testing.Set("getFamiliesWithWork", Napi::Function::New(env, getFamiliesWithWork, "getFamiliesWithWork"));
   testing.Set("readFontFile", Napi::Function::New(env, readFontFile, "readFontFile"));
   exports.Set("__testing", testing);
   return exports;

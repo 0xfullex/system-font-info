@@ -184,20 +184,22 @@ void orderLikeCoreText(FamilySeeds& family) {
   family.seeds = std::move(ordered);
 }
 
-std::vector<Family> enumerate(const EnumerateOptions& options) {
+std::vector<Family> enumerate(const Request& request, WorkLog& work) {
   const Ref<CFArrayRef> collection = copyCollectionDescriptors();
   std::vector<FamilySeeds> families = groupByFamily(groupByPostscriptName(collection.get()));
 
-  FaceReader reader(options);
+  FaceReader reader(request, work);
   std::vector<Family> result;
-  result.reserve(families.size());
   for (FamilySeeds& seeds : families) {
-    orderLikeCoreText(seeds);
+    if (!request.wantsFamily(seeds.name)) continue;
 
     Family family;
     family.family = seeds.name;
-    for (size_t i = 0; i < seeds.seeds.size(); ++i) {
-      family.faces.push_back(reader.read(seeds.seeds[i].descriptor, seeds.seeds[i].shadowed));
+    if (request.wantsAnyFace()) {
+      orderLikeCoreText(seeds);
+      for (size_t i = 0; i < seeds.seeds.size(); ++i) {
+        family.faces.push_back(reader.read(seeds.seeds[i].descriptor, seeds.seeds[i].shadowed));
+      }
     }
     result.push_back(std::move(family));
   }
@@ -206,9 +208,9 @@ std::vector<Family> enumerate(const EnumerateOptions& options) {
 
 }  // namespace
 
-std::vector<Family> enumerateFonts(const EnumerateOptions& options) {
+std::vector<Family> enumerateFonts(const Request& request, WorkLog& work) {
   std::vector<Family> result;
-  runInAutoreleasePool([&] { result = enumerate(options); });
+  runInAutoreleasePool([&] { result = enumerate(request, work); });
   return result;
 }
 

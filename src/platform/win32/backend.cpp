@@ -15,7 +15,7 @@ namespace {
 
 }  // namespace
 
-std::vector<Family> enumerateFonts(const EnumerateOptions&) { notImplemented(); }
+std::vector<Family> enumerateFonts(const Request&, WorkLog&) { notImplemented(); }
 
 std::optional<std::string> decodeLegacyText(sfnt::LegacyEncoding, std::span<const uint8_t>) { return std::nullopt; }
 

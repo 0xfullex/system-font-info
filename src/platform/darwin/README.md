@@ -8,7 +8,7 @@ first for the contract.
 
 | File | Role |
 | --- | --- |
-| `enumerate.cpp` | `enumerateFonts`: collection, grouping by PostScript name and family, member order |
+| `enumerate.cpp` | `enumerateFonts`: collection, grouping by PostScript name and family, member order, the `families` filter |
 | `face_reader.*` | builds one `Face`; caches the parsed tables, the axes and the collection face lookups for one enumeration |
 | `traits.*` | pure conversions: CSS weight and width, style, scope, format |
 | `variations.*` | axes, coordinates, named instance |
@@ -18,6 +18,18 @@ first for the contract.
 | `testing.cpp` | the register / unregister test hooks |
 | `autorelease_pool.*` | the autorelease pool the worker thread runs in (the only Objective-C++) |
 | `cf.*` | owning CF reference and checked accessors |
+
+## What the request changes
+
+The backend still reads every face of the requested families completely: the
+request selects the families (`Request::wantsFamily`, applied after the
+collection is grouped into families, before their faces are read) and whether
+faces are read at all (`wantsAnyFace()`), builds the `opentype` entries it
+names, and reads the character set only for `faces.coverage`. What reaches JS
+is cut to the request by `core/to_js.cpp`. `WorkLog` counts the `CTFont`s
+created (`fontResources`), the `opentype` entries built per font resource
+(`tableEntries`) and the character sets read for `faces.coverage`
+(`characterSets`). The per-family `languageCoverage` is not counted yet.
 
 ## One face per PostScript name
 
@@ -64,7 +76,7 @@ objects internally.
 - `monospace`, `color`: symbolic bits. `symbol`: the cmap has a (3,0) subtable
   (from the tables). `enabled`: `kCTFontEnabledAttribute` (a number or a
   boolean). The simulations are always false: macOS has none.
-- `languages`: `kCTFontLanguagesAttribute`.
+- `supportedLanguages`: `kCTFontLanguagesAttribute`.
 - `scope`, first rule that applies: `kCTFontRegistrationScopeAttribute` is the
   process scope: process. `kCTFontPriorityAttribute` 40000: user; 10000 /
   20000 / 30000: system; 60000 with the persistent registration scope: system;
@@ -95,7 +107,7 @@ objects internally.
   identifiers without names; the call is made once per font resource (the
   named instances of a variable font report the same list). `metrics` are CoreText's lengths scaled from the
   creation size to font units (the slant angle is in degrees and is not
-  scaled); they are attached only when `tables` is on.
+  scaled); they are read only when the request wants `faces.platform.metrics`.
 
 ## Tables and sharing
 
@@ -113,10 +125,10 @@ CTFont provides them. This was not observed on macOS 27; it is a guard.
 Every face is read through `sfnt::readFontTables` (tag list from
 `CTFontCopyAvailableTables` in CoreText's own order, which the reader sorts;
 bytes from `CTFontCopyTable`) whatever
-`options.tables` says: the names, `fvar` and `cmap` feed fields that exist
+the request says: the names, `fvar` and `cmap` feed fields that exist
 anyway. The `opentype` value is built from it by `sfnt::openTypeValue` with
-every entry. The option only decides whether `opentype` and `platform.metrics`
-are attached. The result is cached per font resource (file path and face index) for the length of one enumeration, so
+the entries of the request (`Request::openTypeSelection`); `opentype` is
+attached when the request wants an entry. The result is cached per font resource (file path and face index) for the length of one enumeration, so
 the named instances of a variable font share one `opentype` value and one axes
 list.
 
@@ -134,7 +146,7 @@ list.
   those of the `fvar` axis with the same tag, and `hidden` falls back to the
   `fvar` axis flag when CoreText's dictionary has none. `coordinates`:
   `CTFontCopyVariation`, which lists only axes away from their default, filled
-  up to every axis. `namedInstance`: the first `fvar` instance whose
+  up to every axis. `namedInstanceIndex`: the first `fvar` instance whose
   coordinates all match. CoreText reports coordinates cut to four decimals, so
   the match tolerance is 5e-4.
 
