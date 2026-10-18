@@ -75,9 +75,9 @@ export function defaultString(strings: readonly LocalizedString[]): string {
   return strings[0]?.value ?? ''
 }
 
-function normalizeOpenType(opentype: OpenTypeInfo): void {
+function normalizeOpenType(opentype: Partial<OpenTypeInfo>): void {
   // The raw name table view: languages are canonicalized, records are never merged.
-  for (const record of opentype.names) record.language = canonicalizeTag(record.language)
+  for (const record of opentype.names ?? []) record.language = canonicalizeTag(record.language)
 
   for (const axis of opentype.fvar?.axes ?? []) tidyLocalized(axis.names)
   for (const instance of opentype.fvar?.instances ?? []) tidyLocalized(instance.subfamilyNames)
