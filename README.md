@@ -84,7 +84,7 @@ npm run copy-prebuild  # optional: build/Release/*.node -> prebuilds/<target>/
 npm test
 ```
 
-`copy-prebuild` names the directory from the target table (`ts/targets.ts`, compiled by `npm run build:ts`); `npm run copy-prebuild -- --arch x64` names the target architecture of a cross build.
+`copy-prebuild` names the directory from the target table (`ts/targets.ts`, compiled by `npm run build:ts`); `npm run copy-prebuild -- --arch x64` names the target architecture of a cross build. `npm run copy-prebuild -- --strip` strips the copy, as a release build does.
 
 ## Development
 
