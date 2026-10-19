@@ -1,5 +1,7 @@
 # system-font-info
 
+English | [简体中文](README.zh-CN.md)
+
 [![npm version](https://img.shields.io/npm/v/system-font-info.svg)](https://www.npmjs.com/package/system-font-info)
 [![Node.js](https://img.shields.io/node/v/system-font-info.svg)](https://nodejs.org)
 [![CI](https://github.com/0xfullex/system-font-info/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/0xfullex/system-font-info/actions/workflows/ci.yml)

@@ -13,6 +13,7 @@ const TARGET_IDS = ['darwin-arm64', 'linux-x64-glibc']
 const completePackage = () => [
   'package.json',
   'README.md',
+  'README.zh-CN.md',
   'LICENSE',
   'CHANGELOG.md',
   'dist/index.js',
@@ -90,7 +91,7 @@ test('sources, build files and anything unlisted are refused', () => {
 })
 
 test('required root files and the fontconfig notice must be packed', () => {
-  const required = ['README.md', 'LICENSE', 'CHANGELOG.md', 'third_party/fontconfig/COPYING']
+  const required = ['README.md', 'README.zh-CN.md', 'LICENSE', 'CHANGELOG.md', 'third_party/fontconfig/COPYING']
   const files = completePackage()
   const problems = check(files, { packed: files.filter((file) => !required.includes(file)) })
   assert.deepEqual(

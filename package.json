@@ -26,6 +26,7 @@
     "docs/",
     "prebuilds/",
     "README.md",
+    "README.zh-CN.md",
     "LICENSE",
     "CHANGELOG.md",
     "third_party/fontconfig/COPYING"

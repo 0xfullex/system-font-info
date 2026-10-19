@@ -24,7 +24,7 @@ export const ADDON_FILE = 'system-font-info.node'
 const INSTALL_SCRIPTS = ['preinstall', 'install', 'postinstall']
 
 /** The files at the package root that must ship. */
-const ROOT_FILES = ['package.json', 'README.md', 'LICENSE', 'CHANGELOG.md']
+const ROOT_FILES = ['package.json', 'README.md', 'README.zh-CN.md', 'LICENSE', 'CHANGELOG.md']
 
 /** The license notice of the fontconfig data the addon is generated from, and the note that explains it. */
 const THIRD_PARTY_FILES = ['third_party/fontconfig/COPYING', 'third_party/fontconfig/README.md']
