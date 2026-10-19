@@ -14,6 +14,16 @@ List the font families installed on a system, with full metadata, through the op
 
 Every platform returns one shape, and the caller declares which fields it wants: localized family, full and style names in every language the font carries, weight, width and style on one scale, supported languages, variable-font axes and named instances, file location, the font's own OpenType tables, character coverage, and each platform's raw values.
 
+## Why
+
+Most font listers for Node.js return one name and a coarse weight and style per font, which is enough to fill a font menu in one language. system-font-info returns what the operating system's font service knows about each face, in one shape on every platform, so a desktop app (an Electron app's main process, for one) can build richer font features on it:
+
+- show every family under its name in the user's language, with its styles' localized names, rather than the English name only;
+- offer only the fonts that support a language, such as the fonts that can set Simplified Chinese, from the languages each font supports and its character coverage per language;
+- build weight and width controls for a variable font from its axes and named instances;
+- read a face's file location, its OpenType tables and each platform's raw values when the normalized fields are not enough;
+- ask only for the fields it needs, and pay only for those, with a result type computed from the request.
+
 ## Supported platforms
 
 Node.js 22 or newer, in plain Node.js and in the main process of Electron (see [Electron](#electron)). The package ships a prebuilt binary for each of these targets, and nothing else has one:
