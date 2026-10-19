@@ -31,6 +31,28 @@ std::vector<uint32_t> availableTags(CTFontRef font) {
   return tags;
 }
 
+// The languages CoreText names for the face (`kCTFontLanguagesAttribute`), read a second time when the first read is
+// empty. CoreText works a font's languages out once per process and stores them on the font object that every
+// descriptor of that font shares, then marks them as known. A reader looks up the stored list first and the mark
+// after it, without a lock between the two, and gives an empty list when it finds no list but the mark set: a thread
+// that asks while another thread is storing the list is handed an empty array for a font that has languages. Two
+// enumerations running at the same time (two calls not awaited one after the other) are enough for that. By the time
+// such a read returns the list is stored, so the second read gives it; a font without languages is empty both times.
+// Measured on macOS 27 by holding one thread inside the read while another finished it (`TBaseFont::CopyLocales`).
+std::vector<std::string> supportedLanguagesOf(CTFontDescriptorRef descriptor) {
+  Ref<CFTypeRef> languages = copyAttribute(descriptor, kCTFontLanguagesAttribute);
+  if (!asArray(languages.get()) || CFArrayGetCount(asArray(languages.get())) == 0) {
+    languages = copyAttribute(descriptor, kCTFontLanguagesAttribute);
+  }
+  std::vector<std::string> result;
+  if (CFArrayRef array = asArray(languages.get())) {
+    for (CFIndex i = 0; i < CFArrayGetCount(array); ++i) {
+      result.push_back(toUtf8(asString(CFArrayGetValueAtIndex(array, i))));
+    }
+  }
+  return result;
+}
+
 }  // namespace
 
 FaceReader::FileFaces& FaceReader::fileFaces(const std::string& path) {
@@ -184,13 +206,7 @@ Face FaceReader::read(CTFontDescriptorRef descriptor, const std::string& postscr
   face.monospace = traits.symbolic.value_or(0) & kCTFontTraitMonoSpace;
   face.color = traits.symbolic.value_or(0) & kCTFontTraitColorGlyphs;
   face.enabled = enabled;
-  if (request_.wants(Field::FacesSupportedLanguages)) {
-    if (const auto languages = copyAttribute(descriptor, kCTFontLanguagesAttribute); asArray(languages.get())) {
-      for (CFIndex i = 0; i < CFArrayGetCount(asArray(languages.get())); ++i) {
-        face.supportedLanguages.push_back(toUtf8(asString(CFArrayGetValueAtIndex(asArray(languages.get()), i))));
-      }
-    }
-  }
+  if (request_.wants(Field::FacesSupportedLanguages)) face.supportedLanguages = supportedLanguagesOf(descriptor);
   if (request_.wants(Field::FacesScope)) {
     face.scope = scopeOf(integerValue(copyAttribute(descriptor, kCTFontPriorityAttribute).get()),
                          integerValue(copyAttribute(descriptor, kCTFontRegistrationScopeAttribute).get()), enabled);

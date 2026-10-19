@@ -169,7 +169,12 @@ listing (the `file` of a face does not depend on whether `families` was given). 
   listed without the disabled fonts (see "Disabled fonts"); the descriptor's
   `kCTFontEnabledAttribute` is 1 for a disabled font. The simulations are always
   false: macOS has none.
-- `supportedLanguages`: `kCTFontLanguagesAttribute`.
+- `supportedLanguages`: `kCTFontLanguagesAttribute`, read a second time when it
+  is empty (`supportedLanguagesOf` in `face_reader.cpp`). CoreText works a font's
+  languages out once per process, on the font object every descriptor of the
+  font shares, and a thread that reads them while another thread is storing them
+  gets an empty array; two enumerations running at once are enough. Once a read
+  has returned, the list is stored, so the second read is the true answer.
 - `scope`, first rule that applies: `kCTFontRegistrationScopeAttribute` is the
   process scope: process. The face is disabled: unknown, because CoreText makes
   up the priority (60000) and the registration scope (2) of a disabled font, so

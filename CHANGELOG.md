@@ -2,6 +2,11 @@
 
 All notable changes to `system-font-info` are listed here, newest first. Versions before 1.0.0 may change the API in a minor release.
 
+## Unreleased
+
+- macOS: a face's `supportedLanguages`, and the family list built from them, could come back empty for a font that has languages when two calls ran at the same time.
+- The README leads with what the package returns compared with a typical font lister, and has a Simplified Chinese translation (`README.zh-CN.md`, also in the package).
+
 ## 0.9.0 - 2026-10-18
 
 First release.
