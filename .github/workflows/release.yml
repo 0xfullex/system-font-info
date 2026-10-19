@@ -71,6 +71,9 @@ jobs:
             echo "::error::The tagged commit $(git rev-parse --short HEAD) is not on main."
             exit 1
           fi
+          # The Release notes come from this commit's CHANGELOG.md. Checked here, before anything is published: once the
+          # version is on npm, the tagged commit can no longer be given its notes.
+          node scripts/ci/release-notes.mjs "$version" > /dev/null
           echo "version=$version" >> "$GITHUB_OUTPUT"
           case "$version" in *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;; *) echo "prerelease=false" >> "$GITHUB_OUTPUT" ;; esac
           if [ "$EVENT" = workflow_dispatch ] && [ "$DRY_RUN" = true ]; then

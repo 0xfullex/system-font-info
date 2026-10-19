@@ -124,7 +124,7 @@ The steps the CI and release workflows share live in two local actions, `.github
 
 `.github/workflows/release.yml` builds, verifies and publishes the package. It runs when a `v*` tag is pushed, and on demand as a dry run: everything except the publish. The jobs, in order:
 
-1. `verify`: the tag is `v` plus the version in `package.json`, and the tagged commit is on `main`.
+1. `verify`: the tag is `v` plus the version in `package.json`, the tagged commit is on `main`, and its `CHANGELOG.md` has a non-empty section for the version (checked before anything is published, since a published version's tagged commit can no longer be given its notes).
 2. `build`: every target of the table is built natively (Linux in the manylinux container), stripped, and uploaded as an artifact.
 3. `test-prebuilds`: the prebuilds are assembled with no `build/` anywhere and `npm test` runs on every target's runner. A Linux addon built in the container is therefore tested on the runner's newer glibc, fontconfig and FreeType.
 4. `pack`: `npm pack`. `prepack` (`scripts/check-package.mjs`) refuses unless every target has its prebuild, `dist/` is newer than `ts/`, nothing but the expected files is packed (no sources, no `binding.gyp`, no tests), and `package.json` has no `install`, `preinstall` or `postinstall` script (the package never builds at install time). A refusal also prints how to list the contents. There is no switch to skip it; `npm pack --dry-run --ignore-scripts` shows a package's contents without the check. The tarball is the `package` artifact.
