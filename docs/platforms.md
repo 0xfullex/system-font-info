@@ -2,11 +2,11 @@
 
 How each operating system provides the fields that [api.md](api.md) defines: the OS API behind every field (the API defines what the value means), the kind of work it costs, how each platform forms families, what it lists, how quickly it sees font changes, and what calls cost on the machines measured.
 
-| Platform | Font service | Status |
-| --- | --- | --- |
-| macOS | CoreText | implemented |
-| Windows | DirectWrite | implemented |
-| Linux | fontconfig, with FreeType for WOFF tables | implemented |
+| Platform | Font service |
+| --- | --- |
+| macOS | CoreText |
+| Windows | DirectWrite |
+| Linux | fontconfig, with FreeType for WOFF tables |
 
 The Windows backend and its selected-field paths are measured directly below; separate component observations are identified as such. The Linux figures are measured on the backend. Where a platform's behaviour has not been established, this document says it is not yet documented.
 
@@ -245,7 +245,6 @@ CoreText also keeps a cache in the process that answers PostScript name matching
 - **Not listed**: fonts whose data is not on the machine; fonts a process registered privately with `AddFontResourceEx(FR_PRIVATE)`, which are not in the system collection.
 - **Fonts marked as hidden** are listed, with `enabled: true` and `platform.inactiveFamilyPreference: true`.
 - **`families`**: `IDWriteFontCollection::FindFamilyName` (case-insensitive, accepts localized names) gives the candidates; the backend keeps only the families whose `family` is exactly the requested string. `scope` still needs the whole system font set (1,235 entries on the machine measured), even for one family.
-- **Process-local test fonts**: the test hooks combine registered files with the system set through `IDWriteFontSetBuilder2`, then construct a WSS collection. They install no font and change no registry value. The next call sees a hook registration or unregistration immediately; those resources have `scope: 'process'`. This test-only collection does not make fonts registered independently with `FR_PRIVATE` visible.
 
 ### Field sources
 
@@ -315,10 +314,10 @@ Measured on the machine below, with a test font installed into the user's font d
 - **Each call loads a fresh configuration** (`FcInitLoadConfigAndFonts`), owns it alone and destroys it at the end, so the call sees the fonts on disk now and shares no fontconfig state with the rest of the process. With warm fontconfig caches this costs about 5 ms.
 - **The list** is `FcFontList` over that configuration, with `FC_NAMELANG` set to `en` and one fixed object set whatever fields are selected: the scalar fontconfig objects the field table below uses (including the [platform fields](#platform-fields-2)) plus `FC_FILE`, `FC_INDEX` and `FC_VARIABLE`. `FC_CHARSET` and `FC_LANG` are added only when a field needing them is selected: `languageCoverage` and `faces.coverage` (`FC_CHARSET`), `supportedLanguages` of a family or a face (`FC_LANG`). `FcFontList` returns its patterns in the order of a hash of the requested objects' values, so its order changes with the object set; the backend does not use it (see member order below).
 - **A face is a pattern with fixed coordinates.** fontconfig also lists, for each variable font, a pattern whose weight and width are ranges (`FC_VARIABLE` true); it describes the whole design space, so it is not a face, and its ranges are the face's `axes`. A variable font is listed as its default instance and its named instances. On the machine measured this leaves 806 of 816 patterns, with 806 distinct identities.
-- **Not listed**: fonts the configuration rejects (`<rejectfont>`); fontconfig offers no enumeration of them. Fonts that other code adds to fontconfig's current configuration (`FcConfigAppFontAddFile`) are not in the configuration the call loads and are not listed; the application set of each call's configuration holds only the fonts registered through the test hook, and those have `process` scope.
+- **Not listed**: fonts the configuration rejects (`<rejectfont>`); fontconfig offers no enumeration of them. Fonts that other code adds to fontconfig's current configuration (`FcConfigAppFontAddFile`) are not in the configuration the call loads and are not listed.
 - **A variable font whose `fvar` cannot be read** (the file is no longer a font, or is unreadable, though fontconfig's cache still lists it) gives its named instances no `coordinates`, so the identity could not tell them apart. It is listed as one face, its default instance (the pattern with no named-instance bits in `FC_INDEX`, else the first in member order), and its other named instances are omitted. The face has no `axes`, `coordinates` or `opentype`.
 - **Type 1 fonts** are listed with the attributes fontconfig gives and no `opentype`.
-- **Member order** is the faces' order in the configuration's font sets (`FcConfigGetFonts`: the system set, then the application set), the order fontconfig loaded them and the order `FcFontList` walks before hashing. It does not depend on the fields selected, so the order of faces, and of a family's names collected from them, is the same in every projection, as the [invariants](api.md#invariants) require.
+- **Member order** is the faces' order in the configuration's font sets (`FcConfigGetFonts`), the order fontconfig loaded them and the order `FcFontList` walks before hashing. It does not depend on the fields selected, so the order of faces, and of a family's names collected from them, is the same in every projection, as the [invariants](api.md#invariants) require.
 - **`families`**: one `FcFontList` query per distinct requested family gives the candidates (it matches any of a font's family names); the results are merged, and the backend keeps only the families whose `family` is exactly a requested string. Several family conditions in one query mean intersection rather than union.
 
 ### Field sources
@@ -344,7 +343,7 @@ The group of each field is in [the matrix of Source groups](#the-group-of-every-
 | `enabled` | Always true: a font fontconfig rejects is not listed. |
 | `simulations` | Always false: fontconfig synthesizes bold and oblique only when matching (`FC_EMBOLDEN`, `FC_MATRIX` in a match result), never in the list. |
 | `supportedLanguages` | `FC_LANG`. |
-| `scope` | `process` for a font in the call's application set, which only the test hook fills. Otherwise the `FC_FILE` path, compared at directory boundaries: under `/usr/share/fonts` or `/usr/local/share/fonts` is `system`; under `$XDG_DATA_HOME/fonts` (by default `~/.local/share/fonts`) or `~/.fonts` is `user`; anything else `unknown`. fontconfig has no field saying who installed a font, so this is the path's convention, not a fact the OS reports. |
+| `scope` | The `FC_FILE` path, compared at directory boundaries: under `/usr/share/fonts` or `/usr/local/share/fonts` is `system`; under `$XDG_DATA_HOME/fonts` (by default `~/.local/share/fonts`) or `~/.fonts` is `user`; anything else `unknown`. fontconfig has no field saying who installed a font, so this is the path's convention, not a fact the OS reports. |
 | `format` | `FC_FONTFORMAT`: `TrueType` and `Type 42` are `truetype`; `CFF` is `cff`, or `cff2` when the font has a `CFF2` table; `Type 1` and `CID Type 1` are `type1`; `PCF`, `BDF` and `Windows FNT` are `bitmap`; anything else `unknown`. |
 | `file.path` | `FC_FILE`. |
 | `file.index` | The low 16 bits of `FC_INDEX`. |
@@ -413,7 +412,7 @@ Each selection ran in 5 new Node processes, with 6 sequential calls per process.
 | `details` | A, B, C | 1164.076 [1074.385-1211.174] | 1150.844 [1102.217-1201.715] |
 | `full` | A, B, C, D | 1386.593 [1363.315-1393.517] | 1355.879 [1317.027-1460.280] |
 
-`fields: []` and `names` return 462 families without faces; the other three selections return 462 families and 2,562 faces. Neither coverage field is in these presets. Every call and its process exit code was recorded and the family and face counts were checked; the figures are medians and ranges over those calls. These measured calls replace the earlier selection estimates derived by subtracting a TRUE collection-update timing.
+`fields: []` and `names` return 462 families without faces; the other three selections return 462 families and 2,562 faces. Neither coverage field is in these presets. Every call and its process exit code was recorded and the family and face counts were checked; the figures are medians and ranges over those calls.
 
 Component capture on 2026-10-18: Intel Core i7-8700K, 6 cores / 12 logical CPUs, 31.93 GiB, Windows 11 Pro 10.0.26200 x64, dwrite.dll 6.2.26100.9711, MSVC 19.29. WSS with `checkForUpdates` FALSE: 462 families, 2,568 members (1,333 simulated), 906 resources; 20 resources are variable. Each mode ran in 5 new processes with 6 sequential trials each. First is the median of the 5 initial trials; later is the median of the 25 subsequent trials. Brackets give minimum and maximum, in milliseconds. Resource discovery and file/index deduplication are excluded setup; OS file caches were warm.
 
