@@ -8,6 +8,10 @@
     "type": "git",
     "url": "git+https://github.com/0xfullex/system-font-info.git"
   },
+  "homepage": "https://github.com/0xfullex/system-font-info#readme",
+  "bugs": {
+    "url": "https://github.com/0xfullex/system-font-info/issues"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
