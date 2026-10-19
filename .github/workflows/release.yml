@@ -1,8 +1,8 @@
 name: Release
 
-# A `v*` tag builds, verifies and publishes the package. Run by hand (`gh workflow run release.yml --ref <branch>`) it is
+# A `v*` tag builds, verifies and publishes the package, then creates its GitHub Release. Run by hand (`gh workflow run release.yml --ref <branch>`) it is
 # a dry run by default: everything except the publish, so the same pipeline can be checked on any branch and its package
-# artifact taken for a publish done by hand.
+# artifact taken for a publish done by hand. A dry run creates no Release.
 on:
   push:
     tags: ['v*']
@@ -40,6 +40,10 @@ jobs:
     timeout-minutes: 5
     outputs:
       publish: ${{ steps.verify.outputs.publish }}
+      version: ${{ steps.verify.outputs.version }}
+      # Whether the version has a pre-release part: such a version goes to the `next` npm tag and is a prerelease on
+      # GitHub. The one place that decides it.
+      prerelease: ${{ steps.verify.outputs.prerelease }}
     steps:
       # actions/checkout v7.0.1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -67,6 +71,8 @@ jobs:
             echo "::error::The tagged commit $(git rev-parse --short HEAD) is not on main."
             exit 1
           fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          case "$version" in *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;; *) echo "prerelease=false" >> "$GITHUB_OUTPUT" ;; esac
           if [ "$EVENT" = workflow_dispatch ] && [ "$DRY_RUN" = true ]; then
             echo "::notice::Dry run: v$version is verified and nothing is published."
             echo "publish=false" >> "$GITHUB_OUTPUT"
@@ -319,6 +325,8 @@ jobs:
           name: package
           path: package
       - name: Publish
+        env:
+          PRERELEASE: ${{ needs.verify.outputs.prerelease }}
         run: |
           set -euo pipefail
           # Trusted publishing needs npm 11.5.1 or newer.
@@ -331,5 +339,72 @@ jobs:
             exit 0
           fi
           # A version with a pre-release part is not what `npm install` gets.
-          case "$version" in *-*) tag=next ;; *) tag=latest ;; esac
+          if [ "$PRERELEASE" = true ]; then tag=next; else tag=latest; fi
           npm publish "$tarball" --provenance --tag "$tag"
+
+  # The GitHub Release of a tag run, with the tarball npm serves for the version as its one asset. It also runs when
+  # `publish` found the version already on npm (the first version is published by hand, then tagged), so the asset is
+  # fetched from the registry, never taken from this run's own build: a rebuild is not byte-identical to what was published.
+  github-release:
+    needs: [verify, publish]
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.ref_name }}
+      VERSION: ${{ needs.verify.outputs.version }}
+      PRERELEASE: ${{ needs.verify.outputs.prerelease }}
+    steps:
+      # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      # actions/setup-node v7.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: ${{ env.NODE_MAJOR }}
+      # A re-run, or a Release made by hand, is left as it is.
+      - name: Look for an existing Release
+        id: existing
+        run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "::notice::The Release for $TAG already exists and is left as it is."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Take this version's notes from CHANGELOG.md
+        if: steps.existing.outputs.exists == 'false'
+        run: node scripts/ci/release-notes.mjs "$VERSION" > "$RUNNER_TEMP/notes.md"
+      # The registry may take a moment to serve a version that was just published, so the download is retried a few times.
+      - name: Download the published tarball and check it against the registry
+        if: steps.existing.outputs.exists == 'false'
+        run: |
+          set -euo pipefail
+          name=$(node -p "require('./package.json').name")
+          asset_dir="$RUNNER_TEMP/asset"
+          mkdir "$asset_dir"
+          attempt=1
+          until npm pack "$name@$VERSION" --pack-destination "$asset_dir" > /dev/null \
+            && expected=$(npm view "$name@$VERSION" dist.integrity) && [ -n "$expected" ]; do
+            if [ "$attempt" -ge 10 ]; then
+              echo "::error::$name@$VERSION could not be fetched from the registry after $attempt attempts."
+              exit 1
+            fi
+            echo "$name@$VERSION is not served yet (attempt $attempt); retrying in 15 seconds."
+            attempt=$((attempt + 1))
+            sleep 15
+          done
+          actual="sha512-$(openssl dgst -sha512 -binary "$asset_dir"/*.tgz | openssl base64 -A)"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::The downloaded tarball has integrity $actual, the registry says $expected."
+            exit 1
+          fi
+          echo "asset=$(ls "$asset_dir"/*.tgz)" >> "$GITHUB_ENV"
+      - name: Create the Release
+        if: steps.existing.outputs.exists == 'false'
+        run: |
+          flags=()
+          if [ "$PRERELEASE" = true ]; then flags+=(--prerelease); fi
+          gh release create "$TAG" "$asset" --verify-tag --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md" "${flags[@]}"
