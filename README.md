@@ -10,19 +10,43 @@
 [![Linux](https://img.shields.io/badge/Linux%20glibc-x64%20%7C%20arm64-E95420.svg)](#supported-platforms)
 [![Electron](https://img.shields.io/badge/Electron-main%20process-47848F.svg)](#electron)
 
-List the font families installed on a system, with full metadata, through the operating system's own font service: CoreText on macOS, DirectWrite on Windows, fontconfig on Linux. It is a Node-API addon with prebuilt binaries; nothing is compiled when you install it.
+**Font pickers that know as much about a font as the operating system does.**
 
-Every platform returns one shape, and the caller declares which fields it wants: localized family, full and style names in every language the font carries, weight, width and style on one scale, supported languages, variable-font axes and named instances, file location, the font's own OpenType tables, character coverage, and each platform's raw values.
+system-font-info lists the fonts installed on macOS, Windows and Linux through each system's own font service (CoreText, DirectWrite, fontconfig) and returns what that service knows about every face, in one shape on every platform. Most font listers for Node.js return one name and a coarse weight and style per font, enough for a plain menu in one language. This gives an Electron app, or any desktop tool, what a real font menu needs:
 
-## Why
+| | A typical font lister | system-font-info |
+| --- | --- | --- |
+| Family and style names | One name, usually English | Every language the font carries: `苹方-简`, `蘋方-簡`, `PingFang SC`; `常规体`, `標準體`, `Regular` |
+| Weight, width, style | Coarse labels | CSS numbers on one scale on every platform (`font-weight` 1-1000, `font-width` 50-200%), plus each platform's raw value |
+| Languages | Not reported | The languages each face supports, and character coverage for the languages you ask about |
+| Variable fonts | Not reported | Axes with their ranges and localized names; named instances as faces |
+| Files and tables | A path at most | File path and collection index, the font's own OpenType tables |
+| Cost and types | Everything, on every call | Only the fields you ask for, with the result type computed from them |
+| Install | Often compiled at install, or shells out to `fc-list` or PowerShell | Prebuilt for six targets; nothing is compiled, nothing is spawned |
 
-Most font listers for Node.js return one name and a coarse weight and style per font, which is enough to fill a font menu in one language. system-font-info returns what the operating system's font service knows about each face, in one shape on every platform, so a desktop app (an Electron app's main process, for one) can build richer font features on it:
+### What it looks like
 
-- show every family under its name in the user's language, with its styles' localized names, rather than the English name only;
-- offer only the fonts that support a language, such as the fonts that can set Simplified Chinese, from the languages each font supports and its character coverage per language;
-- build weight and width controls for a variable font from its axes and named instances;
-- read a face's file location, its OpenType tables and each platform's raw values when the normalized fields are not enough;
-- ask only for the fields it needs, and pay only for those, with a result type computed from the request.
+A font menu in Chinese, with only the families that can set Simplified Chinese:
+
+```js
+import { getFamilies, getFamily, pickName } from 'system-font-info'
+
+const families = await getFamilies({ fields: ['familyNames', 'supportedLanguages'] })
+const menu = families
+  .filter((family) => family.supportedLanguages.includes('zh-Hans'))
+  .map((family) => ({ family: family.family, label: pickName(family.familyNames, ['zh-CN', 'en']) }))
+// [..., { family: 'Hiragino Sans GB', label: '冬青黑体简体中文' }, ..., { family: 'PingFang SC', label: '苹方-简' }, ...]
+```
+
+A weight slider for a variable font, with its named instances as stops:
+
+```js
+const syriac = await getFamily('Noto Sans Syriac', { fields: ['faces.axes', 'faces.styleName', 'faces.weight'] })
+// syriac.faces[0].axes:  [{ tag: 'wght', min: 100, max: 900, default: 400, names: [...] }]
+// syriac.faces:          Regular 400, Thin 100, ExtraLight 200, Light 300, Medium 500, ... Black 900
+```
+
+(Output from macOS 27; each platform lists what its font service holds.)
 
 ## Supported platforms
 
