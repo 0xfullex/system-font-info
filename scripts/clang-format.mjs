@@ -39,7 +39,9 @@ function checkVersion() {
   const version = result.stdout.trim()
   const major = /version (\d+)\./.exec(version)?.[1]
   if (Number(major) !== REQUIRED_MAJOR) {
-    fail(`found "${version}" but major version ${REQUIRED_MAJOR} is required. Install clang-format ${REQUIRED_MAJOR}, see CONTRIBUTING.md#development.`)
+    fail(
+      `found "${version}" but major version ${REQUIRED_MAJOR} is required. Install clang-format ${REQUIRED_MAJOR}, see CONTRIBUTING.md#development.`
+    )
   }
 }
 
