@@ -334,7 +334,8 @@ jobs:
           set -euo pipefail
           # Trusted publishing needs npm 11.5.1 or newer.
           node -e "if (process.argv[1].localeCompare('11.5.1', undefined, { numeric: true }) < 0) { console.error('npm ' + process.argv[1] + ' is older than 11.5.1'); process.exit(1) }" "$(npm --version)"
-          tarball=$(ls package/*.tgz)
+          # The ./ keeps npm from reading `package/<file>.tgz` as a GitHub `owner/repo` shorthand and running git.
+          tarball=$(ls ./package/*.tgz)
           version=$(tar -xOzf "$tarball" package/package.json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
           # A re-run after a publish must not fail on the version that is already there.
           if npm view "system-font-info@$version" version > /dev/null 2>&1; then
