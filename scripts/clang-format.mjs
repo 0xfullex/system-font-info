@@ -33,13 +33,13 @@ function checkVersion() {
   const result = spawnSync('clang-format', ['--version'], { encoding: 'utf8' })
   if (result.error || result.status !== 0) {
     fail(
-      `could not run clang-format (${result.error?.message ?? `exit code ${result.status}`}). Install clang-format ${REQUIRED_MAJOR}, see README.md.`
+      `could not run clang-format (${result.error?.message ?? `exit code ${result.status}`}). Install clang-format ${REQUIRED_MAJOR}, see CONTRIBUTING.md#development.`
     )
   }
   const version = result.stdout.trim()
   const major = /version (\d+)\./.exec(version)?.[1]
   if (Number(major) !== REQUIRED_MAJOR) {
-    fail(`found "${version}" but major version ${REQUIRED_MAJOR} is required. Install clang-format ${REQUIRED_MAJOR}, see README.md.`)
+    fail(`found "${version}" but major version ${REQUIRED_MAJOR} is required. Install clang-format ${REQUIRED_MAJOR}, see CONTRIBUTING.md#development.`)
   }
 }
 
