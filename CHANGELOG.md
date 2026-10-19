@@ -2,7 +2,7 @@
 
 All notable changes to `system-font-info` are listed here, newest first. Versions before 1.0.0 may change the API in a minor release.
 
-## Unreleased
+## 0.9.0 - 2026-10-18
 
 First release.
 

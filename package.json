@@ -1,6 +1,6 @@
 {
   "name": "system-font-info",
-  "version": "0.0.0",
+  "version": "0.9.0",
   "description": "List installed system fonts with full metadata (localized names, supported languages, variable axes and named instances) through CoreText, DirectWrite and fontconfig. Prebuilt Node-API addon, no install-time compilation.",
   "license": "MIT",
   "author": "fullex",
