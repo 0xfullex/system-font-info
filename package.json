@@ -60,19 +60,25 @@
     "prepack": "node scripts/check-package.mjs"
   },
   "keywords": [
+    "font",
     "fonts",
     "system-fonts",
-    "font-list",
     "installed-fonts",
-    "localized",
+    "font-list",
+    "font-manager",
+    "font-metadata",
+    "font-enumeration",
     "variable-fonts",
+    "opentype",
+    "localized-names",
     "coretext",
     "directwrite",
     "fontconfig",
-    "native",
     "napi",
     "node-addon",
-    "electron"
+    "native-addon",
+    "electron",
+    "prebuilt"
   ],
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
