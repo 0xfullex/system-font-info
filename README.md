@@ -1,5 +1,15 @@
 # system-font-info
 
+[![npm version](https://img.shields.io/npm/v/system-font-info.svg)](https://www.npmjs.com/package/system-font-info)
+[![Node.js](https://img.shields.io/node/v/system-font-info.svg)](https://nodejs.org)
+[![CI](https://github.com/0xfullex/system-font-info/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/0xfullex/system-font-info/actions/workflows/ci.yml)
+[![License](https://img.shields.io/npm/l/system-font-info.svg)](LICENSE)
+
+[![macOS](https://img.shields.io/badge/macOS-arm64%20%7C%20x64-555555.svg)](#supported-platforms)
+[![Windows](https://img.shields.io/badge/Windows-x64%20%7C%20arm64-0078D4.svg)](#supported-platforms)
+[![Linux](https://img.shields.io/badge/Linux%20glibc-x64%20%7C%20arm64-E95420.svg)](#supported-platforms)
+[![Electron](https://img.shields.io/badge/Electron-main%20process-47848F.svg)](#electron)
+
 List the font families installed on a system, with full metadata, through the operating system's own font service: CoreText on macOS, DirectWrite on Windows, fontconfig on Linux. It is a Node-API addon with prebuilt binaries; nothing is compiled when you install it.
 
 Every platform returns one shape, and the caller declares which fields it wants: localized family, full and style names in every language the font carries, weight, width and style on one scale, supported languages, variable-font axes and named instances, file location, the font's own OpenType tables, character coverage, and each platform's raw values.
